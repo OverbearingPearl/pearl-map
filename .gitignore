@@ -1,3 +1,4 @@
+# Leiningen
 pom.xml
 pom.xml.asc
 *.jar
@@ -10,5 +11,51 @@ pom.xml.asc
 .lein-repl-history
 .lein-plugins/
 .lein-failures
+
+# Boot
+.boot
+
+# Clojure
 .nrepl-port
 .cpcache/
+
+# ClojureScript
+out/
+.shadow-cljs/
+.cljs_node_repl/
+.cljs_rhino_repl/
+*.js
+!test-target/
+main.js
+
+# Emacs
+*~
+\#*
+.\#*
+
+# Vim
+*.swp
+*.swo
+
+# IntelliJ
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Aider
+.aider*
