@@ -81,32 +81,24 @@ flowchart TD
 
 **Phase-Driven Strategy**: Focused on rapid validation, iterative enhancement, and strategic expansion
 
-```mermaid
-flowchart LR
-    P1[Phase 1: Core MVP]
-    P2[Phase 2: Enhanced PWA]
-    P3[Phase 3: Platform Expansion]
-    
-    P1 --> P2 --> P3
-    
-    subgraph P1 [Web Application Foundation]
-        S1A[Browser-based SPA]
-        S1B[3D Viewing & Basic Editor]
-        S1C[PWA Foundation]
-    end
-    
-    subgraph P2 [Product Enhancement]
-        S2A[Offline Support & Installation]
-        S2B[Performance Optimization]
-        S2C[Advanced Analysis Tools]
-    end
-    
-    subgraph P3 [Cross-Platform Expansion]
-        S3A[API-First Platform]
-        S3B[Mobile Hybrid Applications]
-        S3C[Desktop Applications]
-    end
-```
+#### Phase 1: Web Application Foundation (Core MVP)
+- **Browser-based SPA**: Full-featured single-page application
+- **3D Viewing & Basic Editor**: Core 3D visualization with essential editing capabilities
+- **PWA Foundation**: Progressive Web App infrastructure setup
+
+#### Phase 2: Product Enhancement (Enhanced PWA)
+- **Offline Support & Installation**: Enable offline usage and app installation
+- **Performance Optimization**: Enhance loading speeds and rendering performance
+- **Advanced Analysis Tools**: Add sophisticated spatial analysis capabilities
+
+#### Phase 3: Cross-Platform Expansion (Platform Expansion)
+- **API-First Platform**: Develop comprehensive API for third-party integration
+- **Mobile Hybrid Applications**: Extend to iOS and Android using hybrid approaches
+- **Desktop Applications**: Native desktop application versions
+
+**Visual Flow**: Phase 1 → Phase 2 → Phase 3
+
+Each phase builds upon the previous work, ensuring continuous enhancement and expansion of capabilities.
 
 ## Conclusion
 
