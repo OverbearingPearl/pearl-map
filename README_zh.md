@@ -1,6 +1,6 @@
 # Pearl-Map: 3D 网络地图平台
 
-[English Version](README.md)
+[English](README.md) | [中文](README_zh.md)
 
 一个基于 Clojure 和 ClojureScript 构建的高性能、可定制的 3D 网络地图应用程序。使用 MapLibre GL 渲染矢量瓦片和 3D 地形，由 OpenStreetMap 数据驱动，并配备实时样式编辑器以实现动态视觉定制。
 
