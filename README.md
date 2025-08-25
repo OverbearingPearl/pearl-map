@@ -1,14 +1,14 @@
-# Pearl-Map: 3D Web Mapping Platform
+# Pearl-Map: 3D Web Mapping Platform 🌍
 
 [English](README.md) | [中文](README_zh.md)
 
 A high-performance, customizable 3D web mapping application built with Clojure and ClojureScript. Renders vector tiles and 3D terrain using MapLibre GL, powered by OpenStreetMap data, featuring a real-time style editor for dynamic visual customization.
 
-## Overview
+## 📖 Overview
 
 Pearl-Map delivers an immersive 3D geospatial visualization experience, enabling users to explore, analyze, and present location-based data through an intuitive interface. The platform combines powerful rendering capabilities with advanced customization tools.
 
-## Architecture
+## 🏗️ Architecture
 
 ### 1. Business Architecture
 
@@ -16,15 +16,15 @@ Pearl-Map delivers an immersive 3D geospatial visualization experience, enabling
 Provide a high-performance, customizable 3D geospatial visualization platform that enables intuitive exploration, analysis, and presentation of location-based data.
 
 **Key Capabilities**
-- **3D Map Core Experience**: Fluid navigation (pan, zoom, tilt, rotate), 3D terrain rendering, building extrusion, and custom 3D model integration
-- **Dynamic Style Editor**: Real-time visual customization through UI controls and code editor with live preview and theme sharing
-- **Data Integration & Visualization**: Seamless OpenStreetMap integration with support for GeoJSON and API-based geodata
-- **Analysis & Querying**: Spatial feature querying, measurement tools, and future support for advanced spatial analysis
+- **🗺️ 3D Map Core Experience**: Fluid navigation (pan, zoom, tilt, rotate), 3D terrain rendering, building extrusion, and custom 3D model integration
+- **🎨 Dynamic Style Editor**: Real-time visual customization through UI controls and code editor with live preview and theme sharing
+- **📊 Data Integration & Visualization**: Seamless OpenStreetMap integration with support for GeoJSON and API-based geodata
+- **🔍 Analysis & Querying**: Spatial feature querying, measurement tools, and future support for advanced spatial analysis
 
 **User Roles**
-- **End Viewer**: Explore pre-configured maps and visualizations
-- **Map Editor/Analyst**: Create and customize map views using style editing and data integration tools
-- **Administrator**: Manage users, system configuration, and backend services
+- **👀 End Viewer**: Explore pre-configured maps and visualizations
+- **✏️ Map Editor/Analyst**: Create and customize map views using style editing and data integration tools
+- **⚙️ Administrator**: Manage users, system configuration, and backend services
 
 ### 2. Application Architecture
 
@@ -84,24 +84,24 @@ flowchart TD
 **Phase-Driven Strategy**: Focused on rapid validation, iterative enhancement, and strategic expansion
 
 #### Phase 1: Web Application Foundation (Core MVP)
-- **Browser-based SPA**: Full-featured single-page application
-- **3D Viewing & Basic Editor**: Core 3D visualization with essential editing capabilities
-- **PWA Foundation**: Progressive Web App infrastructure setup
+- **🌐 Browser-based SPA**: Full-featured single-page application
+- **🏔️ 3D Viewing & Basic Editor**: Core 3D visualization with essential editing capabilities
+- **📱 PWA Foundation**: Progressive Web App infrastructure setup
 
 #### Phase 2: Product Enhancement (Enhanced PWA)
-- **Offline Support & Installation**: Enable offline usage and app installation
-- **Performance Optimization**: Enhance loading speeds and rendering performance
-- **Advanced Analysis Tools**: Add sophisticated spatial analysis capabilities
+- **📴 Offline Support & Installation**: Enable offline usage and app installation
+- **⚡ Performance Optimization**: Enhance loading speeds and rendering performance
+- **🔬 Advanced Analysis Tools**: Add sophisticated spatial analysis capabilities
 
 #### Phase 3: Cross-Platform Expansion (Platform Expansion)
-- **API-First Platform**: Develop comprehensive API for third-party integration
-- **Mobile Hybrid Applications**: Extend to iOS and Android using hybrid approaches
-- **Desktop Applications**: Native desktop application versions
+- **🔌 API-First Platform**: Develop comprehensive API for third-party integration
+- **📱 Mobile Hybrid Applications**: Extend to iOS and Android using hybrid approaches
+- **💻 Desktop Applications**: Native desktop application versions
 
 **Visual Flow**: Phase 1 → Phase 2 → Phase 3
 
 Each phase builds upon the previous work, ensuring continuous enhancement and expansion of capabilities.
 
-## Conclusion
+## 🎯 Conclusion
 
 This development strategy follows a low-risk, high-iteration-speed approach. Each phase builds upon previous work, maximizing code reuse and leveraging the full potential of the Clojure/Script ecosystem. The hybrid mobile approach in Phase 3 provides the most efficient path to cross-platform presence.
