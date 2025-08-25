@@ -83,18 +83,22 @@ flowchart TD
 ### Development Environment Setup
 
 **Prerequisites**
-- Java Development Kit (JDK) 11+
+- Java Development Kit (JDK) 8+ (Recommended JDK 11 or 17 LTS)
 - Node.js 14+
 - npm or yarn
 
 **Installation Steps**
-1. Install Clojure CLI tools
-2. Install project dependencies:
+1. Ensure you have a compatible Java version installed:
+   ```bash
+   java -version
+   ```
+2. Install Clojure CLI tools
+3. Install project dependencies:
    ```bash
    # Install JavaScript dependencies
    npm install
    ```
-3. Start development environment:
+4. Start development environment:
    ```bash
    # Start frontend build and hot-reload
    npm run dev

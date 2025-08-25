@@ -83,18 +83,22 @@ flowchart TD
 ### 开发环境设置
 
 **前置要求**
-- Java Development Kit (JDK) 11+
+- Java Development Kit (JDK) 8+ (推荐 JDK 11 或 17 LTS)
 - Node.js 14+
 - npm 或 yarn
 
 **安装步骤**
-1. 安装 Clojure CLI 工具
-2. 安装项目依赖：
+1. 确保已安装符合要求的 Java 版本：
+   ```bash
+   java -version
+   ```
+2. 安装 Clojure CLI 工具
+3. 安装项目依赖：
    ```bash
    # 安装 JavaScript 依赖
    npm install
    ```
-3. 启动开发环境：
+4. 启动开发环境：
    ```bash
    # 启动前端构建和热重载
    npm run dev
