@@ -55,7 +55,7 @@ flowchart TD
     Backend[Backend API<br/>Clojure]
     Database[Database<br/>PostGIS]
     Services[External Services<br/>OSM/Third-party]
-    
+
     User <-->|Renders & Interacts| Frontend
     Frontend <-->|API Calls| Backend
     Backend <-->|Query/Persist| Database
@@ -71,13 +71,48 @@ flowchart TD
 | **Map Rendering** | MapLibre GL JS | Open-source WebGL support with 3D features and custom styling |
 | **Style Editor** | Monaco Editor | Professional code editing experience for style JSON |
 | **HTTP Client** | cljs-ajax/fetch | Robust API communication |
-| **Build Tool** | shadow-cljs | Superior development experience with hot-reload and NPM integration |
+| **Frontend Build Tool** | shadow-cljs | Superior development experience with hot-reload and NPM integration |
+| **Backend Build Tool** | deps.edn (Clojure CLI) | Official toolchain, lightweight and flexible, integrates well with shadow-cljs |
 | **Backend Framework** | Clojure, Ring, Reitit, Integrant | High-performance JVM runtime with robust web stack |
 | **Data Storage** | PostgreSQL + PostGIS | Industry standard for spatial data processing |
 | **Data Formats** | JSON, EDN, MVT | Universal compatibility with native Clojure support |
 | **Authentication** | Buddy | Mature security library with JWT support |
 | **Deployment** | Docker, Nginx, JDK | Containerized environments for consistency |
-| **DevOps** | Git, Leiningen/deps.edn | Standard version control and build tools |
+| **Version Control** | Git | Standard version control system |
+
+### Development Environment Setup
+
+**Prerequisites**
+- Java Development Kit (JDK) 11+
+- Node.js 14+
+- npm or yarn
+
+**Installation Steps**
+1. Install Clojure CLI tools
+2. Install project dependencies:
+   ```bash
+   # Install JavaScript dependencies
+   npm install
+   ```
+3. Start development environment:
+   ```bash
+   # Start frontend build and hot-reload
+   npm run dev
+
+   # Start backend REPL in another terminal
+   clj -M:dev
+
+   # Start static file server (for development)
+   npm run serve
+   ```
+
+**Building for Production**
+```bash
+# Build frontend resources
+npm run build
+
+# Build backend Uberjar (requires additional configuration)
+```
 
 ### 4. Development Roadmap
 

@@ -55,7 +55,7 @@ flowchart TD
     Backend[后端 API<br/>Clojure]
     Database[数据库<br/>PostGIS]
     Services[外部服务<br/>OSM/第三方]
-    
+
     User <-->|渲染与交互| Frontend
     Frontend <-->|API 调用| Backend
     Backend <-->|查询/持久化| Database
@@ -71,13 +71,48 @@ flowchart TD
 | **地图渲染** | MapLibre GL JS | 开源 WebGL 支持，具有 3D 功能和自定义样式 |
 | **样式编辑器** | Monaco Editor | 专业的代码编辑体验，用于样式 JSON |
 | **HTTP 客户端** | cljs-ajax/fetch | 强大的 API 通信能力 |
-| **构建工具** | shadow-cljs | 优越的开发体验，支持热重载和 NPM 集成 |
+| **前端构建工具** | shadow-cljs | 优越的开发体验，支持热重载和 NPM 集成 |
+| **后端构建工具** | deps.edn (Clojure CLI) | 官方工具链，轻量灵活，与 shadow-cljs 集成良好 |
 | **后端框架** | Clojure, Ring, Reitit, Integrant | 高性能 JVM 运行时，具有强大的 Web 栈 |
 | **数据存储** | PostgreSQL + PostGIS | 空间数据处理的行业标准 |
 | **数据格式** | JSON, EDN, MVT | 通用兼容性，支持原生 Clojure |
 | **认证** | Buddy | 成熟的安全库，支持 JWT |
 | **部署** | Docker, Nginx, JDK | 容器化环境确保一致性 |
-| **DevOps** | Git, Leiningen/deps.edn | 标准版本控制和构建工具 |
+| **版本控制** | Git | 标准版本控制系统 |
+
+### 开发环境设置
+
+**前置要求**
+- Java Development Kit (JDK) 11+
+- Node.js 14+
+- npm 或 yarn
+
+**安装步骤**
+1. 安装 Clojure CLI 工具
+2. 安装项目依赖：
+   ```bash
+   # 安装 JavaScript 依赖
+   npm install
+   ```
+3. 启动开发环境：
+   ```bash
+   # 启动前端构建和热重载
+   npm run dev
+
+   # 在另一个终端启动后端 REPL
+   clj -M:dev
+
+   # 启动静态文件服务器（用于开发）
+   npm run serve
+   ```
+
+**构建生产版本**
+```bash
+# 构建前端资源
+npm run build
+
+# 构建后端 Uberjar（需要额外配置）
+```
 
 ### 4. 开发路线图
 
