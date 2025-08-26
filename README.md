@@ -112,7 +112,7 @@ The deployment architecture follows a cloud-native approach with containerizatio
 
 **Deployment Pipeline**
 ```mermaid
-flowchart LR
+flowchart TB
     Code[Code Repository] -->|Git Push| CI[CI/CD Pipeline]
     CI -->|Build & Test| Build[Container Build]
     Build -->|Push Image| Registry[Container Registry]

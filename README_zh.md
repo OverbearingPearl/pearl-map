@@ -112,7 +112,7 @@ clj -T:build uberjar
 
 **部署流水线**
 ```mermaid
-flowchart LR
+flowchart TB
     Code[代码仓库] -->|Git Push| CI[CI/CD 流水线]
     CI -->|构建与测试| Build[容器构建]
     Build -->|推送镜像| Registry[容器镜像仓库]
