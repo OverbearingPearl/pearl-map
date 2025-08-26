@@ -85,7 +85,6 @@ flowchart TD
 **Prerequisites**
 - **Java Development Kit**: OpenJDK 17
 - **Node.js**: 20 LTS
-- npm or yarn
 
 **Building for Production**
 ```bash

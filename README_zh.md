@@ -85,7 +85,6 @@ flowchart TD
 **前置要求**
 - **Java Development Kit**: OpenJDK 17
 - **Node.js**: 20 LTS
-- npm 或 yarn
 
 **构建生产版本**
 ```bash
