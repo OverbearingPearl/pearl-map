@@ -78,6 +78,7 @@ flowchart TD
 | **数据格式** | JSON, EDN, MVT | 通用兼容性，支持原生 Clojure |
 | **认证** | Buddy | 成熟的安全库，支持 JWT |
 | **部署** | Docker, Nginx, JDK | 容器化环境确保一致性 |
+| **基础设施即代码** | Terraform | 自动化云资源配置和管理 |
 | **版本控制** | Git | 标准版本控制系统 |
 
 ### 开发环境设置

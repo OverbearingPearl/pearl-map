@@ -78,6 +78,7 @@ flowchart TD
 | **Data Formats** | JSON, EDN, MVT | Universal compatibility with native Clojure support |
 | **Authentication** | Buddy | Mature security library with JWT support |
 | **Deployment** | Docker, Nginx, JDK | Containerized environments for consistency |
+| **Infrastructure as Code** | Terraform | Automated cloud resource provisioning and management |
 | **Version Control** | Git | Standard version control system |
 
 ### Development Environment Setup
