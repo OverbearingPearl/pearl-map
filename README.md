@@ -83,43 +83,9 @@ flowchart TD
 ### Development Environment Setup
 
 **Prerequisites**
-- **Java Development Kit**: OpenJDK 17 (Required)
-- Node.js 14+
+- **Java Development Kit**: OpenJDK 17
+- **Node.js**: 20 LTS
 - npm or yarn
-
-**Note**: Pearl-Map requires OpenJDK 17 specifically. Other versions may not be fully compatible.
-
-**Installation Steps**
-1. **Install OpenJDK 17** (using Homebrew on macOS):
-   ```bash
-   brew install openjdk@17
-   ```
-
-2. **Verify Java installation**:
-   ```bash
-   java -version
-   # Should show: openjdk version "17.x.x"
-   ```
-
-3. Install Clojure CLI tools
-
-4. Install project dependencies:
-   ```bash
-   # Install JavaScript dependencies
-   npm install
-   ```
-
-5. Start development environment:
-   ```bash
-   # Start frontend build and hot-reload
-   npm run dev
-
-   # Start backend REPL in another terminal
-   clj -M:dev
-
-   # Start static file server (for development)
-   npm run serve
-   ```
 
 **Building for Production**
 ```bash
