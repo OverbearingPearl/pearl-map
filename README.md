@@ -115,10 +115,215 @@ flowchart TD
 # Build frontend resources
 npm run build
 
-# Build backend Uberjar (requires additional configuration)
+# Build backend Uberjar
+clj -T:build uberjar
 ```
 
-### 4. Development Roadmap
+### 5. Deployment Architecture & Design
+
+**Deployment Architecture Overview**
+
+The deployment architecture follows a cloud-native approach with containerization and orchestration at its core. The system is designed for scalability, reliability, and maintainability.
+
+**Infrastructure Components**
+- **Infrastructure as Code**: Terraform for provisioning and managing cloud resources
+- **Application Containers**: Docker containers for frontend and backend services
+- **Orchestration**: Kubernetes for container management and scaling
+- **Database**: Managed PostgreSQL with PostGIS extension
+- **Object Storage**: For static assets and tile caching
+- **CDN**: For global content delivery of static assets
+- **Monitoring**: Prometheus for metrics, Grafana for visualization, and ELK stack for logging
+
+**Deployment Pipeline**
+```mermaid
+flowchart LR
+    Code[Code Repository] -->|Git Push| CI[CI/CD Pipeline]
+    CI -->|Build & Test| Build[Container Build]
+    Build -->|Push Image| Registry[Container Registry]
+    Registry -->|Deploy| K8s[Kubernetes Cluster]
+    K8s -->|Monitor| Monitoring[Monitoring Stack]
+```
+
+**Infrastructure as Code with Terraform**
+
+Pearl-Map uses Terraform to manage cloud infrastructure across multiple environments. This ensures consistent, reproducible infrastructure provisioning.
+
+**Terraform Module Structure**
+```
+infrastructure/
+├── modules/
+│   ├── network/          # VPC, subnets, security groups
+│   ├── database/         # RDS/Cloud SQL with PostGIS
+│   ├── kubernetes/       # EKS/GKE cluster configuration
+│   ├── storage/          # Object storage buckets
+│   └── monitoring/       # Monitoring stack resources
+├── environments/
+│   ├── dev/              # Development environment
+│   ├── staging/          # Staging environment
+│   └── prod/             # Production environment
+└── scripts/              # Terraform helper scripts
+```
+
+**Key Terraform Configurations**
+```hcl
+# Example: AWS EKS cluster module
+module "eks_cluster" {
+  source = "./modules/kubernetes"
+
+  cluster_name    = "pearl-map-prod"
+  cluster_version = "1.27"
+  vpc_id          = module.network.vpc_id
+  subnet_ids      = module.network.private_subnets
+
+  node_groups = {
+    general = {
+      desired_size = 3
+      max_size     = 10
+      min_size     = 3
+      instance_types = ["t3.medium"]
+    }
+  }
+}
+```
+
+**Terraform Workflow**
+1. **Plan Changes**: `terraform plan` to review infrastructure modifications
+2. **Apply Changes**: `terraform apply` to provision resources
+3. **State Management**: Remote state storage in S3/GCS with locking
+4. **Module Reuse**: Shared modules across environments for consistency
+
+**Production Deployment Options**
+
+**Option 1: Traditional Server Deployment**
+1. Build the application:
+   ```bash
+   # Build frontend
+   npm run build
+
+   # Build backend JAR
+   clj -T:build uberjar
+   ```
+2. Set up a reverse proxy (Nginx) for static files and API routing
+3. Configure environment variables for database connections and other services
+4. Use process management (systemd, supervisord) to run the JAR file
+
+**Option 2: Docker Container Deployment**
+1. Create a Dockerfile for the backend service
+2. Build and run using Docker Compose:
+   ```bash
+   # Example command to build and run
+   docker-compose up -d --build
+   ```
+3. The docker-compose can include PostgreSQL, Nginx, and the application
+
+**Option 3: Cloud Platform Deployment (Terraform Managed)**
+- **AWS**: Terraform-managed EKS cluster with RDS PostgreSQL and S3
+  ```bash
+  cd infrastructure/environments/prod/aws
+  terraform init
+  terraform plan
+  terraform apply
+  ```
+- **Google Cloud**: Terraform-managed GKE with Cloud SQL and Cloud Storage
+  ```bash
+  cd infrastructure/environments/prod/gcp
+  terraform init
+  terraform plan
+  terraform apply
+  ```
+- **Azure**: Terraform-managed AKS with Azure Database for PostgreSQL and Blob Storage
+  ```bash
+  cd infrastructure/environments/prod/azure
+  terraform init
+  terraform plan
+  terraform apply
+  ```
+
+**Kubernetes Deployment Configuration**
+
+**Backend Deployment (example)**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pearl-map-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: pearl-map-backend
+  template:
+    metadata:
+      labels:
+        app: pearl-map-backend
+    spec:
+      containers:
+      - name: backend
+        image: pearl-map-backend:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: pearl-map-secrets
+              key: database-url
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: pearl-map-secrets
+              key: jwt-secret
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+```
+
+**Service Mesh & Ingress**
+- **Ingress Controller**: Nginx Ingress for routing external traffic
+- **Service Mesh**: Istio for advanced traffic management and security
+- **TLS Termination**: Automated SSL certificates with Let's Encrypt and cert-manager
+
+**Monitoring & Observability**
+- **Metrics Collection**: Prometheus operators for scraping metrics
+- **Log Aggregation**: Fluentd -> Elasticsearch -> Kibana pipeline
+- **Tracing**: Jaeger for distributed tracing
+- **Alerting**: Alertmanager configured with Slack/PagerDuty integrations
+
+**Environment Configuration**
+Set the following environment variables for production:
+```bash
+# Database
+DATABASE_URL=your_production_database_url
+DB_POOL_SIZE=10
+
+# Security
+JWT_SECRET=your_secure_jwt_secret
+JWT_EXPIRE_MINUTES=1440
+
+# External Services
+MAP_API_KEY=your_map_service_api_key
+TILE_SERVER_URL=your_tile_server_url
+
+# Performance
+HTTP_MAX_THREADS=100
+HTTP_PORT=3000
+
+# Monitoring
+PROMETHEUS_METRICS_PORT=9000
+JAEGER_ENDPOINT=http://jaeger-collector:14268/api/traces
+```
+
+### 6. Development Roadmap
 
 **Phase-Driven Strategy**: Focused on rapid validation, iterative enhancement, and strategic expansion
 
