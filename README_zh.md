@@ -83,22 +83,33 @@ flowchart TD
 ### 开发环境设置
 
 **前置要求**
-- Java Development Kit (JDK) 8+ (推荐 JDK 11 或 17 LTS)
+- **Java Development Kit**: OpenJDK 17 (必需)
 - Node.js 14+
 - npm 或 yarn
 
+**注意**: Pearl-Map 需要 specifically OpenJDK 17。其他版本可能不完全兼容。
+
 **安装步骤**
-1. 确保已安装符合要求的 Java 版本：
+1. **安装 OpenJDK 17** (在 macOS 上使用 Homebrew):
+   ```bash
+   brew install openjdk@17
+   ```
+
+2. **验证 Java 安装**:
    ```bash
    java -version
+   # 应该显示: openjdk version "17.x.x"
    ```
-2. 安装 Clojure CLI 工具
-3. 安装项目依赖：
+
+3. 安装 Clojure CLI 工具
+
+4. 安装项目依赖：
    ```bash
    # 安装 JavaScript 依赖
    npm install
    ```
-4. 启动开发环境：
+
+5. 启动开发环境：
    ```bash
    # 启动前端构建和热重载
    npm run dev
