@@ -12,89 +12,89 @@ Pearl-Map 提供沉浸式的 3D 地理空间可视化体验，使用户能够通
 
 ```
 pearl-map/
-├── .github/                    # GitHub 工作流和 CI/CD 配置
-│   └── workflows/              # CI/CD 流水线定义
-├── bin/                        # 可执行脚本
-├── dev/                        # 开发环境配置
-│   └── user.clj                # 开发用户配置
-├── doc/                        # 项目文档
-│   ├── deployment.md           # 部署指南
-│   └── api.md                  # API 文档
-├── infrastructure/             # 基础设施即代码
-│   ├── modules/                # Terraform 模块
-│   │   ├── network/            # VPC、子网、安全组
-│   │   ├── database/           # 带 PostGIS 的 RDS/Cloud SQL
-│   │   ├── kubernetes/         # EKS/GKE 集群配置
-│   │   ├── storage/            # 对象存储桶
-│   │   └── monitoring/         # 监控栈资源
-│   └── environments/           # 环境配置
-│       ├── dev/                # 开发环境
-│       ├── staging/            # 预发布环境
-│       └── prod/               # 生产环境
-├── src/                        # 源代码
-│   ├── clj/                    # 后端 Clojure 代码
-│   │   └── pearl_map/          # 主命名空间
-│   │       ├── core.clj        # 核心功能
-│   │       ├── api/            # API 处理器
-│   │       │   ├── handlers.clj
-│   │       │   └── routes.clj
-│   │       ├── db/             # 数据库层
-│   │       │   ├── core.clj
-│   │       │   └── queries.clj
-│   │       ├── config/         # 配置管理
-│   │       │   └── config.clj
-│   │       ├── middleware/     # 中间件
-│   │       │   └── auth.clj
-│   │       └── main.clj        # 应用入口点
-│   └── cljs/                   # 前端 ClojureScript 代码
-│       └── pearl_map/          # 前端主命名空间
-│           ├── core.cljs       # 前端核心
-│           ├── events.cljs     # re-frame 事件
-│           ├── subs.cljs       # re-frame 订阅
-│           ├── views/          # React 组件
-│           │   ├── map.cljs    # 地图组件
-│           │   ├── editor.cljs # 样式编辑器组件
-│           │   └── ui.cljs     # UI 组件
-│           ├── api.cljs        # API 客户端
-│           └── services/       # 前端服务
-│               └── map_engine.cljs # 地图引擎封装
-├── resources/                  # 资源文件
-│   ├── config/                 # 配置文件
-│   │   ├── config.edn          # 基础配置
-│   │   ├── dev.edn             # 开发环境配置
-│   │   └── prod.edn            # 生产环境配置
-│   ├── public/                 # 静态资源
-│   │   ├── index.html          # HTML 模板
-│   │   ├── css/                # CSS 样式
-│   │   │   └── style.css
-│   │   └── js/                 # JavaScript 库
-│   ├── sql/                    # 数据库脚本
-│   │   └── migrations/         # 数据库迁移
-│   └── data/                   # 示例数据
-│       ├── sample-geojson/     # GeoJSON 示例数据
-│       └── map-styles/         # 地图样式示例
-├── test/                       # 测试代码
-│   ├── clj/                    # 后端测试
-│   │   └── pearl_map/          # 测试命名空间
-│   │       ├── api/            # API 测试
-│   │       ├── db/             # 数据库测试
-│   │       └── integration/    # 集成测试
-│   └── cljs/                   # 前端测试
-│       └── pearl_map/          # 前端测试命名空间
-│           ├── components/     # 组件测试
-│           └── services/       # 服务测试
-├── target/                     # 构建输出（gitignore）
-├── .gitignore                  # Git 忽略规则
-├── .editorconfig               # 编辑器配置
-├── .nvmrc                      # Node.js 版本
-├── deps.edn                    # Clojure 依赖
-├── package.json                # JavaScript 依赖
-├── shadow-cljs.edn             # ClojureScript 构建配置
-├── docker-compose.yml          # Docker 开发环境
-├── Dockerfile                  # 生产环境 Dockerfile
-├── Makefile                    # 构建脚本
-├── CHANGELOG.md                # 变更日志
-└── README.md                   # 项目文档
+├── .github/                           # GitHub 工作流和 CI/CD 配置
+│   └── workflows/                     # CI/CD 流水线定义
+├── bin/                               # 可执行脚本
+├── dev/                               # 开发环境配置
+│   └── user.clj                       # 开发用户配置
+├── doc/                               # 项目文档
+│   ├── deployment.md                  # 部署指南
+│   └── api.md                         # API 文档
+├── infrastructure/                    # 基础设施即代码
+│   ├── modules/                       # Terraform 模块
+│   │   ├── network/                   # VPC、子网、安全组
+│   │   ├── database/                  # 带 PostGIS 的 RDS/Cloud SQL
+│   │   ├── kubernetes/                # EKS/GKE 集群配置
+│   │   ├── storage/                   # 对象存储桶
+│   │   └── monitoring/                # 监控栈资源
+│   └── environments/                  # 环境配置
+│       ├── dev/                       # 开发环境
+│       ├── staging/                   # 预发布环境
+│       └── prod/                      # 生产环境
+├── src/                               # 源代码
+│   ├── clj/                           # 后端 Clojure 代码
+│   │   └── pearl_map/                 # 主命名空间
+│   │       ├── core.clj               # 核心功能
+│   │       ├── api/                   # API 处理器
+│   │       │   ├── handlers.clj       # 请求处理器
+│   │       │   └── routes.clj         # API 路由
+│   │       ├── db/                    # 数据库层
+│   │       │   ├── core.clj           # 数据库核心
+│   │       │   └── queries.clj        # 数据库查询
+│   │       ├── config/                # 配置管理
+│   │       │   └── config.clj         # 配置处理
+│   │       ├── middleware/            # 中间件
+│   │       │   └── auth.clj           # 认证中间件
+│   │       └── main.clj               # 应用入口点
+│   └── cljs/                          # 前端 ClojureScript 代码
+│       └── pearl_map/                 # 前端主命名空间
+│           ├── core.cljs              # 前端核心
+│           ├── events.cljs            # re-frame 事件
+│           ├── subs.cljs              # re-frame 订阅
+│           ├── views/                 # React 组件
+│           │   ├── map.cljs           # 地图组件
+│           │   ├── editor.cljs        # 样式编辑器组件
+│           │   └── ui.cljs            # UI 组件
+│           ├── api.cljs               # API 客户端
+│           └── services/              # 前端服务
+│               └── map_engine.cljs    # 地图引擎封装
+├── resources/                         # 资源文件
+│   ├── config/                        # 配置文件
+│   │   ├── config.edn                 # 基础配置
+│   │   ├── dev.edn                    # 开发环境配置
+│   │   └── prod.edn                   # 生产环境配置
+│   ├── public/                        # 静态资源
+│   │   ├── index.html                 # HTML 模板
+│   │   ├── css/                       # CSS 样式
+│   │   │   └── style.css              # 主样式表
+│   │   └── js/                        # JavaScript 库
+│   ├── sql/                           # 数据库脚本
+│   │   └── migrations/                # 数据库迁移
+│   └── data/                          # 示例数据
+│       ├── sample-geojson/            # GeoJSON 示例数据
+│       └── map-styles/                # 地图样式示例
+├── test/                              # 测试代码
+│   ├── clj/                           # 后端测试
+│   │   └── pearl_map/                 # 测试命名空间
+│   │       ├── api/                   # API 测试
+│   │       ├── db/                    # 数据库测试
+│   │       └── integration/           # 集成测试
+│   └── cljs/                          # 前端测试
+│       └── pearl_map/                 # 前端测试命名空间
+│           ├── components/            # 组件测试
+│           └── services/              # 服务测试
+├── target/                            # 构建输出（gitignore）
+├── .gitignore                         # Git 忽略规则
+├── .editorconfig                      # 编辑器配置
+├── .nvmrc                             # Node.js 版本
+├── deps.edn                           # Clojure 依赖
+├── package.json                       # JavaScript 依赖
+├── shadow-cljs.edn                    # ClojureScript 构建配置
+├── docker-compose.yml                 # Docker 开发环境
+├── Dockerfile                         # 生产环境 Dockerfile
+├── Makefile                           # 构建脚本
+├── CHANGELOG.md                       # 变更日志
+└── README.md                          # 项目文档
 ```
 
 ### 关键配置文件

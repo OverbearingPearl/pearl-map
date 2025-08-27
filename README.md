@@ -12,89 +12,89 @@ Pearl-Map delivers an immersive 3D geospatial visualization experience, enabling
 
 ```
 pearl-map/
-├── .github/                    # GitHub workflows and CI/CD configuration
-│   └── workflows/              # CI/CD pipeline definitions
-├── bin/                        # Executable scripts
-├── dev/                        # Development environment configuration
-│   └── user.clj                # User configuration for development
-├── doc/                        # Project documentation
-│   ├── deployment.md           # Deployment guide
-│   └── api.md                  # API documentation
-├── infrastructure/             # Infrastructure as Code
-│   ├── modules/                # Terraform modules
-│   │   ├── network/            # VPC, subnets, security groups
-│   │   ├── database/           # RDS/Cloud SQL with PostGIS
-│   │   ├── kubernetes/         # EKS/GKE cluster configuration
-│   │   ├── storage/            # Object storage buckets
-│   │   └── monitoring/         # Monitoring stack resources
-│   └── environments/           # Environment configurations
-│       ├── dev/                # Development environment
-│       ├── staging/            # Staging environment
-│       └── prod/               # Production environment
-├── src/                        # Source code
-│   ├── clj/                    # Backend Clojure code
-│   │   └── pearl_map/          # Main namespace
-│   │       ├── core.clj        # Core functionality
-│   │       ├── api/            # API handlers
-│   │       │   ├── handlers.clj
-│   │       │   └── routes.clj
-│   │       ├── db/             # Database layer
-│   │       │   ├── core.clj
-│   │       │   └── queries.clj
-│   │       ├── config/         # Configuration management
-│   │       │   └── config.clj
-│   │       ├── middleware/     # Middleware
-│   │       │   └── auth.clj
-│   │       └── main.clj        # Application entry point
-│   └── cljs/                   # Frontend ClojureScript code
-│       └── pearl_map/          # Frontend main namespace
-│           ├── core.cljs       # Frontend core
-│           ├── events.cljs     # re-frame events
-│           ├── subs.cljs       # re-frame subscriptions
-│           ├── views/          # React components
-│           │   ├── map.cljs    # Map component
-│           │   ├── editor.cljs # Style editor component
-│           │   └── ui.cljs     # UI components
-│           ├── api.cljs        # API client
-│           └── services/       # Frontend services
-│               └── map_engine.cljs # Map engine wrapper
-├── resources/                  # Resource files
-│   ├── config/                 # Configuration files
-│   │   ├── config.edn          # Base configuration
-│   │   ├── dev.edn             # Development configuration
-│   │   └── prod.edn            # Production configuration
-│   ├── public/                 # Static assets
-│   │   ├── index.html          # HTML template
-│   │   ├── css/                # CSS styles
-│   │   │   └── style.css
-│   │   └── js/                 # JavaScript libraries
-│   ├── sql/                    # Database scripts
-│   │   └── migrations/         # Database migrations
-│   └── data/                   # Sample data
-│       ├── sample-geojson/     # GeoJSON sample data
-│       └── map-styles/         # Map style examples
-├── test/                       # Test code
-│   ├── clj/                    # Backend tests
-│   │   └── pearl_map/          # Test namespace
-│   │       ├── api/            # API tests
-│   │       ├── db/             # Database tests
-│   │       └── integration/    # Integration tests
-│   └── cljs/                   # Frontend tests
-│       └── pearl_map/          # Frontend test namespace
-│           ├── components/     # Component tests
-│           └── services/       # Service tests
-├── target/                     # Build output (gitignore)
-├── .gitignore                  # Git ignore rules
-├── .editorconfig               # Editor configuration
-├── .nvmrc                      # Node.js version
-├── deps.edn                    # Clojure dependencies
-├── package.json                # JavaScript dependencies
-├── shadow-cljs.edn             # ClojureScript build configuration
-├── docker-compose.yml          # Docker development environment
-├── Dockerfile                  # Production Dockerfile
-├── Makefile                    # Build scripts
-├── CHANGELOG.md                # Change log
-└── README.md                   # Project documentation
+├── .github/                           # GitHub workflows and CI/CD configuration
+│   └── workflows/                     # CI/CD pipeline definitions
+├── bin/                               # Executable scripts
+├── dev/                               # Development environment configuration
+│   └── user.clj                       # User configuration for development
+├── doc/                               # Project documentation
+│   ├── deployment.md                  # Deployment guide
+│   └── api.md                         # API documentation
+├── infrastructure/                    # Infrastructure as Code
+│   ├── modules/                       # Terraform modules
+│   │   ├── network/                   # VPC, subnets, security groups
+│   │   ├── database/                  # RDS/Cloud SQL with PostGIS
+│   │   ├── kubernetes/                # EKS/GKE cluster configuration
+│   │   ├── storage/                   # Object storage buckets
+│   │   └── monitoring/                # Monitoring stack resources
+│   └── environments/                  # Environment configurations
+│       ├── dev/                       # Development environment
+│       ├── staging/                   # Staging environment
+│       └── prod/                      # Production environment
+├── src/                               # Source code
+│   ├── clj/                           # Backend Clojure code
+│   │   └── pearl_map/                 # Main namespace
+│   │       ├── core.clj               # Core functionality
+│   │       ├── api/                   # API handlers
+│   │       │   ├── handlers.clj       # Request handlers
+│   │       │   └── routes.clj         # API routes
+│   │       ├── db/                    # Database layer
+│   │       │   ├── core.clj           # Database core
+│   │       │   └── queries.clj        # Database queries
+│   │       ├── config/                # Configuration management
+│   │       │   └── config.clj         # Configuration handling
+│   │       ├── middleware/            # Middleware
+│   │       │   └── auth.clj           # Authentication middleware
+│   │       └── main.clj               # Application entry point
+│   └── cljs/                          # Frontend ClojureScript code
+│       └── pearl_map/                 # Frontend main namespace
+│           ├── core.cljs              # Frontend core
+│           ├── events.cljs            # re-frame events
+│           ├── subs.cljs              # re-frame subscriptions
+│           ├── views/                 # React components
+│           │   ├── map.cljs           # Map component
+│           │   ├── editor.cljs        # Style editor component
+│           │   └── ui.cljs            # UI components
+│           ├── api.cljs               # API client
+│           └── services/              # Frontend services
+│               └── map_engine.cljs    # Map engine wrapper
+├── resources/                         # Resource files
+│   ├── config/                        # Configuration files
+│   │   ├── config.edn                 # Base configuration
+│   │   ├── dev.edn                    # Development configuration
+│   │   └── prod.edn                   # Production configuration
+│   ├── public/                        # Static assets
+│   │   ├── index.html                 # HTML template
+│   │   ├── css/                       # CSS styles
+│   │   │   └── style.css              # Main stylesheet
+│   │   └── js/                        # JavaScript libraries
+│   ├── sql/                           # Database scripts
+│   │   └── migrations/                # Database migrations
+│   └── data/                          # Sample data
+│       ├── sample-geojson/            # GeoJSON sample data
+│       └── map-styles/                # Map style examples
+├── test/                              # Test code
+│   ├── clj/                           # Backend tests
+│   │   └── pearl_map/                 # Test namespace
+│   │       ├── api/                   # API tests
+│   │       ├── db/                    # Database tests
+│   │       └── integration/           # Integration tests
+│   └── cljs/                          # Frontend tests
+│       └── pearl_map/                 # Frontend test namespace
+│           ├── components/            # Component tests
+│           └── services/              # Service tests
+├── target/                            # Build output (gitignore)
+├── .gitignore                         # Git ignore rules
+├── .editorconfig                      # Editor configuration
+├── .nvmrc                             # Node.js version
+├── deps.edn                           # Clojure dependencies
+├── package.json                       # JavaScript dependencies
+├── shadow-cljs.edn                    # ClojureScript build configuration
+├── docker-compose.yml                 # Docker development environment
+├── Dockerfile                         # Production Dockerfile
+├── Makefile                           # Build scripts
+├── CHANGELOG.md                       # Change log
+└── README.md                          # Project documentation
 ```
 
 ### Key Configuration Files
