@@ -33,31 +33,31 @@ pearl-map/
 │       └── prod/               # Production environment
 ├── src/                        # Source code
 │   ├── clj/                    # Backend Clojure code
-│   │   ├── pearl_map/          # Main namespace
-│   │   │   ├── core.clj        # Core functionality
-│   │   │   ├── api/            # API handlers
-│   │   │   │   ├── handlers.clj
-│   │   │   │   └── routes.clj
-│   │   │   ├── db/             # Database layer
-│   │   │   │   ├── core.clj
-│   │   │   │   └── queries.clj
-│   │   │   ├── config/         # Configuration management
-│   │   │   │   └── config.clj
-│   │   │   └── middleware/     # Middleware
-│   │   │       └── auth.clj
-│   │   └── pearl_map/main.clj  # Application entry point
+│   │   └── pearl_map/          # Main namespace
+│   │       ├── core.clj        # Core functionality
+│   │       ├── api/            # API handlers
+│   │       │   ├── handlers.clj
+│   │       │   └── routes.clj
+│   │       ├── db/             # Database layer
+│   │       │   ├── core.clj
+│   │       │   └── queries.clj
+│   │       ├── config/         # Configuration management
+│   │       │   └── config.clj
+│   │       ├── middleware/     # Middleware
+│   │       │   └── auth.clj
+│   │       └── main.clj        # Application entry point
 │   └── cljs/                   # Frontend ClojureScript code
-│       ├── pearl_map/          # Frontend main namespace
-│       │   ├── core.cljs       # Frontend core
-│       │   ├── events.cljs     # re-frame events
-│   │   │   ├── subs.cljs       # re-frame subscriptions
-│   │   │   ├── views/          # React components
-│   │   │   │   ├── map.cljs    # Map component
-│   │   │   │   ├── editor.cljs # Style editor component
-│   │   │   │   └── ui.cljs     # UI components
-│   │   │   ├── api.cljs        # API client
-│   │   │   └── services/       # Frontend services
-│   │   │       └── map_engine.cljs # Map engine wrapper
+│       └── pearl_map/          # Frontend main namespace
+│           ├── core.cljs       # Frontend core
+│           ├── events.cljs     # re-frame events
+│           ├── subs.cljs       # re-frame subscriptions
+│           ├── views/          # React components
+│           │   ├── map.cljs    # Map component
+│           │   ├── editor.cljs # Style editor component
+│           │   └── ui.cljs     # UI components
+│           ├── api.cljs        # API client
+│           └── services/       # Frontend services
+│               └── map_engine.cljs # Map engine wrapper
 ├── resources/                  # Resource files
 │   ├── config/                 # Configuration files
 │   │   ├── config.edn          # Base configuration

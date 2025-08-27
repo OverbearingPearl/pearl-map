@@ -33,31 +33,31 @@ pearl-map/
 │       └── prod/               # 生产环境
 ├── src/                        # 源代码
 │   ├── clj/                    # 后端 Clojure 代码
-│   │   ├── pearl_map/          # 主命名空间
-│   │   │   ├── core.clj        # 核心功能
-│   │   │   ├── api/            # API 处理器
-│   │   │   │   ├── handlers.clj
-│   │   │   │   └── routes.clj
-│   │   │   ├── db/             # 数据库层
-│   │   │   │   ├── core.clj
-│   │   │   │   └── queries.clj
-│   │   │   ├── config/         # 配置管理
-│   │   │   │   └── config.clj
-│   │   │   └── middleware/     # 中间件
-│   │   │       └── auth.clj
-│   │   └── pearl_map/main.clj  # 应用入口点
+│   │   └── pearl_map/          # 主命名空间
+│   │       ├── core.clj        # 核心功能
+│   │       ├── api/            # API 处理器
+│   │       │   ├── handlers.clj
+│   │       │   └── routes.clj
+│   │       ├── db/             # 数据库层
+│   │       │   ├── core.clj
+│   │       │   └── queries.clj
+│   │       ├── config/         # 配置管理
+│   │       │   └── config.clj
+│   │       ├── middleware/     # 中间件
+│   │       │   └── auth.clj
+│   │       └── main.clj        # 应用入口点
 │   └── cljs/                   # 前端 ClojureScript 代码
-│       ├── pearl_map/          # 前端主命名空间
-│       │   ├── core.cljs       # 前端核心
-│       │   ├── events.cljs     # re-frame 事件
-│       │   ├── subs.cljs       # re-frame 订阅
-│       │   ├── views/          # React 组件
-│       │   │   ├── map.cljs    # 地图组件
-│       │   │   ├── editor.cljs # 样式编辑器组件
-│       │   │   └── ui.cljs     # UI 组件
-│       │   ├── api.cljs        # API 客户端
-│       │   └── services/       # 前端服务
-│       │       └── map_engine.cljs # 地图引擎封装
+│       └── pearl_map/          # 前端主命名空间
+│           ├── core.cljs       # 前端核心
+│           ├── events.cljs     # re-frame 事件
+│           ├── subs.cljs       # re-frame 订阅
+│           ├── views/          # React 组件
+│           │   ├── map.cljs    # 地图组件
+│           │   ├── editor.cljs # 样式编辑器组件
+│           │   └── ui.cljs     # UI 组件
+│           ├── api.cljs        # API 客户端
+│           └── services/       # 前端服务
+│               └── map_engine.cljs # 地图引擎封装
 ├── resources/                  # 资源文件
 │   ├── config/                 # 配置文件
 │   │   ├── config.edn          # 基础配置
