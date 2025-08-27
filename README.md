@@ -222,7 +222,7 @@ npm run build
 clj -T:build uberjar
 ```
 
-### 5. Deployment Architecture & Design
+### 4. Deployment Architecture & Design
 
 **Deployment Architecture Overview**
 
@@ -426,7 +426,7 @@ PROMETHEUS_METRICS_PORT=9000
 JAEGER_ENDPOINT=http://jaeger-collector:14268/api/traces
 ```
 
-### 6. Development Roadmap
+### 5. Development Roadmap
 
 **Phase-Driven Strategy**: Focused on rapid validation, iterative enhancement, and strategic expansion
 

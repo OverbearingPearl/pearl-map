@@ -222,7 +222,7 @@ npm run build
 clj -T:build uberjar
 ```
 
-### 5. 部署架构与设计
+### 4. 部署架构与设计
 
 **部署架构概述**
 
@@ -426,7 +426,7 @@ PROMETHEUS_METRICS_PORT=9000
 JAEGER_ENDPOINT=http://jaeger-collector:14268/api/traces
 ```
 
-### 6. 开发路线图
+### 5. 开发路线图
 
 **分阶段策略**: 专注于快速验证、迭代增强和战略扩展
 
