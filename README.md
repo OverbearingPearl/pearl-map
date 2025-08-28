@@ -106,8 +106,8 @@ pearl-map/
 ### Development Environment Setup
 
 **Prerequisites**
-- **Java Development Kit**: OpenJDK 17
-- **Node.js**: 20 LTS
+- **Java Development Kit**: OpenJDK 21
+- **Node.js**: 22 LTS
 
 **Initial Setup**
 ```bash
@@ -117,12 +117,9 @@ cd pearl-map
 
 # Install dependencies
 npm install
-clojure -P
 
 # Start development environment
-npm run dev              # Frontend hot-reload
-clj -M:dev              # Backend REPL
-npm run serve           # Static file server
+npm run dev              # Frontend hot-reload with shadow-cljs
 ```
 
 **Building for Production**

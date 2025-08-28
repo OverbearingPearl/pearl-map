@@ -106,8 +106,8 @@ pearl-map/
 ### 开发环境设置
 
 **前置要求**
-- **Java Development Kit**: OpenJDK 17
-- **Node.js**: 20 LTS
+- **Java Development Kit**: OpenJDK 21
+- **Node.js**: 22 LTS
 
 **初始设置**
 ```bash
@@ -117,12 +117,9 @@ cd pearl-map
 
 # 安装依赖
 npm install
-clojure -P
 
 # 启动开发环境
-npm run dev              # 前端热重载
-clj -M:dev              # 后端 REPL
-npm run serve           # 静态文件服务器
+npm run dev              # 前端热重载（使用 shadow-cljs）
 ```
 
 **构建生产版本**
