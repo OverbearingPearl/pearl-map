@@ -6,6 +6,7 @@
  {:repositories
   {"central" {:url "https://maven.aliyun.com/repository/central"}
    "clojars" {:url "https://mirrors.tuna.tsinghua.edu.cn/clojars/"}}}
+ :dev-http {8080 "target/public"}
  :builds
  {:app {:target :browser
         :output-dir "target/public/js"
