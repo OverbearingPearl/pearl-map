@@ -103,34 +103,6 @@ pearl-map/
 - **`shadow-cljs.edn`**: ClojureScript frontend build and compilation configuration
 - **`package.json`**: JavaScript dependencies and NPM scripts configuration
 
-### Development Environment Setup
-
-**Prerequisites**
-- **Java Development Kit**: OpenJDK 21
-- **Node.js**: 22 LTS
-
-**Initial Setup**
-```bash
-# Clone the repository
-git clone <repository-url>
-cd pearl-map
-
-# Install dependencies
-npm install
-
-# Start development environment
-npm run dev              # Frontend hot-reload with shadow-cljs
-```
-
-**Building for Production**
-```bash
-# Build frontend resources
-npm run build
-
-# Build backend Uberjar
-clj -T:build uberjar
-```
-
 ## 🏗️ Architecture
 
 ### 1. Business Architecture
@@ -203,21 +175,6 @@ flowchart TD
 | **Deployment** | Docker, Nginx, JDK | Containerized environments for consistency |
 | **Infrastructure as Code** | Terraform | Automated cloud resource provisioning and management |
 | **Version Control** | Git | Standard version control system |
-
-### Development Environment Setup
-
-**Prerequisites**
-- **Java Development Kit**: OpenJDK 17
-- **Node.js**: 20 LTS
-
-**Building for Production**
-```bash
-# Build frontend resources
-npm run build
-
-# Build backend Uberjar
-clj -T:build uberjar
-```
 
 ### 4. Deployment Architecture & Design
 

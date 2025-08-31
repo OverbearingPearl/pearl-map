@@ -103,34 +103,6 @@ pearl-map/
 - **`shadow-cljs.edn`**: ClojureScript 前端构建和编译配置
 - **`package.json`**: JavaScript 依赖和 NPM 脚本配置
 
-### 开发环境设置
-
-**前置要求**
-- **Java Development Kit**: OpenJDK 21
-- **Node.js**: 22 LTS
-
-**初始设置**
-```bash
-# 克隆仓库
-git clone <repository-url>
-cd pearl-map
-
-# 安装依赖
-npm install
-
-# 启动开发环境
-npm run dev              # 前端热重载（使用 shadow-cljs）
-```
-
-**构建生产版本**
-```bash
-# 构建前端资源
-npm run build
-
-# 构建后端 Uberjar
-clj -T:build uberjar
-```
-
 ## 🏗️ 架构
 
 ### 1. 业务架构
@@ -203,21 +175,6 @@ flowchart TD
 | **部署** | Docker, Nginx, JDK | 容器化环境确保一致性 |
 | **基础设施即代码** | Terraform | 自动化云资源配置和管理 |
 | **版本控制** | Git | 标准版本控制系统 |
-
-### 开发环境设置
-
-**前置要求**
-- **Java Development Kit**: OpenJDK 17
-- **Node.js**: 20 LTS
-
-**构建生产版本**
-```bash
-# 构建前端资源
-npm run build
-
-# 构建后端 Uberjar
-clj -T:build uberjar
-```
 
 ### 4. 部署架构与设计
 
