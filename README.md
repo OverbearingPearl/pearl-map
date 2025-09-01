@@ -158,12 +158,16 @@ flowchart TD
     Frontend -.->|Direct Tile Fetch| Services
 ```
 
+**Data Flow Note**: Phase 1 focuses on validating GLTF model integration for the Eiffel Tower in Paris, laying the technical foundation for the full 3D model management system in Phase 2.
+
 ### 3. Technology Stack
 
 | Component | Technology | Rationale |
 |-----------|------------|-----------|
 | **Frontend Framework** | ClojureScript, Reagent, re-frame | Immutable data flow for complex UI state, functional programming for maintainability |
 | **Map Rendering** | MapLibre GL JS | Open-source WebGL support with 3D features and custom styling |
+| **3D Model Rendering** | Three.js + maplibre-gl-js-three | Advanced 3D model support with seamless MapLibre integration |
+| **3D Model Formats** | GLTF, GLB, 3D Tiles | Industry standard formats for 3D geospatial data |
 | **Style Editor** | Monaco Editor | Professional code editing experience for style JSON |
 | **HTTP Client** | cljs-ajax/fetch | Robust API communication |
 | **Frontend Build Tool** | shadow-cljs | Superior development experience with hot-reload and NPM integration |
@@ -384,20 +388,21 @@ JAEGER_ENDPOINT=http://jaeger-collector:14268/api/traces
 
 **Phase-Driven Strategy**: Focused on rapid validation, iterative enhancement, and strategic expansion
 
-#### Phase 1: Web Frontend & 3D Core (Initial MVP)
-- **🌐 Web Application Foundation**: Single-page application with core UI components
-- **🏔️ 3D Rendering Engine**: MapLibre GL integration with OSM data sources
+#### Phase 1: Web Frontend & 3D Core (Paris-focused MVP)
+- **🌐 Web Application Foundation**: Single-page application with core UI components focused on Paris exploration
+- **🏔️ 3D Rendering Engine**: MapLibre GL integration with OSM data sources and custom 3D model support
+- **🗼 Eiffel Tower Demonstration**: Integration of GLTF model rendering for the Eiffel Tower landmark in Paris (48.8584° N, 2.2945° E)
 - **🎨 Basic Style Editor**: Real-time visual customization capabilities
-- **🗺️ Core Navigation**: Pan, zoom, tilt, and rotate interactions
-- **Direct OSM Integration**: Leverage OpenStreetMap services directly without custom backend
+- **🗺️ Core Navigation**: Pan, zoom, tilt, and rotate interactions around Paris
+- **Direct OSM Integration**: Leverage OpenStreetMap services directly with enhanced 3D model overlay
 
 #### Phase 2: SDK Development & API Expansion
 - **📦 SDK Architecture**: Design and develop client SDKs for various platforms
 - **🔌 API Gateway**: Build robust backend services for advanced functionality
-- **🗃️ Data Management**: Add support for custom data sources and storage
-- **🌐 Multi-Source Integration**: Support for non-OSM data sources (WMS, WMTS, GeoJSON, etc.)
-- **📱 Mobile SDKs**: Develop native SDKs for iOS and Android platforms
-- **🌐 Web SDK**: Package core functionality as embeddable web components
+- **🗃️ 3D Model Management System**: Develop comprehensive GLTF model loading, caching, and rendering system
+- **🌐 Multi-Source 3D Data Integration**: Support for bulk 3D model ingestion from various sources (GLTF, GLB, 3D Tiles)
+- **📱 Mobile SDKs**: Develop native SDKs for iOS and Android platforms with 3D model support
+- **🌐 Web SDK**: Package core functionality as embeddable web components with 3D capabilities
 
 #### Phase 3: Progressive Enhancement & Cross-Platform
 - **📱 PWA Capabilities**: Add offline support, installation, and service workers
