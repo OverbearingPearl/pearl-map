@@ -55,8 +55,9 @@ pearl-map/
 │   │       │   ├── auth.clj                 # Authentication middleware [TO BE CREATED]
 │   │       │   ├── cors.clj                 # CORS middleware [TO BE CREATED]
 │   │       │   └── logging.clj              # Logging middleware [TO BE CREATED]
-│   │       ├── build.clj                    # Build tasks and utilities [EXISTS]
 │   │       └── main.clj                     # Application entry point [TO BE CREATED]
+│   ├── pearl_map/                           # Build utilities namespace
+│   │   └── build.clj                        # Build tasks and utilities [EXISTS]
 │   └── cljs/                                # Frontend ClojureScript code
 │       └── pearl_map/                       # Frontend main namespace
 │           ├── core.cljs                    # Frontend core [EXISTS]

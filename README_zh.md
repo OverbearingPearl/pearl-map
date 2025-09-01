@@ -55,8 +55,9 @@ pearl-map/
 │   │       │   ├── auth.clj                 # 认证中间件 [待建]
 │   │       │   ├── cors.clj                 # CORS 中间件 [待建]
 │   │       │   └── logging.clj              # 日志中间件 [待建]
-│   │       ├── build.clj                    # 构建任务和工具 [已存在]
 │   │       └── main.clj                     # 应用入口点 [待建]
+│   ├── pearl_map/                           # 构建工具命名空间
+│   │   └── build.clj                        # 构建任务和工具 [已存在]
 │   └── cljs/                                # 前端 ClojureScript 代码
 │       └── pearl_map/                       # 前端主命名空间
 │           ├── core.cljs                    # 前端核心 [已存在]
