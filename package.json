@@ -6,7 +6,9 @@
     "scripts": {
         "dev": "shadow-cljs watch app",
         "build": "shadow-cljs release app",
-        "clean": "rm -rf target/public/js"
+        "clean": "rm -rf target/public/js",
+        "predev": "clj -M -m pearl-map.build",
+        "prebuild": "clj -M -m pearl-map.build"
     },
     "keywords": ["map", "3d", "geospatial", "visualization"],
     "author": "OverbearingPearl",

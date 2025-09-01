@@ -171,3 +171,13 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Project specific
+/resources/public/js/                  # Compiled JavaScript from shadow-cljs
+/resources/public/css/maplibre-gl.css  # Copied CSS file (will be generated during build)
+/.shadow-cljs/                         # Shadow-cljs cache
+/.nrepl-port                           # nREPL port file
+/.clj-kondo/                           # Clj-kondo linting cache
+/.lsp/                                 # LSP configuration and cache
+/.calva/                               # Calva (VS Code extension) configuration
+/.cpcache/                             # Clojure CLI cache

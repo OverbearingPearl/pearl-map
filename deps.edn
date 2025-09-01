@@ -1,0 +1,11 @@
+{:paths ["src/cljs" "src" "resources"]
+ :deps {nrepl/nrepl {:mvn/version "1.1.0"}
+        cider/cider-nrepl {:mvn/version "0.43.0"}}
+ :mvn/repos
+ {"central" {:url "https://maven.aliyun.com/repository/central"}
+  "clojars" {:url "https://mirrors.tuna.tsinghua.edu.cn/clojars/"}
+  "public" {:url "https://maven.aliyun.com/repository/public"}}
+ :aliases {:dev {:extra-paths ["dev"]}
+           :test {:extra-paths ["test"]}
+           :cider {:main-opts ["-m" "nrepl.cmdline"
+                               "--middleware" "[cider.nrepl/cider-middleware]"]}}}
