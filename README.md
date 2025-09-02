@@ -72,17 +72,16 @@ pearl-map/
 │           └── services/                    # Frontend services
 │               ├── map_engine.cljs          # Map engine wrapper [TO BE CREATED]
 │               └── threejs.cljs             # Three.js integration [TO BE CREATED]
-├── resources/                               # Resource files
+├── resources/                               # Source resource files (git tracked)
 │   ├── config/                              # Configuration files [TO BE CREATED]
 │   │   ├── config.edn                       # Base configuration [TO BE CREATED]
 │   │   ├── dev.edn                          # Development configuration [TO BE CREATED]
 │   │   └── prod.edn                         # Production configuration [TO BE CREATED]
-│   ├── public/                              # Static assets
+│   ├── public/                              # Static source assets
 │   │   ├── index.html                       # HTML template [EXISTS]
-│   │   ├── css/                             # CSS styles
+│   │   ├── css/                             # CSS source styles
 │   │   │   └── style.css                    # Main stylesheet [TO BE CREATED]
-│   │   ├── js/                              # JavaScript libraries [EXISTS]
-│   │   └── models/                          # 3D model assets [TO BE CREATED]
+│   │   └── models/                          # 3D model source assets [TO BE CREATED]
 │   │       └── eiffel-tower.gltf            # Eiffel Tower 3D model [TO BE CREATED]
 │   ├── sql/                                 # Database scripts [TO BE CREATED]
 │   │   └── migrations/                      # Database migrations
@@ -109,7 +108,7 @@ pearl-map/
 │           │   └── map_test.cljs            # Map component tests [TO BE CREATED]
 │           └── services/                    # Service tests
 │               └── map_engine_test.cljs     # Map engine tests [TO BE CREATED]
-├── target/                                  # Build output (gitignore)
+├── target/                                  # Final build output & compiled assets for release (excluded from git)
 ├── .gitignore                               # Git ignore rules [EXISTS]
 ├── .editorconfig                            # Editor configuration [TO BE CREATED]
 ├── .nvmrc                                   # Node.js version [EXISTS]

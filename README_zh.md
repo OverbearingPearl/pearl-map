@@ -72,17 +72,16 @@ pearl-map/
 │           └── services/                    # 前端服务
 │               ├── map_engine.cljs          # 地图引擎封装 [待建]
 │               └── threejs.cljs             # Three.js 集成 [待建]
-├── resources/                               # 资源文件
+├── resources/                               # 源代码资源文件（git 跟踪）
 │   ├── config/                              # 配置文件 [待建]
 │   │   ├── config.edn                       # 基础配置 [待建]
 │   │   ├── dev.edn                          # 开发环境配置 [待建]
 │   │   └── prod.edn                         # 生产环境配置 [待建]
-│   ├── public/                              # 静态资源
+│   ├── public/                              # 静态源资源
 │   │   ├── index.html                       # HTML 模板 [已存在]
-│   │   ├── css/                             # CSS 样式
+│   │   ├── css/                             # CSS 源样式
 │   │   │   └── style.css                    # 主样式表 [待建]
-│   │   ├── js/                              # JavaScript 库 [已存在]
-│   │   └── models/                          # 3D 模型资源 [待建]
+│   │   └── models/                          # 3D 模型源资源 [待建]
 │   │       └── eiffel-tower.gltf            # 埃菲尔铁塔 3D 模型 [待建]
 │   ├── sql/                                 # 数据库脚本 [待建]
 │   │   └── migrations/                      # 数据库迁移
@@ -109,7 +108,7 @@ pearl-map/
 │           │   └── map_test.cljs            # 地图组件测试 [待建]
 │           └── services/                    # 服务测试
 │               └── map_engine_test.cljs     # 地图引擎测试 [待建]
-├── target/                                  # 构建输出（gitignore）
+├── target/                                  # 最终构建输出和编译资产用于发布（git 排除）
 ├── .gitignore                               # Git 忽略规则 [已存在]
 ├── .editorconfig                            # 编辑器配置 [待建]
 ├── .nvmrc                                   # Node.js 版本 [已存在]

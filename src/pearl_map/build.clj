@@ -3,12 +3,12 @@
   (:gen-class))
 
 (defn copy-maplibre-css
-  "Build hook to automatically copy maplibre CSS from node_modules to resources/public/css"
+  "Build hook to automatically copy maplibre CSS from node_modules to target/public/css"
   []
   (println "Copying maplibre-gl.css from node_modules...")
 
   (let [source (io/file "node_modules/maplibre-gl/dist/maplibre-gl.css")
-        target-dir (io/file "resources/public/css")
+        target-dir (io/file "target/public/css")
         target (io/file target-dir "maplibre-gl.css")]
 
     ;; Create target directory if it doesn't exist
