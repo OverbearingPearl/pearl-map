@@ -135,33 +135,41 @@ The initial implementation focuses on Phase 1 of the development roadmap, specif
 
 **Core Features Implemented:**
 - ✅ Basic React/Reagent component structure with home page
-- ✅ MapLibre GL JS integration with OSM base layer
-- ✅ Eiffel Tower coordinates pre-configured as center point
+- ✅ MapLibre GL JS integration with multiple style support
+- ✅ Eiffel Tower coordinates pre-configured as center point (2.2945°E, 48.8584°N)
 - ✅ Responsive map container with proper styling
 - ✅ Map instance state management using Reagent atoms
+- ✅ Style switching functionality (Basic/Dark/Light styles)
+- ✅ Navigation controls integration
+- ✅ Scale control integration
+- ✅ Error handling and debugging utilities
+- ✅ OSM raster tiles integration with German mirror support
 
-**Technical Implementation Details:**
-- Map centered at Eiffel Tower coordinates (2.2945°E, 48.8584°N)
-- Default OSM style from Maplibre demo tiles
-- Zoom level 15 for appropriate landmark viewing
-- Flat map view (no tilt or rotation initially)
+**Current Technical Status:**
+- Map centered at Eiffel Tower coordinates with zoom level 15
+- Support for multiple map styles:
+  - ✅ Basic Style: OpenStreetMap raster tiles (German mirror) - WORKING
+  - ✅ Dark Style: Carto Dark Matter vector tiles - WORKING
+  - ✅ Light Style: Carto Positron vector tiles - WORKING
+- 45° pitch angle for 3D perspective
 - Proper cleanup and state management patterns
+- Hot-reload support for development
 
 **File Structure Added:**
 ```
 src/
 ├── cljs/pearl_map/
-│   ├── core.cljs              # Main application entry point
+│   ├── core.cljs              # Main application entry point with complete map functionality
 │   └── (other files to be added)
 └── pearl_map/
     └── build.clj              # Build tasks and utilities
 ```
 
-**Next Steps for Phase 1:**
-- Add 3D model integration for Eiffel Tower (GLTF)
-- Implement basic style editor components
-- Add navigation controls (pan, zoom, tilt, rotate)
-- Enhance UI with proper styling and layout
+**Next Steps:**
+- Next: Add 3D model integration for Eiffel Tower (GLTF)
+- Next: Implement basic style editor components
+- Next: Enhance UI with proper styling and layout
+- Next: Add tilt and rotation controls
 
 ## 🏗️ Architecture
 
