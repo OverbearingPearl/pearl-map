@@ -209,19 +209,30 @@
 
 (defn ^:dev/after-load reload []
   "Hot-reload function using Reagent's React 18 API"
-  ;; Re-render React components first
-  (when @react-root
-    (rdomc/render @react-root [home-page]))
-
-  ;; Clean up and reinitialize map (still needed for direct DOM manipulation)
+  ;; 1. First clean up map instance and DOM elements
   (when @map-instance
     (.remove @map-instance)
     (reset! map-instance nil))
-  ;; Use requestAnimationFrame for better timing with DOM updates
-  (js/requestAnimationFrame
-   (fn []
-     (init-map)
-     (js/console.log "Hot reload completed with Reagent React 18 API"))))
+
+  ;; 2. Clean up map container DOM element
+  (let [map-container (.getElementById js/document "map-container")]
+    (when map-container
+      (let [parent (.-parentNode map-container)
+            new-container (.createElement js/document "div")]
+        (.setAttribute new-container "id" "map-container")
+        (.setAttribute new-container "style" "width:100%;height:100vh;position:absolute;top:0;left:0;")
+        (.removeChild parent map-container)
+        (.appendChild parent new-container))))
+
+  ;; 3. Reset current style state
+  (reset! current-style (:basic style-urls))
+
+  ;; 4. Force re-render all components (update closure references)
+  (when @react-root
+    (rdomc/render @react-root [home-page]))
+
+  ;; 5. Delay map reinitialization to ensure DOM is fully updated
+  (js/setTimeout init-map 100))
 
 (defn init []
   "Application initialization entry point"
