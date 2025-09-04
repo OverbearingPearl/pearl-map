@@ -1,9 +1,8 @@
 (ns pearl-map.core
   (:require [reagent.core :as reagent]
-            [reagent.dom :as rdom]
+            [reagent.dom.client :as rdomc]
             ;; Import maplibre using shadow-cljs require syntax
-            ["maplibre-gl" :as maplibre]
-            ["react-dom/client" :as react-dom]))  ;; Import React 18 client
+            ["maplibre-gl" :as maplibre]))
 
 ;; Eiffel Tower coordinates for Paris focus [longitude, latitude]
 (def eiffel-tower-coords [2.2945 48.8584])
@@ -11,7 +10,7 @@
 ;; Atom to hold map instance for state management
 (def map-instance (reagent/atom nil))
 
-;; Atom to hold React root instance
+;; Use Reagent's React 18 root instance management
 (def react-root (reagent/atom nil))
 
 ;; Update the style URLs to use working demo styles
@@ -200,20 +199,29 @@
    [debug-info]])  ; Add debug info panel
 
 (defn mount-root []
-  "Mount the root component using React 18 createRoot API"
+  "Mount the root component using Reagent's React 18 API"
   (let [app-element (.getElementById js/document "app")
-        root (react-dom/createRoot app-element)]
-    ;; Store root instance for cleanup
+        root (rdomc/create-root app-element)]
     (reset! react-root root)
-    (.render root (reagent/as-element [home-page]))
+    (rdomc/render root [home-page])
     ;; Initialize map after a short delay to ensure DOM is fully rendered
     (js/setTimeout init-map 100)))
 
 (defn ^:dev/after-load reload []
-  "Hot-reload function for development with React 18"
+  "Hot-reload function using Reagent's React 18 API"
+  ;; Re-render React components first
   (when @react-root
-    (.render @react-root (reagent/as-element [home-page])))
-  (js/console.log "Hot reload completed"))
+    (rdomc/render @react-root [home-page]))
+
+  ;; Clean up and reinitialize map (still needed for direct DOM manipulation)
+  (when @map-instance
+    (.remove @map-instance)
+    (reset! map-instance nil))
+  ;; Use requestAnimationFrame for better timing with DOM updates
+  (js/requestAnimationFrame
+   (fn []
+     (init-map)
+     (js/console.log "Hot reload completed with Reagent React 18 API"))))
 
 (defn init []
   "Application initialization entry point"
