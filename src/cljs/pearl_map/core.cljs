@@ -187,12 +187,17 @@
 
 (defn ^:dev/after-load reload []
   "Hot-reload function using Reagent's React 18 API"
-  ;; 1. First clean up map instance and DOM elements
+  (js/console.log "Hot-reloading application... Current style:" @current-style)
+
+  ;; 1. First clean up map instance
   (when @map-instance
-    (.remove @map-instance)
+    (try
+      (.remove @map-instance)
+      (catch js/Error e
+        (js/console.warn "Error removing map instance:" e)))
     (reset! map-instance nil))
 
-  ;; 2. Clean up map container DOM element
+  ;; 2. Clean up and recreate map container DOM element to ensure fresh state
   (let [map-container (.getElementById js/document "map-container")]
     (when map-container
       (let [parent (.-parentNode map-container)
@@ -202,14 +207,15 @@
         (.removeChild parent map-container)
         (.appendChild parent new-container))))
 
-  ;; 3. Reset current style state
-  (reset! current-style (:basic style-urls))
+  ;; 3. DO NOT reset current style - preserve user's style selection
+  ;; This allows changes to the initial value to take effect during development
 
   ;; 4. Force re-render all components (update closure references)
   (when @react-root
     (rdomc/render @react-root [home-page]))
 
   ;; 5. Delay map reinitialization to ensure DOM is fully updated
+  ;; The map will use the current value of current-style, which may have been modified
   (js/setTimeout init-map 100))
 
 (defn init []
