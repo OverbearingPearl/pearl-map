@@ -22,28 +22,6 @@
 ;; Atom to track current map style
 (def current-style (reagent/atom (:basic style-urls)))
 
-;; Complete raster style configuration for OSM tiles
-(def raster-style-config
-  (clj->js
-   {:version 8
-    :name "OSM Bright"
-    :center (clj->js eiffel-tower-coords)  ;; Convert coordinates to JS array
-    :zoom 15
-    :pitch 45
-    :bearing 0
-    :sources
-    {:osm
-     {:type "raster"
-      :tiles ["https://tile.openstreetmap.de/{z}/{x}/{y}.png"]
-      :tileSize 256
-      :attribution "© OpenStreetMap contributors"}}
-    :layers
-    [{:id "osm-tiles"
-      :type "raster"
-      :source "osm"
-      :minzoom 0
-      :maxzoom 19}]}))
-
 (defn map-container []
   "Reagent component that renders the map container with proper styling"
   [:div {:id "map-container"
