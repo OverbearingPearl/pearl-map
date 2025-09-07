@@ -1,7 +1,10 @@
 {:source-paths ["src/cljs" "src"]
  :dependencies [[reagent "1.3.0"]
                 [re-frame "1.3.0"]
-                [cljs-ajax "0.8.4"]]
+                [cljs-ajax "0.8.4"]
+                [cider/cider-nrepl "0.57.0"]]
+ :nrepl {:port 8777
+         :middleware [cider.nrepl/cider-middleware]}
  :maven
  {:repositories
   {"central" {:url "https://maven.aliyun.com/repository/central"}
@@ -14,7 +17,7 @@
         :modules {:main {:init-fn pearl-map.core/init}}
         :devtools {:after-load pearl-map.core/reload}
         :dev {:compiler-options {:closure-defines {re-frame.trace.trace-enabled? true}
-                :build-hooks [(pearl-map.build/copy-maplibre-css)]}}
+                                 :build-hooks [(pearl-map.build/copy-maplibre-css)]}}
         :release {:compiler-options {:build-hooks [(pearl-map.build/copy-maplibre-css)]}}}
   :test {:target :browser-test
          :test-dir "target/test"
