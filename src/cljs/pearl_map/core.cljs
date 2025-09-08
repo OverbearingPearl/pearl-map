@@ -1,6 +1,7 @@
 (ns pearl-map.core
   (:require [reagent.core :as reagent]
             [reagent.dom.client :as rdomc]
+            [pearl-map.editor :refer [building-style-editor]]
             ;; Import maplibre using shadow-cljs require syntax
             ["maplibre-gl" :as maplibre]))
 
@@ -75,8 +76,10 @@
               ;; Create map instance using imported maplibre module
               map-obj (maplibre/Map. map-config)]
 
-          ;; Store map instance in atom for state management
+          ;; Store map instance in atom for state management and set global reference
           (reset! map-instance map-obj)
+          (set! (.-pearlMapInstance js/window) map-obj)
+          (js/console.log "Map instance stored globally as window.pearlMapInstance")
 
           ;; Add navigation controls for better UX
           (.addControl map-obj (maplibre/NavigationControl.))
@@ -88,7 +91,24 @@
           (.on map-obj "load"
                (fn []
                  (js/console.log "Map successfully loaded")
-                 (js/console.log "Current style:" @current-style)))
+                 (js/console.log "Current style:" @current-style)
+                 ;; Add buildings layer for vector styles
+                 (when (and (not= @current-style "raster-style")
+                            (not (.getLayer map-obj "buildings")))
+                   (try
+                     (.addLayer map-obj
+                       (clj->js
+                        {:id "buildings"
+                         :type "fill"
+                         :source "composite"
+                         :source-layer "building"
+                         :filter ["==" "extrude" "true"]
+                         :paint {:fill-color "#f0f0f0"
+                                 :fill-opacity 0.7
+                                 :fill-outline-color "#cccccc"}}))
+                     (js/console.log "Buildings layer added successfully")
+                     (catch js/Error e
+                       (js/console.warn "Could not add buildings layer (may not be available in this style):" e))))))
           ;; Handle map errors
           (.on map-obj "error"
                (fn [e]
@@ -173,6 +193,7 @@
     [:p {:style {:margin "2px 0 0 0" :fontSize "0.8em" :color "#999"}}
      "Using MapLibre demo vector service"]]
    [style-controls]
+   [pearl-map.editor/building-style-editor]
    [map-container]
    [debug-info]])  ; Add debug info panel
 
@@ -195,7 +216,9 @@
       (.remove @map-instance)
       (catch js/Error e
         (js/console.warn "Error removing map instance:" e)))
-    (reset! map-instance nil))
+    (reset! map-instance nil)
+    (set! (.-pearlMapInstance js/window) nil)
+    (js/console.log "Map instance and global reference cleared"))
 
   ;; 2. Clean up and recreate map container DOM element to ensure fresh state
   (let [map-container (.getElementById js/document "map-container")]
