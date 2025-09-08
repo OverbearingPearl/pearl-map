@@ -144,22 +144,29 @@ The initial implementation focuses on Phase 1 of the development roadmap, specif
 - ✅ Scale control integration
 - ✅ Error handling and debugging utilities
 - ✅ OSM raster tiles integration with German mirror support
+- ✅ Real-time building style editor with color and opacity adjustments
+- ✅ Automatic building layer detection and style application
+- ✅ Real-time preview functionality
+- ✅ Hot-reload support for development environment
 
 **Current Technical Status:**
-- Map centered at Eiffel Tower coordinates with zoom level 15
+- Map centered at Eiffel Tower coordinates with zoom level 15, 45° pitch angle
 - Support for multiple map styles:
   - ✅ Basic Style: OpenStreetMap raster tiles (German mirror) - WORKING
-  - ✅ Dark Style: Carto Dark Matter vector tiles - WORKING
-  - ✅ Light Style: Carto Positron vector tiles - WORKING
-- 45° pitch angle for 3D perspective
-- Proper cleanup and state management patterns
-- Hot-reload support for development
+  - ✅ Dark Style: Carto Dark Matter vector tiles - WORKING (with building style editing)
+  - ✅ Light Style: Carto Positron vector tiles - WORKING (with building style editing)
+- Building style editor provides real-time preview functionality
+- Support for real-time adjustments of fill color, outline color, and opacity
+- One-click switching between light and dark themes
+- Complete debugging tools and layer information viewing
+- Hot-reload support for development environment
 
 **File Structure Added:**
 ```
 src/
 ├── cljs/pearl_map/
 │   ├── core.cljs              # Main application entry point with complete map functionality
+│   ├── editor.cljs            # Building style editor component (IMPLEMENTED)
 │   └── (other files to be added)
 └── pearl_map/
     └── build.clj              # Build tasks and utilities
@@ -167,9 +174,9 @@ src/
 
 **Next Steps:**
 - Next: Add 3D model integration for Eiffel Tower (GLTF)
-- Next: Implement basic style editor components
-- Next: Enhance UI with proper styling and layout
+- Next: Enhance UI styling and layout
 - Next: Add tilt and rotation controls
+- Next: Expand style editor to support more properties
 
 ## 🏗️ Architecture
 

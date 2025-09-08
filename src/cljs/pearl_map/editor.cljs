@@ -13,10 +13,6 @@
 ;; Current editing style state
 (def current-editing-style (reagent/atom (:light default-building-styles)))
 
-(defn update-building-style [style-key value]
-  "Update building style and apply to map"
-  (swap! current-editing-style assoc style-key value))
-
 (defn apply-current-style []
   "Apply the current editing style to the map buildings"
   (let [map-inst (.-pearlMapInstance js/window)
@@ -46,6 +42,11 @@
             (js/console.log "Building styles applied successfully")))
         (js/console.warn "Map is not loaded yet. Please wait for the map to load completely.")))
     (js/console.log "=== DEBUG: Finished apply-current-style ===")))
+
+(defn update-building-style [style-key value]
+  "Update building style and apply to map"
+  (swap! current-editing-style assoc style-key value)
+  (apply-current-style))
 
 ;; Add a function to check if we should listen for map load events
 (defn setup-map-listener []
@@ -106,14 +107,12 @@
        [:div {:style {:display "flex" :gap "10px" :margin-bottom "15px"}}
         [:button {:on-click #(do
                                (reset! current-editing-style (:light default-building-styles))
-                               (apply-current-style)
-                               (setup-map-listener))
+                               (apply-current-style))
                   :style {:padding "8px 12px" :border "none" :border-radius "4px"
                           :background "#007bff" :color "white" :cursor "pointer"}} "Light Theme"]
         [:button {:on-click #(do
                                (reset! current-editing-style (:dark default-building-styles))
-                               (apply-current-style)
-                               (setup-map-listener))
+                               (apply-current-style))
                   :style {:padding "8px 12px" :border "none" :border-radius "4px"
                           :background "#343a40" :color "white" :cursor "pointer"}} "Dark Theme"]]
 
@@ -122,11 +121,7 @@
          "Buildings Status:"]
         [:p {:style {:color "#666" :font-size "11px" :margin "0" :font-style "italic"}}
          "Only works with Dark or Light vector styles"]]
-       [:div {:style {:display "flex" :gap "10px" :margin-top "10px"}}
-        [:button {:on-click apply-current-style
-                  :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                          :background "#28a745" :color "white" :cursor "pointer" :flex "1"}}
-         "Apply Style"]
+       [:div {:style {:margin-top "10px"}}
         [:button {:on-click #(let [map-inst (.-pearlMapInstance js/window)]
                                (when map-inst
                                  (let [style-obj (.getStyle map-inst)
@@ -137,5 +132,5 @@
                                                      "| Type:" (.-type layer)
                                                      "| Source:" (.-source layer))))))
                   :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                          :background "#6c757d" :color "white" :cursor "pointer" :flex "1"}}
+                          :background "#6c757d" :color "white" :cursor "pointer" :width "100%"}}
          "Debug Layers"]]])}))
