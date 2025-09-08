@@ -1,6 +1,5 @@
 {
     "name": "pearl-map",
-    "version": "0.1.0",
     "description": "A high-performance 3D web mapping platform",
     "main": "index.js",
     "scripts": {
