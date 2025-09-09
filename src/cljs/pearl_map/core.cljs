@@ -8,11 +8,11 @@
 ;; Eiffel Tower coordinates for Paris focus [longitude, latitude]
 (def eiffel-tower-coords [2.2945 48.8584])
 
-;; Atom to hold map instance for state management
-(def map-instance (reagent/atom nil))
+;; Atom to hold map instance for state management - use defonce to preserve across hot-reloads
+(defonce map-instance (reagent/atom nil))
 
 ;; Use Reagent's React 18 root instance management
-(def react-root (reagent/atom nil))
+(def react-root (atom nil))
 
 ;; Update the style URLs to use working demo styles
 (def style-urls
@@ -20,8 +20,8 @@
    :dark "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
    :light "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"})
 
-;; Atom to track current map style
-(def current-style (reagent/atom (:basic style-urls)))
+;; Atom to track current map style - use defonce to preserve value across hot-reloads
+(defonce current-style (reagent/atom (:basic style-urls)))
 
 (defn map-container []
   "Reagent component that renders the map container with proper styling"
@@ -97,15 +97,15 @@
                             (not (.getLayer map-obj "buildings")))
                    (try
                      (.addLayer map-obj
-                       (clj->js
-                        {:id "buildings"
-                         :type "fill"
-                         :source "composite"
-                         :source-layer "building"
-                         :filter ["==" "extrude" "true"]
-                         :paint {:fill-color "#f0f0f0"
-                                 :fill-opacity 0.7
-                                 :fill-outline-color "#cccccc"}}))
+                                (clj->js
+                                 {:id "buildings"
+                                  :type "fill"
+                                  :source "composite"
+                                  :source-layer "building"
+                                  :filter ["==" "extrude" "true"]
+                                  :paint {:fill-color "#f0f0f0"
+                                          :fill-opacity 0.7
+                                          :fill-outline-color "#cccccc"}}))
                      (js/console.log "Buildings layer added successfully")
                      (catch js/Error e
                        (js/console.warn "Could not add buildings layer (may not be available in this style):" e))))))
@@ -121,22 +121,23 @@
 ;; Add error handling to style switching function
 (defn change-map-style [style-url]
   (reset! current-style style-url)
-  (when-let [^js map-inst @map-instance]
-    (try
-      ;; Check if it's raster style
-      (if (= style-url "raster-style")
-        ;; For raster styles, need to recreate map instance
-        (do
-          (when @map-instance
-            (.remove @map-instance))  ;; Remove existing map
-          (reset! map-instance nil)
-          (js/setTimeout init-map 100))  ;; Delay reinitializing map
-        ;; For vector styles, use standard setStyle method
-        (.setStyle map-inst style-url))
+  (when-let [map-inst @map-instance]
+    (let [^js js-map-inst map-inst]
+      (try
+        ;; Check if it's raster style
+        (if (= style-url "raster-style")
+          ;; For raster styles, need to recreate map instance
+          (do
+            (when @map-instance
+              (.remove ^js js-map-inst))  ;; Remove existing map
+            (reset! map-instance nil)
+            (js/setTimeout init-map 100))  ;; Delay reinitializing map
+          ;; For vector styles, use standard setStyle method
+          (.setStyle ^js js-map-inst style-url))
 
-      (js/console.log "Style changed to:" style-url)
-      (catch js/Error e
-        (js/console.error "Failed to change style:" e)))))
+        (js/console.log "Style changed to:" style-url)
+        (catch js/Error e
+          (js/console.error "Failed to change style:" e))))))
 
 ;; Add style control UI component
 (defn style-controls []
@@ -210,36 +211,12 @@
   "Hot-reload function using Reagent's React 18 API"
   (js/console.log "Hot-reloading application... Current style:" @current-style)
 
-  ;; 1. First clean up map instance
-  (when @map-instance
-    (try
-      (.remove @map-instance)
-      (catch js/Error e
-        (js/console.warn "Error removing map instance:" e)))
-    (reset! map-instance nil)
-    (set! (.-pearlMapInstance js/window) nil)
-    (js/console.log "Map instance and global reference cleared"))
-
-  ;; 2. Clean up and recreate map container DOM element to ensure fresh state
-  (let [map-container (.getElementById js/document "map-container")]
-    (when map-container
-      (let [parent (.-parentNode map-container)
-            new-container (.createElement js/document "div")]
-        (.setAttribute new-container "id" "map-container")
-        (.setAttribute new-container "style" "width:100%;height:100vh;position:absolute;top:0;left:0;")
-        (.removeChild parent map-container)
-        (.appendChild parent new-container))))
-
-  ;; 3. DO NOT reset current style - preserve user's style selection
-  ;; This allows changes to the initial value to take effect during development
-
-  ;; 4. Force re-render all components (update closure references)
+  ;; Simply re-render the root component to pick up any code changes
+  ;; The map instance and its state are preserved
   (when @react-root
     (rdomc/render @react-root [home-page]))
 
-  ;; 5. Delay map reinitialization to ensure DOM is fully updated
-  ;; The map will use the current value of current-style, which may have been modified
-  (js/setTimeout init-map 100))
+  (js/console.log "Hot-reload complete"))
 
 (defn init []
   "Application initialization entry point"
