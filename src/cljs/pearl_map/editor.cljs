@@ -1,6 +1,7 @@
 (ns pearl-map.editor
   (:require [reagent.core :as reagent]
-            [clojure.string :as str]))
+            [clojure.string :as str])
+  (:require ["color" :as color]))
 
 ;; Default building style configurations
 (def default-building-styles
@@ -20,19 +21,12 @@
       (and (string? color-value) (str/starts-with? color-value "#"))
       color-value
 
-      ;; 2. RGBA string format
-      (and (string? color-value) (str/includes? color-value "rgba"))
-      (let [matches (re-matches #"rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)" color-value)]
-        (if matches
-          (let [[_ r g b a] matches
-                r-hex (.toString (js/parseInt r) 16)
-                g-hex (.toString (js/parseInt g) 16)
-                b-hex (.toString (js/parseInt b) 16)]
-            (str "#"
-                 (.padStart r-hex 2 "0")
-                 (.padStart g-hex 2 "0")
-                 (.padStart b-hex 2 "0")))
-          (throw (js/Error. (str "Invalid rgba format: " color-value)))))
+      ;; 2. RGBA/RGB string format
+      (and (string? color-value) (or (str/includes? color-value "rgba")
+                                     (str/includes? color-value "rgb")))
+      (-> (color color-value)
+          (.hex)
+          (.toString))
 
       ;; 3. MapLibre expression format: ["interpolate", "linear", "zoom", ...]
       (and (object? color-value) (.-expression color-value))
@@ -135,12 +129,11 @@
   (when hex-str
     (if (str/starts-with? hex-str "rgba")
       hex-str
-      (let [hex (str/replace hex-str #"^#" "")
-            r (js/parseInt (subs hex 0 2) 16)
-            g (js/parseInt (subs hex 2 4) 16)
-            b (js/parseInt (subs hex 4 6) 16)
-            opacity-value (get-opacity-value opacity)]
-        (str "rgba(" r "," g "," b "," opacity-value ")")))))
+      (let [opacity-value (get-opacity-value opacity)
+            color-obj (color hex-str)
+            rgb-obj (.rgb color-obj)
+            rgba-obj (.alpha rgb-obj opacity-value)]
+        (.string rgba-obj)))))
 
 ;; Current editing style state - use defonce to preserve state during hot reload
 (defonce current-editing-style (reagent/atom (:light default-building-styles)))
