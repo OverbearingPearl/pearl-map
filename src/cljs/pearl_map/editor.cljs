@@ -74,7 +74,8 @@
                                      (str/includes? color-value "rgb")))
       (-> (color color-value)
           (.hex)
-          (.toString))
+          (.toString)
+          (.toLowerCase))
 
       ;; 3. MapLibre expression format: ["interpolate", "linear", "zoom", ...]
       (and (object? color-value) (.-expression color-value))
