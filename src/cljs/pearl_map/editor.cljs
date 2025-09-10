@@ -12,6 +12,54 @@
           :fill-opacity 0.8
           :fill-outline-color "#4a5568"}})
 
+;; Shared MapLibre parsing utilities
+(defn get-current-zoom []
+  "Get current zoom level from map instance"
+  (let [map-inst (.-pearlMapInstance js/window)]
+    (when map-inst (.getZoom map-inst))))
+
+(defn parse-maplibre-stops [stops-obj]
+  "Parse MapLibre stops format and return interpolated value"
+  (let [current-zoom (get-current-zoom)
+        stops (.-stops stops-obj)
+        sorted-stops (sort-by first (js->clj stops))]
+    (if (empty? sorted-stops)
+      (throw (js/Error. "Empty stops array"))
+      (let [first-stop (first sorted-stops)
+            last-stop (last sorted-stops)]
+        (cond
+          (<= current-zoom (first first-stop)) (second first-stop)
+          (>= current-zoom (first last-stop)) (second last-stop)
+          :else (loop [[[z1 v1] & rest-stops] sorted-stops]
+                  (when (and rest-stops (first (first rest-stops)))
+                    (let [[z2 v2] (first rest-stops)]
+                      (if (and (>= current-zoom z1) (< current-zoom z2))
+                        (+ v1 (* (- current-zoom z1) (/ (- v2 v1) (- z2 z1))))
+                        (recur rest-stops))))))))))
+
+(defn parse-maplibre-expression [expr-obj]
+  "Parse MapLibre expression format and return interpolated value"
+  (let [current-zoom (get-current-zoom)
+        expr (.-expression expr-obj)]
+    (if (and (array? expr)
+             (= (aget expr 0) "interpolate")
+             (= (aget expr 1) "linear")
+             (= (aget expr 2) "zoom"))
+      (let [stops (drop 3 (array-seq expr))
+            stop-pairs (partition 2 stops)]
+        (if (empty? stop-pairs)
+          (throw (js/Error. "Empty expression stops"))
+          (let [first-pair (first stop-pairs)
+                last-pair (last stop-pairs)]
+            (cond
+              (<= current-zoom (first first-pair)) (second first-pair)
+              (>= current-zoom (first last-pair)) (second last-pair)
+              :else (loop [[[z1 v1] [z2 v2] & more] stop-pairs]
+                      (if (and z2 (>= current-zoom z1) (< current-zoom z2))
+                        (+ v1 (* (- current-zoom z1) (/ (- v2 v1) (- z2 z1))))
+                        (recur (cons [z2 v2] more))))))))
+      (throw (js/Error. (str "Unsupported expression format: " (js/JSON.stringify expr)))))))
+
 ;; Color conversion functions
 (defn rgba-to-hex [color-value]
   "Convert color value to hex format - handle various MapLibre color formats"
@@ -30,28 +78,17 @@
 
       ;; 3. MapLibre expression format: ["interpolate", "linear", "zoom", ...]
       (and (object? color-value) (.-expression color-value))
-      (let [expr (.-expression color-value)]
-        (if (and (array? expr)
-                 (>= (.-length expr) 6)
-                 (= (aget expr 0) "interpolate")
-                 (= (aget expr 1) "linear")
-                 (= (aget expr 2) "zoom"))
-          ;; For expressions, return the first color stop value as default
-          (let [stops (drop 3 (array-seq expr))
-                color-stops (filter string? stops)]
-            (if (empty? color-stops)
-              (throw (js/Error. "No color stops found in expression"))
-              (first color-stops)))
-          (throw (js/Error. (str "Unsupported color expression format: " (js/JSON.stringify expr))))))
+      (let [color-stop (parse-maplibre-expression color-value)]
+        (if (string? color-stop)
+          color-stop
+          (throw (js/Error. "No valid color stops found in expression"))))
 
       ;; 4. MapLibre stops format: {"stops": [[zoom, color], ...]}
       (and (object? color-value) (.-stops color-value))
-      (let [stops (.-stops color-value)
-            sorted-stops (sort-by first (js->clj stops))
-            color-stops (filter string? (map second sorted-stops))]
-        (if (empty? color-stops)
-          (throw (js/Error. "No color stops found in stops array"))
-          (first color-stops)))
+      (let [color-stop (parse-maplibre-stops color-value)]
+        (if (string? color-stop)
+          color-stop
+          (throw (js/Error. "No valid color stops found in stops array"))))
 
       ;; 5. Other object formats - try to convert to string
       (object? color-value)
@@ -73,56 +110,22 @@
 
 (defn get-opacity-value [opacity]
   "Get actual opacity value from MapLibre opacity object for current zoom level"
-  (let [map-inst (.-pearlMapInstance js/window)
-        current-zoom (when map-inst (.getZoom map-inst))]
-    (cond
-      ;; 1. Simple number
-      (number? opacity) opacity
+  (cond
+    ;; 1. Simple number
+    (number? opacity) opacity
 
-      ;; 2. Stops format: {"stops": [[zoom1, value1], [zoom2, value2]]}
-      (and (object? opacity) (.-stops opacity))
-      (let [stops (.-stops opacity)
-            sorted-stops (sort-by first (js->clj stops))]
-        (if (empty? sorted-stops)
-          (throw (js/Error. "Empty stops array in opacity value"))
-          (let [first-stop (first sorted-stops)
-                last-stop (last sorted-stops)]
-            (cond
-              (<= current-zoom (first first-stop)) (second first-stop)
-              (>= current-zoom (first last-stop)) (second last-stop)
-              :else (loop [[[z1 v1] & rest-stops] sorted-stops]
-                      (when (and rest-stops (first (first rest-stops)))
-                        (let [[z2 v2] (first rest-stops)]
-                          (if (and (>= current-zoom z1) (< current-zoom z2))
-                            (+ v1 (* (- current-zoom z1) (/ (- v2 v1) (- z2 z1))))
-                            (recur rest-stops)))))))))
+    ;; 2. Stops format: {"stops": [[zoom1, value1], [zoom2, value2]]}
+    (and (object? opacity) (.-stops opacity))
+    (parse-maplibre-stops opacity)
 
-      ;; 3. Expression format: ["interpolate", "linear", "zoom", z1, v1, z2, v2]
-      (and (object? opacity) (.-expression opacity))
-      (let [expr (.-expression opacity)]
-        (if (and (array? expr)
-                 (= (aget expr 0) "interpolate")
-                 (= (aget expr 1) "linear")
-                 (= (aget expr 2) "zoom"))
-          (let [stops (drop 3 (array-seq expr))
-                stop-pairs (partition 2 stops)]
-            (if (empty? stop-pairs)
-              (throw (js/Error. "Empty expression stops in opacity value"))
-              (let [first-pair (first stop-pairs)
-                    last-pair (last stop-pairs)]
-                (cond
-                  (<= current-zoom (first first-pair)) (second first-pair)
-                  (>= current-zoom (first last-pair)) (second last-pair)
-                  :else (loop [[[z1 v1] [z2 v2] & more] stop-pairs]
-                          (if (and z2 (>= current-zoom z1) (< current-zoom z2))
-                            (+ v1 (* (- current-zoom z1) (/ (- v2 v1) (- z2 z1))))
-                            (recur (cons [z2 v2] more))))))))
-          (throw (js/Error. (str "Unsupported expression format: " (js/JSON.stringify expr))))))
+    ;; 3. Expression format: ["interpolate", "linear", "zoom", z1, v1, z2, v2]
+    (and (object? opacity) (.-expression opacity))
+    (parse-maplibre-expression opacity)
 
-      ;; 4. Other formats - throw error instead of returning default value
-      (object? opacity) (throw (js/Error. (str "Unsupported opacity object format: " (js/JSON.stringify opacity))))
+    ;; 4. Other formats - throw error instead of returning default value
+    (object? opacity) (throw (js/Error. (str "Unsupported opacity object format: " (js/JSON.stringify opacity))))
 
-      :else (throw (js/Error. (str "Invalid opacity value type: " (type opacity)))))))
+    :else (throw (js/Error. (str "Invalid opacity value type: " (type opacity))))))
 
 (defn hex-to-rgba [hex-str opacity]
   "Convert hex string to rgba format for MapLibre - throw error on failure"
