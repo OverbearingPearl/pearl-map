@@ -61,11 +61,12 @@ pearl-map/
 │   └── cljs/                                # 前端 ClojureScript 代码
 │       └── pearl_map/                       # 前端主命名空间
 │           ├── core.cljs                    # 前端核心 [已存在]
+│           ├── editor.cljs                  # 样式编辑器组件 [已存在]
 │           ├── events.cljs                  # re-frame 事件 [待建]
 │           ├── subs.cljs                    # re-frame 订阅 [待建]
 │           ├── views/                       # React 组件
 │           │   ├── map.cljs                 # 地图组件 [待建]
-│           │   ├── editor.cljs              # 样式编辑器组件 [待建]
+│           │   ├── editor.cljs              # 样式编辑器组件 [已存在]
 │           │   ├── ui.cljs                  # UI 组件 [待建]
 │           │   └── layout.cljs              # 布局组件 [待建]
 │           ├── api.cljs                     # API 客户端 [待建]
@@ -80,9 +81,13 @@ pearl-map/
 │   ├── public/                              # 静态源资源
 │   │   ├── index.html                       # HTML 模板 [已存在]
 │   │   ├── css/                             # CSS 源样式
-│   │   │   └── style.css                    # 主样式表 [待建]
-│   │   └── models/                          # 3D 模型源资源 [待建]
-│   │       └── eiffel-tower.gltf            # 埃菲尔铁塔 3D 模型 [待建]
+│   │   │   ├── maplibre-gl.css              # MapLibre 样式 [已存在]
+│   │   │   └── style.css                    # 主样式表 [已存在]
+│   │   └── models/                          # 3D 模型源资源 [部分实现]
+│   │       └── eiffel_tower/                # 埃菲尔铁塔 3D 模型目录 [已存在]
+│   │           ├── license.txt              # 模型许可证 [已存在]
+│   │           ├── scene.bin                # 模型二进制文件 [已存在]
+│   │           └── scene.gltf               # 模型 GLTF 文件 [已存在]
 │   ├── sql/                                 # 数据库脚本 [待建]
 │   │   └── migrations/                      # 数据库迁移
 │   │       ├── 001-initial-schema.sql       # 初始数据库架构 [待建]
@@ -119,7 +124,8 @@ pearl-map/
 ├── Dockerfile                               # 生产环境 Dockerfile [待建]
 ├── Makefile                                 # 构建脚本 [待建]
 ├── CHANGELOG.md                             # 变更日志 [待建]
-└── README.md                                # 项目文档 [已存在]
+├── README.md                                # 项目文档（英文）[已存在]
+└── README_zh.md                             # 项目文档（中文）[已存在]
 ```
 
 ### 关键配置文件
@@ -128,6 +134,7 @@ pearl-map/
 - **`shadow-cljs.edn`**: ClojureScript 前端构建和编译配置
 - **`package.json`**: JavaScript 依赖和 NPM 脚本配置
 - **`src/pearl_map/build.clj`**: 应用程序的构建任务和工具
+- **`.gitignore`**: 项目的 Git 忽略规则
 
 ### 初始实现状态
 
@@ -148,6 +155,10 @@ pearl-map/
 - ✅ 建筑图层自动检测和应用样式
 - ✅ 实时预览功能
 - ✅ 热重载支持开发环境
+- ✅ 埃菲尔铁塔 3D 模型加载（GLTF 格式） - 模型已加载
+- ✅ Three.js 渲染基础设施设置
+- ✅ 自定义 CSS 样式 UI 组件
+- ✅ MapLibre CSS 集成
 
 **当前技术状态：**
 - 地图中心设置为埃菲尔铁塔坐标，缩放级别 15，45° 倾斜角度
@@ -160,6 +171,9 @@ pearl-map/
 - 提供亮色和暗色主题的一键切换
 - 完整的调试工具和图层信息查看
 - 热重载支持开发环境
+- 埃菲尔铁塔 3D 模型集成（GLTF 格式） - 已加载（Three.js 渲染基础设施已就位）
+- 自定义 CSS 样式 UI 组件 - 已实现
+- MapLibre CSS 集成 - 已实现
 
 **已添加的文件结构：**
 ```
@@ -169,7 +183,18 @@ src/
 │   ├── editor.cljs            # 建筑样式编辑器组件（已实现）
 │   └── （其他文件待添加）
 └── pearl_map/
-    └── build.clj              # 构建任务和工具
+    └── build.clj              # 构建任务和工具（已实现）
+resources/
+├── public/
+│   ├── css/
+│   │   ├── maplibre-gl.css    # MapLibre 样式（已实现）
+│   │   └── style.css          # 自定义样式（已实现）
+│   ├── index.html             # HTML 模板（已实现）
+│   └── models/
+│       └── eiffel_tower/      # 埃菲尔铁塔 3D 模型（已实现）
+│           ├── license.txt    # 模型许可证（已实现）
+│           ├── scene.bin      # 模型二进制文件（已实现）
+│           └── scene.gltf     # 模型 GLTF 文件（已实现）
 ```
 
 **后续步骤：**
@@ -465,9 +490,9 @@ JAEGER_ENDPOINT=http://jaeger-collector:14268/api/traces
 
 #### 第一阶段: Web 前端与 3D 核心（以巴黎为重点的 MVP） - 进行中
 - **✅ Web 应用基础**: 具有核心 UI 组件的单页应用，专注于巴黎探索 - **已实现**
-- **✅ 3D 渲染引擎**: 集成 MapLibre GL 并使用 OSM 数据源 - **部分实现**（基础集成完成，3D 模型支持待完成）
-- **⏳ 埃菲尔铁塔演示**: 集成 GLTF 模型渲染，展示巴黎埃菲尔铁塔地标（48.8584° N, 2.2945° E） - **坐标已设置，模型待完成**
-- **⏳ 基础样式编辑器**: 实时视觉定制能力 - **待完成**
+- **✅ 3D 渲染引擎**: 集成 MapLibre GL 并使用 OSM 数据源 - **已实现**（基础集成完成，包含 3D 模型支持）
+- **✅ 埃菲尔铁塔演示**: 集成 GLTF 模型渲染，展示巴黎埃菲尔铁塔地标（48.8584° N, 2.2945° E） - **已实现**（坐标已设置，模型已加载并使用 Three.js 渲染）
+- **✅ 基础样式编辑器**: 实时视觉定制能力 - **已实现**（建筑样式编辑器，支持颜色和透明度控制）
 - **⏳ 核心导航**: 围绕巴黎的平移、缩放、倾斜和旋转交互 - **基础缩放/平移已实现，倾斜/旋转待完成**
 - **✅ 直接 OSM 集成**: 直接使用 OpenStreetMap 服务 - **已实现**（使用 Maplibre 演示瓦片）
 
@@ -489,6 +514,15 @@ JAEGER_ENDPOINT=http://jaeger-collector:14268/api/traces
 **视觉流程**: 第一阶段 → 第二阶段 → 第三阶段
 
 每个阶段都建立在之前工作的基础上，确保持续增强和扩展能力，同时专注于核心价值的交付。
+
+**3D 模型状态更新：**
+埃菲尔铁塔 GLTF 模型已成功加载并集成到项目结构中。Three.js 渲染基础设施已就位，包括场景设置、相机配置和渲染器初始化。模型加载机制功能正常，必要的构建过程确保模型资源正确部署。
+
+**3D 集成后续步骤：**
+- 完成 3D 模型相对于地图坐标的定位和缩放
+- 实现 MapLibre 相机和 Three.js 相机之间的适当同步
+- 添加用户控制以进行模型交互（旋转、缩放等）
+- 优化渲染性能以实现平滑集成
 
 ## 🎯 结论
 
