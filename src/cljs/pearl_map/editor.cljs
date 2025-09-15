@@ -1,7 +1,8 @@
 (ns pearl-map.editor
   (:require [reagent.core :as reagent]
             [clojure.string :as str])
-  (:require ["color" :as color]))
+  (:require ["color" :as color]
+            ["@maplibre/maplibre-gl-style-spec" :as style-spec]))
 
 ;; Default building style configurations
 (def default-building-styles
@@ -11,6 +12,86 @@
    :dark {:fill-color "#2d3748"
           :fill-opacity 0.8
           :fill-outline-color "#4a5568"}})
+
+;; Add debug function to check style-spec module
+(defn debug-style-spec-module []
+  "Debug function to check style-spec module availability"
+  (js/console.log "=== DEBUG: style-spec module analysis ===")
+  (js/console.log "style-spec module:" style-spec)
+  (when style-spec
+    (js/console.log "Module type:" (type style-spec))
+    (js/console.log "Available keys:" (js/Object.keys style-spec))
+    (js/console.log "validateStyleMin function:" (.-validateStyleMin style-spec))
+    (js/console.log "validateStyleMin type:" (when (.-validateStyleMin style-spec) (type (.-validateStyleMin style-spec))))))
+
+;; Check module when component loads
+(defn check-style-spec-on-load []
+  (js/setTimeout debug-style-spec-module 2000))
+
+;; Add fallback validation function
+(defn fallback-validate-style [style]
+  "Fallback validation when official validation is not available"
+  (try
+    (js/console.log "Using fallback validation")
+    ;; Basic validation rules
+    (let [required-keys #{:fill-color :fill-opacity :fill-outline-color}]
+      ;; Check required fields
+      (doseq [key required-keys]
+        (when (not (contains? style key))
+          (throw (js/Error. (str "Missing required key: " key)))))
+
+      ;; Validate color format
+      (doseq [color-key [:fill-color :fill-outline-color]]
+        (let [color-value (get style color-key)]
+          (when (not (string? color-value))
+            (throw (js/Error. (str color-key " must be a string"))))
+          (when (not (str/starts-with? color-value "#"))
+            (throw (js/Error. (str color-key " must be a hex color starting with #"))))
+          (when (not (re-matches #"^#[0-9A-Fa-f]{6}$" color-value))
+            (throw (js/Error. (str color-key " must be a valid 6-digit hex color"))))))
+
+      ;; Validate opacity range
+      (let [opacity (:fill-opacity style)]
+        (when (not (number? opacity))
+          (throw (js/Error. "fill-opacity must be a number")))
+        (when (or (< opacity 0) (> opacity 1))
+          (throw (js/Error. "fill-opacity must be between 0 and 1"))))
+
+      true)
+    (catch js/Error e
+      (js/console.error "Fallback validation failed:" e)
+      false)))
+
+;; Modify the final validate-style function
+(defn validate-style [style]
+  "Validate style with official validation and fallback"
+  (try
+    (js/console.log "=== Starting style validation ===")
+
+    ;; First try official validation - use validateStyleMin
+    (if (and style-spec (.-validateStyleMin style-spec))
+      (do
+        (js/console.log "Using official MapLibre validation (validateStyleMin)")
+        (let [complete-style (clj->js
+                              {:version 8
+                               :name "Building Style Validation"
+                               :sources {}
+                               :layers [{:id "validation-layer"
+                                         :type "fill"
+                                         :paint style}]})
+              validate-fn (.-validateStyleMin style-spec)]
+
+          (validate-fn complete-style)
+          true))
+
+      ;; Official validation not available, use fallback
+      (do
+        (js/console.warn "Official validation not available, using fallback")
+        (fallback-validate-style style)))
+
+    (catch js/Error e
+      (js/console.error "Style validation failed:" e)
+      false)))
 
 ;; Shared MapLibre parsing utilities
 (defn get-current-zoom []
@@ -182,19 +263,25 @@
           style @current-editing-style]
       (when map-inst
         (if (.-loaded map-inst)
-          (let [building-layer-ids ["building" "building-top"]]
-            (doseq [layer-id building-layer-ids]
-              (when (.getLayer map-inst layer-id)
-                (doseq [[style-key style-value] style]
-                  (let [final-value (cond
-                                      (#{:fill-color :fill-outline-color} style-key)
-                                      (hex-to-rgba style-value (:fill-opacity style))
+          ;; Validate style before applying
+          (let [validation-result (validate-style style)]
+            (if validation-result
+              (let [building-layer-ids ["building" "building-top"]]
+                (doseq [layer-id building-layer-ids]
+                  (when (.getLayer map-inst layer-id)
+                    (doseq [[style-key style-value] style]
+                      (let [final-value (cond
+                                          (#{:fill-color :fill-outline-color} style-key)
+                                          (hex-to-rgba style-value (:fill-opacity style))
 
-                                      (= style-key :fill-opacity)
-                                      style-value
+                                          (= style-key :fill-opacity)
+                                          style-value
 
-                                      :else style-value)]
-                    (.setPaintProperty map-inst layer-id (name style-key) final-value))))))
+                                          :else style-value)]
+                        (.setPaintProperty map-inst layer-id (name style-key) final-value))))))
+              (do
+                (js/console.error "Style validation failed - not applying changes")
+                false)))
           (js/console.warn "Map is not loaded yet"))))
     (catch js/Error e
       (js/console.error "Failed to apply building style:" e)
@@ -202,21 +289,23 @@
 
 (defn update-building-style [style-key value]
   "Update building style and apply to map"
-  ;; Handle different types of values
-  (let [processed-value (cond
-                          (#{:fill-color :fill-outline-color} style-key)
-                          (if (string? value)
-                            (rgba-to-hex value)
-                            (throw (js/Error. (str "Color value must be string, got: " (type value)))))
+  ;; Check for empty values
+  (when (and value (not (str/blank? value)))
+    ;; Handle different types of values
+    (let [processed-value (cond
+                            (#{:fill-color :fill-outline-color} style-key)
+                            (if (string? value)
+                              (rgba-to-hex value)
+                              (throw (js/Error. (str "Color value must be string, got: " (type value)))))
 
-                          (= style-key :fill-opacity)
-                          (if (number? value)
-                            value
-                            (js/parseFloat value))  ;; Try to parse if it's a string
+                            (= style-key :fill-opacity)
+                            (if (number? value)
+                              value
+                              (js/parseFloat value))  ;; Try to parse if it's a string
 
-                          :else value)]
-    (swap! current-editing-style assoc style-key processed-value)
-    (apply-current-style)))
+                            :else value)]
+      (swap! current-editing-style assoc style-key processed-value)
+      (apply-current-style))))
 
 ;; Add a function to check if we should listen for map load events
 (defn setup-map-listener []
@@ -243,7 +332,8 @@
   (reagent/create-class
    {:component-did-mount
     (fn []
-      (js/setTimeout setup-map-listener 1000))  ;; Delay to ensure map is initialized
+      (js/setTimeout setup-map-listener 1000)  ;; Delay to ensure map is initialized
+      (js/setTimeout check-style-spec-on-load 3000))  ;; Check style-spec module
     :reagent-render
     (fn []
       [:div {:style {:position "absolute"
@@ -261,7 +351,7 @@
        [:div {:style {:margin-bottom "10px"}}
         [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Fill Color"]
         [:input {:type "color"
-                 :value (:fill-color @current-editing-style)
+                 :value (or (:fill-color @current-editing-style) "#f0f0f0")
                  :on-change #(update-building-style :fill-color (-> % .-target .-value))
                  :style {:width "100%" :height "30px"}}]]
 
@@ -277,7 +367,7 @@
        [:div {:style {:margin-bottom "15px"}}
         [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Outline Color"]
         [:input {:type "color"
-                 :value (:fill-outline-color @current-editing-style)
+                 :value (or (:fill-outline-color @current-editing-style) "#cccccc")
                  :on-change #(update-building-style :fill-outline-color (-> % .-target .-value))
                  :style {:width "100%" :height "30px"}}]]
 
@@ -310,6 +400,30 @@
         ;; Add current style status display
         [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
          "Current: " (pr-str (select-keys @current-editing-style [:fill-color :fill-opacity :fill-outline-color]))]]
+
+       [:div {:style {:margin-top "15px" :padding-top "15px" :border-top "1px solid #eee"}}
+        [:button {:on-click #(do
+                               (js/console.log "=== Testing Official Validation ===")
+                               (debug-style-spec-module)
+                               ;; 测试有效样式
+                               (let [valid-style {:fill-color "#ff0000" :fill-opacity 0.5 :fill-outline-color "#00ff00"}]
+                                 (js/console.log "Valid style test result:" (validate-style valid-style)))
+                               ;; 测试无效样式
+                               (let [invalid-style {:fill-color "invalid" :fill-opacity 2.0 :fill-outline-color "#00ff00"}]
+                                 (js/console.log "Invalid style test result:" (validate-style invalid-style))))
+                  :style {:padding "8px 12px" :border "none" :border-radius "4px"
+                          :background "#17a2b8" :color "white" :cursor "pointer" :width "100%"
+                          :margin-bottom "10px"}}
+         "Test Official Validation"]
+
+        [:button {:on-click #(do
+                               (js/console.log "=== Debug Current Style ===")
+                               (js/console.log "Current editing style:" @current-editing-style)
+                               (js/console.log "Validation result:" (validate-style @current-editing-style)))
+                  :style {:padding "8px 12px" :border "none" :border-radius "4px"
+                          :background "#6c757d" :color "white" :cursor "pointer" :width "100%"}}
+         "Debug Current Style"]]
+
        [:div {:style {:margin-top "10px"}}
         [:button {:on-click #(let [map-inst (.-pearlMapInstance js/window)]
                                (when map-inst
