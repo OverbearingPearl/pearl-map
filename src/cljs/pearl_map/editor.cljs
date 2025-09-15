@@ -28,66 +28,33 @@
 (defn check-style-spec-on-load []
   (js/setTimeout debug-style-spec-module 2000))
 
-;; Add fallback validation function
-(defn fallback-validate-style [style]
-  "Fallback validation when official validation is not available"
-  (try
-    (js/console.log "Using fallback validation")
-    ;; Basic validation rules
-    (let [required-keys #{:fill-color :fill-opacity :fill-outline-color}]
-      ;; Check required fields
-      (doseq [key required-keys]
-        (when (not (contains? style key))
-          (throw (js/Error. (str "Missing required key: " key)))))
-
-      ;; Validate color format
-      (doseq [color-key [:fill-color :fill-outline-color]]
-        (let [color-value (get style color-key)]
-          (when (not (string? color-value))
-            (throw (js/Error. (str color-key " must be a string"))))
-          (when (not (str/starts-with? color-value "#"))
-            (throw (js/Error. (str color-key " must be a hex color starting with #"))))
-          (when (not (re-matches #"^#[0-9A-Fa-f]{6}$" color-value))
-            (throw (js/Error. (str color-key " must be a valid 6-digit hex color"))))))
-
-      ;; Validate opacity range
-      (let [opacity (:fill-opacity style)]
-        (when (not (number? opacity))
-          (throw (js/Error. "fill-opacity must be a number")))
-        (when (or (< opacity 0) (> opacity 1))
-          (throw (js/Error. "fill-opacity must be between 0 and 1"))))
-
-      true)
-    (catch js/Error e
-      (js/console.error "Fallback validation failed:" e)
-      false)))
-
-;; Modify the final validate-style function
 (defn validate-style [style]
-  "Validate style with official validation and fallback"
+  "Validate style using official MapLibre validation"
   (try
     (js/console.log "=== Starting style validation ===")
+    (js/console.log "Style to validate:" (clj->js style))
 
-    ;; First try official validation - use validateStyleMin
-    (if (and style-spec (.-validateStyleMin style-spec))
-      (do
-        (js/console.log "Using official MapLibre validation (validateStyleMin)")
-        (let [complete-style (clj->js
-                              {:version 8
-                               :name "Building Style Validation"
-                               :sources {}
-                               :layers [{:id "validation-layer"
-                                         :type "fill"
-                                         :paint style}]})
-              validate-fn (.-validateStyleMin style-spec)]
+    ;; Use official validation directly, assuming it's always available
+    (let [complete-style (clj->js
+                          {:version 8
+                           :name "Building Style Validation"
+                           :sources {:dummy-source {:type "geojson"
+                                                    :data {:type "FeatureCollection"
+                                                           :features []}}}
+                           :layers [{:id "validation-layer"
+                                     :type "fill"
+                                     :source "dummy-source"
+                                     :paint style}]})
+          validation-result ((.-validateStyleMin style-spec) complete-style)]
 
-          (validate-fn complete-style)
-          true))
+      (js/console.log "Validation result:" validation-result)
 
-      ;; Official validation not available, use fallback
-      (do
-        (js/console.warn "Official validation not available, using fallback")
-        (fallback-validate-style style)))
+      ;; validateStyleMin returns error array, empty array means validation passed
+      (if (and (array? validation-result) (== (.-length validation-result) 0))
+        true
+        (do
+          (js/console.error "Validation errors:" validation-result)
+          false)))
 
     (catch js/Error e
       (js/console.error "Style validation failed:" e)
@@ -399,41 +366,4 @@
          "Only works with Dark or Light vector styles"]
         ;; Add current style status display
         [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
-         "Current: " (pr-str (select-keys @current-editing-style [:fill-color :fill-opacity :fill-outline-color]))]]
-
-       [:div {:style {:margin-top "15px" :padding-top "15px" :border-top "1px solid #eee"}}
-        [:button {:on-click #(do
-                               (js/console.log "=== Testing Official Validation ===")
-                               (debug-style-spec-module)
-                               ;; 测试有效样式
-                               (let [valid-style {:fill-color "#ff0000" :fill-opacity 0.5 :fill-outline-color "#00ff00"}]
-                                 (js/console.log "Valid style test result:" (validate-style valid-style)))
-                               ;; 测试无效样式
-                               (let [invalid-style {:fill-color "invalid" :fill-opacity 2.0 :fill-outline-color "#00ff00"}]
-                                 (js/console.log "Invalid style test result:" (validate-style invalid-style))))
-                  :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                          :background "#17a2b8" :color "white" :cursor "pointer" :width "100%"
-                          :margin-bottom "10px"}}
-         "Test Official Validation"]
-
-        [:button {:on-click #(do
-                               (js/console.log "=== Debug Current Style ===")
-                               (js/console.log "Current editing style:" @current-editing-style)
-                               (js/console.log "Validation result:" (validate-style @current-editing-style)))
-                  :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                          :background "#6c757d" :color "white" :cursor "pointer" :width "100%"}}
-         "Debug Current Style"]]
-
-       [:div {:style {:margin-top "10px"}}
-        [:button {:on-click #(let [map-inst (.-pearlMapInstance js/window)]
-                               (when map-inst
-                                 (let [style-obj (.getStyle map-inst)
-                                       layers (.-layers style-obj)]
-                                   (js/console.log "=== Available Layers ===")
-                                   (doseq [layer layers]
-                                     (js/console.log "ID:" (.-id layer)
-                                                     "| Type:" (.-type layer)
-                                                     "| Source:" (.-source layer))))))
-                  :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                          :background "#6c757d" :color "white" :cursor "pointer" :width "100%"}}
-         "Debug Layers"]]])}))
+         "Current: " (pr-str (select-keys @current-editing-style [:fill-color :fill-opacity :fill-outline-color]))]]])}))
