@@ -2,7 +2,7 @@
   (:require [reagent.core :as reagent]
             [reagent.dom.client :as rdomc]
             [pearl-map.editor :refer [building-style-editor]]
-            ;; Import maplibre using shadow-cljs require syntax
+            [pearl-map.services.threejs :as threejs]
             ["maplibre-gl" :as maplibre]))
 
 ;; Eiffel Tower coordinates for Paris focus [longitude, latitude]
@@ -10,6 +10,12 @@
 
 ;; Atom to hold map instance for state management - use defonce to preserve across hot-reloads
 (defonce map-instance (reagent/atom nil))
+
+;; Add model state atom to track loading status
+(defonce model-loaded (reagent/atom false))
+
+;; Add global reference for loaded model
+(defonce loaded-model (reagent/atom nil))
 
 ;; Use Reagent's React 18 root instance management
 (def react-root (atom nil))
@@ -92,6 +98,18 @@
                (fn []
                  (js/console.log "Map successfully loaded")
                  (js/console.log "Current style:" @current-style)
+
+                 ;; Load GLTF model after map is ready
+                 (threejs/load-gltf-model
+                  "/models/eiffel_tower/scene.gltf"
+                  (fn [gltf-model]
+                    (js/console.log "Eiffel Tower model loaded successfully")
+                    (reset! model-loaded true)
+                    (reset! loaded-model gltf-model)
+                    ;; Store model reference globally for future rendering
+                    (set! (.-pearlMapModel js/window) gltf-model)
+                    (js/console.log "Model stored as window.pearlMapModel for rendering")))
+
                  ;; Add buildings layer for vector styles
                  (when (and (not= @current-style "raster-style")
                             (not (.getLayer map-obj "buildings")))
@@ -108,7 +126,7 @@
                                           :fill-outline-color "#cccccc"}}))
                      (js/console.log "Buildings layer added successfully")
                      (catch js/Error e
-                       (js/console.warn "Could not add buildings layer (may not be available in this style):" e))))))
+                       (js/console.warn "Could not add buildings layer:" e))))))
           ;; Handle map errors
           (.on map-obj "error"
                (fn [e]
@@ -175,7 +193,8 @@
                  :font-family "Arial, sans-serif"
                  :font-size "12px"}}
    [:div "Map Instance: " (if @map-instance "Loaded" "Not Loaded")]
-   [:div "Container: " (if (.getElementById js/document "map-container") "Exists" "Missing")]])
+   [:div "Container: " (if (.getElementById js/document "map-container") "Exists" "Missing")]
+   [:div "3D Model: " (if @model-loaded "Loaded" "Not Loaded")]])
 
 (defn home-page []
   "Main home page component with integrated 3D map"

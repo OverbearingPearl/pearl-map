@@ -17,8 +17,12 @@
         :modules {:main {:init-fn pearl-map.core/init}}
         :devtools {:after-load pearl-map.core/reload}
         :dev {:compiler-options {:closure-defines {re-frame.trace.trace-enabled? true}
-                                 :build-hooks [(pearl-map.build/copy-maplibre-css)]}}
-        :release {:compiler-options {:build-hooks [(pearl-map.build/copy-maplibre-css)]}}}
+                                 :build-hooks [(pearl-map.build/copy-maplibre-css)
+                                               (pearl-map.build/copy-gltf-files)
+                                               (pearl-map.build/copy-threejs-files)]}}
+        :release {:compiler-options {:build-hooks [(pearl-map.build/copy-maplibre-css)
+                                                   (pearl-map.build/copy-gltf-files)
+                                                   (pearl-map.build/copy-threejs-files)]}}}
   :test {:target :browser-test
          :test-dir "target/test"
          :ns-regexp "-test$"}}}
