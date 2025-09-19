@@ -1,9 +1,5 @@
 (ns pearl-map.services.threejs
-  (:require ["three" :as three]
-            ["three/examples/jsm/loaders/GLTFLoader.js" :refer [GLTFLoader]]
-            ["three/examples/jsm/controls/OrbitControls.js" :refer [OrbitControls]]
-            ["maplibre-gl" :as mapbox]
-            [reagent.core :as reagent]))
+  (:require ["three/examples/jsm/loaders/GLTFLoader.js" :refer [GLTFLoader]]))
 
 ;; GLTF loader function with proper error handling
 (defn load-gltf-model [model-path callback]
