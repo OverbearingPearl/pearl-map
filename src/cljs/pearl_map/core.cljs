@@ -149,7 +149,8 @@
             (when @map-instance
               (.remove ^js js-map-inst))  ;; Remove existing map
             (reset! map-instance nil)
-            (js/setTimeout init-map 100))  ;; Delay reinitializing map
+            ;; Use requestAnimationFrame to ensure DOM is ready
+            (.requestAnimationFrame js/window init-map))
           ;; For vector styles, use standard setStyle method
           (.setStyle ^js js-map-inst style-url))
 
@@ -198,33 +199,38 @@
 
 (defn home-page []
   "Main home page component with integrated 3D map"
-  [:div
-   [:div {:style {:position "absolute"
-                  :top "20px"
-                  :left "20px"
-                  :zIndex 1000
-                  :background "rgba(255,255,255,0.9)"
-                  :padding "10px"
-                  :borderRadius "5px"
-                  :fontFamily "Arial, sans-serif"}}
-    [:h1 {:style {:margin 0 :fontSize "1.5em" :color "#333"}} "Pearl Map - Paris 3D"]
-    [:p {:style {:margin "5px 0 0 0" :fontSize "0.9em" :color "#666"}}
-     "Centered at Eiffel Tower (2.2945°E, 48.8584°N)"]
-    [:p {:style {:margin "2px 0 0 0" :fontSize "0.8em" :color "#999"}}
-     "Using MapLibre demo vector service"]]
-   [style-controls]
-   [pearl-map.editor/building-style-editor]
-   [map-container]
-   [debug-info]])  ; Add debug info panel
+  (reagent/create-class
+   {:component-did-mount
+    (fn []
+      ;; Initialize map after component is mounted to ensure DOM is ready
+      (init-map))
+    :reagent-render
+    (fn []
+      [:div
+       [:div {:style {:position "absolute"
+                      :top "20px"
+                      :left "20px"
+                      :zIndex 1000
+                      :background "rgba(255,255,255,0.9)"
+                      :padding "10px"
+                      :borderRadius "5px"
+                      :fontFamily "Arial, sans-serif"}}
+        [:h1 {:style {:margin 0 :fontSize "1.5em" :color "#333"}} "Pearl Map - Paris 3D"]
+        [:p {:style {:margin "5px 0 0 0" :fontSize "0.9em" :color "#666"}}
+         "Centered at Eiffel Tower (2.2945°E, 48.8584°N)"]
+        [:p {:style {:margin "2px 0 0 0" :fontSize "0.8em" :color "#999"}}
+         "Using MapLibre demo vector service"]]
+       [style-controls]
+       [pearl-map.editor/building-style-editor]
+       [map-container]
+       [debug-info]])}))  ; Add debug info panel
 
 (defn mount-root []
   "Mount the root component using Reagent's React 18 API"
   (let [app-element (.getElementById js/document "app")
         root (rdomc/create-root app-element)]
     (reset! react-root root)
-    (rdomc/render root [home-page])
-    ;; Initialize map after a short delay to ensure DOM is fully rendered
-    (js/setTimeout init-map 100)))
+    (rdomc/render root [home-page])))
 
 (defn ^:dev/after-load reload []
   "Hot-reload function using Reagent's React 18 API"

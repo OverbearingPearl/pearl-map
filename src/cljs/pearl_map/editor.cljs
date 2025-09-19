@@ -24,10 +24,6 @@
     (js/console.log "validateStyleMin function:" (.-validateStyleMin style-spec))
     (js/console.log "validateStyleMin type:" (when (.-validateStyleMin style-spec) (type (.-validateStyleMin style-spec))))))
 
-;; Check module when component loads
-(defn check-style-spec-on-load []
-  (js/setTimeout debug-style-spec-module 2000))
-
 (defn validate-style [style]
   "Validate style using official MapLibre validation"
   (try
@@ -295,75 +291,79 @@
 
 (defn building-style-editor []
   "Building style editor component"
-  ;; Setup map listener when component mounts
-  (reagent/create-class
-   {:component-did-mount
-    (fn []
-      (js/setTimeout setup-map-listener 1000)  ;; Delay to ensure map is initialized
-      (js/setTimeout check-style-spec-on-load 3000))  ;; Check style-spec module
-    :reagent-render
-    (fn []
-      [:div {:style {:position "absolute"
-                     :top "100px"
-                     :right "20px"
-                     :z-index 1000
-                     :background "rgba(255,255,255,0.95)"
-                     :padding "15px"
-                     :border-radius "8px"
-                     :font-family "Arial, sans-serif"
-                     :width "300px"
-                     :box-shadow "0 2px 10px rgba(0,0,0,0.1)"}}
-       [:h3 {:style {:margin "0 0 15px 0" :color "#333"}} "Building Style Editor"]
+  (let [mounted (reagent/atom false)]
+    (reagent/create-class
+     {:component-did-mount
+      (fn []
+        (reset! mounted true)
+        (setup-map-listener)
+        (debug-style-spec-module))
+      :component-will-unmount
+      (fn []
+        (reset! mounted false))
+      :reagent-render
+      (fn []
+        [:div {:style {:position "absolute"
+                       :top "100px"
+                       :right "20px"
+                       :z-index 1000
+                       :background "rgba(255,255,255,0.95)"
+                       :padding "15px"
+                       :border-radius "8px"
+                       :font-family "Arial, sans-serif"
+                       :width "300px"
+                       :box-shadow "0 2px 10px rgba(0,0,0,0.1)"}}
+         [:h3 {:style {:margin "0 0 15px 0" :color "#333"}} "Building Style Editor"]
 
-       [:div {:style {:margin-bottom "10px"}}
-        [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Fill Color"]
-        [:input {:type "color"
-                 :value (or (:fill-color @current-editing-style) "#f0f0f0")
-                 :on-change #(update-building-style :fill-color (-> % .-target .-value))
-                 :style {:width "100%" :height "30px"}}]]
+         [:div {:style {:margin-bottom "10px"}}
+          [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Fill Color"]
+          [:input {:type "color"
+                   :value (or (:fill-color @current-editing-style) "#f0f0f0")
+                   :on-change #(update-building-style :fill-color (-> % .-target .-value))
+                   :style {:width "100%" :height "30px"}}]]
 
-       [:div {:style {:margin-bottom "10px"}}
-        [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Opacity"]
-        [:input {:type "range"
-                 :min "0" :max "1" :step "0.1"
-                 :value (:fill-opacity @current-editing-style)
-                 :on-change #(update-building-style :fill-opacity (js/parseFloat (-> % .-target .-value)))
-                 :style {:width "100%"}}]
-        [:span {:style {:font-size "12px"}} (str "Opacity: " (:fill-opacity @current-editing-style))]]
+         [:div {:style {:margin-bottom "10px"}}
+          [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Opacity"]
+          [:input {:type "range"
+                   :min "0" :max "1" :step "0.1"
+                   :value (:fill-opacity @current-editing-style)
+                   :on-change #(update-building-style :fill-opacity (js/parseFloat (-> % .-target .-value)))
+                   :style {:width "100%"}}]
+          [:span {:style {:font-size "12px"}} (str "Opacity: " (:fill-opacity @current-editing-style))]]
 
-       [:div {:style {:margin-bottom "15px"}}
-        [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Outline Color"]
-        [:input {:type "color"
-                 :value (or (:fill-outline-color @current-editing-style) "#cccccc")
-                 :on-change #(update-building-style :fill-outline-color (-> % .-target .-value))
-                 :style {:width "100%" :height "30px"}}]]
+         [:div {:style {:margin-bottom "15px"}}
+          [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Outline Color"]
+          [:input {:type "color"
+                   :value (or (:fill-outline-color @current-editing-style) "#cccccc")
+                   :on-change #(update-building-style :fill-outline-color (-> % .-target .-value))
+                   :style {:width "100%" :height "30px"}}]]
 
-       [:div {:style {:display "flex" :gap "10px" :margin-bottom "15px" :flex-wrap "wrap"}}
-        [:button {:on-click #(do
-                               (reset! current-editing-style (:light default-building-styles))
-                               (apply-current-style))
-                  :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                          :background "#007bff" :color "white" :cursor "pointer"}} "Light Theme"]
-        [:button {:on-click #(do
-                               (reset! current-editing-style (:dark default-building-styles))
-                               (apply-current-style))
-                  :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                          :background "#343a40" :color "white" :cursor "pointer"}} "Dark Theme"]
-        ;; Add refresh current styles button
-        [:button {:on-click #(when-let [current-styles (get-current-building-styles)]
-                               (reset! current-editing-style current-styles)
-                               ;; Force re-render by ensuring opacity is a number
-                               (when-let [opacity (:fill-opacity current-styles)]
-                                 (when (object? opacity)
-                                   (swap! current-editing-style assoc :fill-opacity (get-opacity-value opacity)))))
-                  :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                          :background "#28a745" :color "white" :cursor "pointer"}} "Refresh Styles"]]
+         [:div {:style {:display "flex" :gap "10px" :margin-bottom "15px" :flex-wrap "wrap"}}
+          [:button {:on-click #(do
+                                 (reset! current-editing-style (:light default-building-styles))
+                                 (apply-current-style))
+                    :style {:padding "8px 12px" :border "none" :border-radius "4px"
+                            :background "#007bff" :color "white" :cursor "pointer"}} "Light Theme"]
+          [:button {:on-click #(do
+                                 (reset! current-editing-style (:dark default-building-styles))
+                                 (apply-current-style))
+                    :style {:padding "8px 12px" :border "none" :border-radius "4px"
+                            :background "#343a40" :color "white" :cursor "pointer"}} "Dark Theme"]
+          ;; Add refresh current styles button
+          [:button {:on-click #(when-let [current-styles (get-current-building-styles)]
+                                 (reset! current-editing-style current-styles)
+                                 ;; Force re-render by ensuring opacity is a number
+                                 (when-let [opacity (:fill-opacity current-styles)]
+                                   (when (object? opacity)
+                                     (swap! current-editing-style assoc :fill-opacity (get-opacity-value opacity)))))
+                    :style {:padding "8px 12px" :border "none" :border-radius "4px"
+                            :background "#28a745" :color "white" :cursor "pointer"}} "Refresh Styles"]]
 
-       [:div {:style {:padding-top "15px" :border-top "1px solid #eee"}}
-        [:p {:style {:color "#666" :font-size "12px" :margin "0 0 10px 0" :font-weight "bold"}}
-         "Buildings Status:"]
-        [:p {:style {:color "#666" :font-size "11px" :margin "0" :font-style "italic"}}
-         "Only works with Dark or Light vector styles"]
-        ;; Add current style status display
-        [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
-         "Current: " (pr-str (select-keys @current-editing-style [:fill-color :fill-opacity :fill-outline-color]))]]])}))
+         [:div {:style {:padding-top "15px" :border-top "1px solid #eee"}}
+          [:p {:style {:color "#666" :font-size "12px" :margin "0 0 10px 0" :font-weight "bold"}}
+           "Buildings Status:"]
+          [:p {:style {:color "#666" :font-size "11px" :margin "0" :font-style "italic"}}
+           "Only works with Dark or Light vector styles"]
+          ;; Add current style status display
+          [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
+           "Current: " (pr-str (select-keys @current-editing-style [:fill-color :fill-opacity :fill-outline-color]))]]])})))
