@@ -1,21 +1,15 @@
 (ns pearl-map.core
   (:require [reagent.core :as reagent]
             [reagent.dom.client :as rdomc]
+            [re-frame.core :as re-frame]
+            [pearl-map.events :as events]
+            [pearl-map.subs :as subs]
             [pearl-map.editor :refer [building-style-editor]]
             [pearl-map.services.threejs :as threejs]
             ["maplibre-gl" :as maplibre]))
 
 ;; Eiffel Tower coordinates for Paris focus [longitude, latitude]
 (def eiffel-tower-coords [2.2945 48.8584])
-
-;; Atom to hold map instance for state management - use defonce to preserve across hot-reloads
-(defonce map-instance (reagent/atom nil))
-
-;; Add model state atom to track loading status
-(defonce model-loaded (reagent/atom false))
-
-;; Add global reference for loaded model
-(defonce loaded-model (reagent/atom nil))
 
 ;; Use Reagent's React 18 root instance management
 (def react-root (atom nil))
@@ -25,9 +19,6 @@
   {:basic "raster-style"  ;; Custom raster style identifier
    :dark "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
    :light "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"})
-
-;; Atom to track current map style - use defonce to preserve value across hot-reloads
-(defonce current-style (reagent/atom (:basic style-urls)))
 
 (defn map-container []
   "Reagent component that renders the map container with proper styling"
@@ -40,11 +31,12 @@
 
 (defn init-map []
   "Initialize Maplibre map with proper style configuration"
-  (let [map-element (.getElementById js/document "map-container")]
+  (let [current-style "raster-style"  ;; Use default style directly
+        map-element (.getElementById js/document "map-container")]
     (when map-element
-      (js/console.log "Initializing map with style:" @current-style)
+      (js/console.log "Initializing map with style:" current-style)
       (try
-        (let [map-config (if (= @current-style "raster-style")
+        (let [map-config (if (= current-style "raster-style")
                            (do
                              (js/console.log "Using raster config with OSM tiles")
                              ;; Create complete raster style configuration
@@ -68,9 +60,9 @@
                                        :maxZoom 19
                                        :minZoom 0}))
                            (do
-                             (js/console.log "Using vector config with URL:" @current-style)
+                             (js/console.log "Using vector config with URL:" current-style)
                              (clj->js {:container "map-container"
-                                       :style @current-style
+                                       :style current-style
                                        :center (clj->js eiffel-tower-coords)
                                        :zoom 15
                                        :pitch 45
@@ -82,8 +74,8 @@
               ;; Create map instance using imported maplibre module
               map-obj (maplibre/Map. map-config)]
 
-          ;; Store map instance in atom for state management and set global reference
-          (reset! map-instance map-obj)
+          ;; Store map instance in re-frame and set global reference
+          (re-frame/dispatch [:set-map-instance map-obj])
           (set! (.-pearlMapInstance js/window) map-obj)
           (js/console.log "Map instance stored globally as window.pearlMapInstance")
 
@@ -97,21 +89,21 @@
           (.on map-obj "load"
                (fn []
                  (js/console.log "Map successfully loaded")
-                 (js/console.log "Current style:" @current-style)
+                 (js/console.log "Current style:" current-style)
 
                  ;; Load GLTF model after map is ready
                  (threejs/load-gltf-model
                   "/models/eiffel_tower/scene.gltf"
                   (fn [gltf-model]
                     (js/console.log "Eiffel Tower model loaded successfully")
-                    (reset! model-loaded true)
-                    (reset! loaded-model gltf-model)
+                    (re-frame/dispatch [:set-model-loaded true])
+                    (re-frame/dispatch [:set-loaded-model gltf-model])
                     ;; Store model reference globally for future rendering
                     (set! (.-pearlMapModel js/window) gltf-model)
                     (js/console.log "Model stored as window.pearlMapModel for rendering")))
 
                  ;; Add buildings layer for vector styles
-                 (when (and (not= @current-style "raster-style")
+                 (when (and (not= current-style "raster-style")
                             (not (.getLayer map-obj "buildings")))
                    (try
                      (.addLayer map-obj
@@ -138,71 +130,78 @@
 
 ;; Add error handling to style switching function
 (defn change-map-style [style-url]
-  (reset! current-style style-url)
-  (when-let [map-inst @map-instance]
-    (let [^js js-map-inst map-inst]
-      (try
-        ;; Check if it's raster style
-        (if (= style-url "raster-style")
-          ;; For raster styles, need to recreate map instance
-          (do
-            (when @map-instance
-              (.remove ^js js-map-inst))  ;; Remove existing map
-            (reset! map-instance nil)
-            ;; Use requestAnimationFrame to ensure DOM is ready
-            (.requestAnimationFrame js/window init-map))
-          ;; For vector styles, use standard setStyle method
-          (.setStyle ^js js-map-inst style-url))
+  (re-frame/dispatch [:set-current-style style-url])
+  (let [map-inst @(re-frame/subscribe [:map-instance])]
+    (when map-inst
+      (let [^js js-map-inst map-inst]
+        (try
+          ;; Check if it's raster style
+          (if (= style-url "raster-style")
+            ;; For raster styles, need to recreate map instance
+            (do
+              (when map-inst
+                (.remove ^js js-map-inst))  ;; Remove existing map
+              (re-frame/dispatch [:set-map-instance nil])
+              ;; Use requestAnimationFrame to ensure DOM is ready
+              (.requestAnimationFrame js/window init-map))
+            ;; For vector styles, use standard setStyle method
+            (.setStyle ^js js-map-inst style-url))
 
-        (js/console.log "Style changed to:" style-url)
-        (catch js/Error e
-          (js/console.error "Failed to change style:" e))))))
+          (js/console.log "Style changed to:" style-url)
+          (catch js/Error e
+            (js/console.error "Failed to change style:" e)))))))
 
 ;; Add style control UI component
 (defn style-controls []
-  [:div {:style {:position "absolute"
-                 :top "20px"
-                 :right "20px"
-                 :z-index 1000
-                 :background "rgba(255,255,255,0.9)"
-                 :padding "10px"
-                 :border-radius "5px"
-                 :font-family "Arial, sans-serif"}}
-   [:h3 {:style {:margin "0 0 10px 0"}} "Map Style"]
-   [:button {:on-click #(change-map-style (:basic style-urls))
-             :style {:margin "5px" :padding "8px 12px" :border "none"
-                     :border-radius "3px" :background "#007bff" :color "white"
-                     :cursor "pointer"}} "Basic Style"]
-   [:button {:on-click #(change-map-style (:dark style-urls))
-             :style {:margin "5px" :padding "8px 12px" :border "none"
-                     :border-radius "3px" :background "#343a40" :color "white"
-                     :cursor "pointer"}} "Dark Style"]
-   [:button {:on-click #(change-map-style (:light style-urls))
-             :style {:margin "5px" :padding "8px 12px" :border "none"
-                     :border-radius "3px" :background "#f8f9fa" :color "black"
-                     :cursor "pointer"}} "Light Style"]])
+  (let [current-style @(re-frame/subscribe [:current-style])]
+    [:div {:style {:position "absolute"
+                   :top "20px"
+                   :right "20px"
+                   :z-index 1000
+                   :background "rgba(255,255,255,0.9)"
+                   :padding "10px"
+                   :border-radius "5px"
+                   :font-family "Arial, sans-serif"}}
+     [:h3 {:style {:margin "0 0 10px 0"}} "Map Style"]
+     [:button {:on-click #(change-map-style (:basic style-urls))
+               :style {:margin "5px" :padding "8px 12px" :border "none"
+                       :border-radius "3px" :background "#007bff" :color "white"
+                       :cursor "pointer"}} "Basic Style"]
+     [:button {:on-click #(change-map-style (:dark style-urls))
+               :style {:margin "5px" :padding "8px 12px" :border "none"
+                       :border-radius "3px" :background "#343a40" :color "white"
+                       :cursor "pointer"}} "Dark Style"]
+     [:button {:on-click #(change-map-style (:light style-urls))
+               :style {:margin "5px" :padding "8px 12px" :border "none"
+                       :border-radius "3px" :background "#f8f9fa" :color "black"
+                       :cursor "pointer"}} "Light Style"]
+     [:div {:style {:margin-top "10px" :font-size "12px" :color "#666"}}
+      "Current: " (str current-style)]]))
 
 ;; Add debug info component to help diagnose issues
 (defn debug-info []
-  [:div {:style {:position "absolute"
-                 :bottom "20px"
-                 :left "20px"
-                 :z-index 1000
-                 :background "rgba(255,255,255,0.9)"
-                 :padding "10px"
-                 :border-radius "5px"
-                 :font-family "Arial, sans-serif"
-                 :font-size "12px"}}
-   [:div "Map Instance: " (if @map-instance "Loaded" "Not Loaded")]
-   [:div "Container: " (if (.getElementById js/document "map-container") "Exists" "Missing")]
-   [:div "3D Model: " (if @model-loaded "Loaded" "Not Loaded")]])
+  (let [map-instance @(re-frame/subscribe [:map-instance])
+        model-loaded @(re-frame/subscribe [:model-loaded])]
+    [:div {:style {:position "absolute"
+                   :bottom "20px"
+                   :left "20px"
+                   :z-index 1000
+                   :background "rgba(255,255,255,0.9)"
+                   :padding "10px"
+                   :border-radius "5px"
+                   :font-family "Arial, sans-serif"
+                   :font-size "12px"}}
+     [:div "Map Instance: " (if map-instance "Loaded" "Not Loaded")]
+     [:div "Container: " (if (.getElementById js/document "map-container") "Exists" "Missing")]
+     [:div "3D Model: " (if model-loaded "Loaded" "Not Loaded")]]))
 
 (defn home-page []
   "Main home page component with integrated 3D map"
   (reagent/create-class
    {:component-did-mount
     (fn []
-      ;; Initialize map after component is mounted to ensure DOM is ready
+      ;; Initialize re-frame db and map
+      (re-frame/dispatch-sync [:initialize-db])
       (init-map))
     :reagent-render
     (fn []
@@ -234,7 +233,7 @@
 
 (defn ^:dev/after-load reload []
   "Hot-reload function using Reagent's React 18 API"
-  (js/console.log "Hot-reloading application... Current style:" @current-style)
+  (js/console.log "Hot-reloading application...")
 
   ;; Simply re-render the root component to pick up any code changes
   ;; The map instance and its state are preserved
@@ -245,5 +244,6 @@
 
 (defn init []
   "Application initialization entry point"
-  (js/console.log "Initializing Pearl Map application with React 18...")
+  (js/console.log "Initializing Pearl Map application with re-frame...")
+  (re-frame/clear-subscription-cache!)
   (mount-root))
