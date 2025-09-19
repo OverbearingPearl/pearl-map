@@ -2,6 +2,7 @@
   (:require [reagent.core :as reagent]
             [reagent.dom.client :as rdomc]
             [re-frame.core :as re-frame]
+            [re-frame.db :refer [app-db]]
             [pearl-map.events :as events]
             [pearl-map.subs :as subs]
             [pearl-map.editor :refer [building-style-editor]]
@@ -130,8 +131,12 @@
 
 ;; Add error handling to style switching function
 (defn change-map-style [style-url]
+  ;; Dispatch the style change first
   (re-frame/dispatch [:set-current-style style-url])
-  (let [map-inst @(re-frame/subscribe [:map-instance])]
+  ;; Get the current map instance from the app-db directly instead of using subscribe
+  ;; This avoids the warning about using subscribe outside of reactive context
+  (let [db @re-frame.db/app-db
+        map-inst (:map-instance db)]
     (when map-inst
       (let [^js js-map-inst map-inst]
         (try
