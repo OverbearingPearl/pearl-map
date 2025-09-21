@@ -72,7 +72,7 @@ pearl-map/
 │           ├── api.cljs                     # API 客户端 [待建]
 │           └── services/                    # 前端服务
 │               ├── map_engine.cljs          # 地图引擎封装 [待建]
-│               └── threejs.cljs             # Three.js 集成 [待建]
+│               └── model_loader.cljs        # Three.js 模型加载集成 [已实现]
 ├── resources/                               # 源代码资源文件（git 跟踪）
 │   ├── config/                              # 配置文件 [待建]
 │   │   ├── config.edn                       # 基础配置 [待建]

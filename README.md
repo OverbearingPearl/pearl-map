@@ -72,7 +72,7 @@ pearl-map/
 │           ├── api.cljs                     # API client [TO BE CREATED]
 │           └── services/                    # Frontend services
 │               ├── map_engine.cljs          # Map engine wrapper [TO BE CREATED]
-│               └── threejs.cljs             # Three.js integration [TO BE CREATED]
+│               └── model_loader.cljs        # Three.js model loading integration [IMPLEMENTED]
 ├── resources/                               # Source resource files (git tracked)
 │   ├── config/                              # Configuration files [TO BE CREATED]
 │   │   ├── config.edn                       # Base configuration [TO BE CREATED]
