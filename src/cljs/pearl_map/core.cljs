@@ -6,7 +6,7 @@
             [pearl-map.events :as events]
             [pearl-map.subs :as subs]
             [pearl-map.editor :refer [building-style-editor]]
-            [pearl-map.services.threejs :as threejs]
+            [pearl-map.services.model-loader :as model-loader]
             [pearl-map.services.map-engine :as map-engine]))
 
 ;; Use Reagent's React 18 root instance management
@@ -30,9 +30,9 @@
       (map-engine/on-map-load
        (fn [map-instance]
          (js/console.log "Map successfully loaded")
-         
+
          ;; Load GLTF model after map is ready
-         (threejs/load-gltf-model
+         (model-loader/load-gltf-model
           "/models/eiffel_tower/scene.gltf"
           (fn [gltf-model]
             (js/console.log "Eiffel Tower model loaded successfully")
@@ -40,11 +40,11 @@
             (re-frame/dispatch [:set-loaded-model gltf-model])
             (set! (.-pearlMapModel js/window) gltf-model)
             (js/console.log "Model stored as window.pearlMapModel for rendering")))
-         
+
          ;; Don't add buildings layer here - it will be handled by style change logic
          ;; This prevents the error when using raster style which doesn't have the composite source
          )))
-    
+
     ;; Set up error handler
     (map-engine/on-map-error
      (fn [e]
