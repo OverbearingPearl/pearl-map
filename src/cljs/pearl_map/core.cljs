@@ -7,22 +7,15 @@
             [pearl-map.subs :as subs]
             [pearl-map.editor :refer [building-style-editor]]
             [pearl-map.services.threejs :as threejs]
-            ["maplibre-gl" :as maplibre]))
-
-;; Eiffel Tower coordinates for Paris focus [longitude, latitude]
-(def eiffel-tower-coords [2.2945 48.8584])
+            [pearl-map.services.map-engine :as map-engine]))
 
 ;; Use Reagent's React 18 root instance management
 (def react-root (atom nil))
 
-;; Update the style URLs to use working demo styles
-(def style-urls
-  {:basic "raster-style"  ;; Custom raster style identifier
-   :dark "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-   :light "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"})
+;; Use the style URLs from map-engine
+(def style-urls map-engine/style-urls)
 
 (defn map-container []
-  "Reagent component that renders the map container with proper styling"
   [:div {:id "map-container"
          :style {:width "100%"
                  :height "100vh"
@@ -31,130 +24,35 @@
                  :left 0}}])
 
 (defn init-map []
-  "Initialize Maplibre map with proper style configuration"
-  (let [current-style "raster-style"  ;; Use default style directly
-        map-element (.getElementById js/document "map-container")]
-    (when map-element
-      (js/console.log "Initializing map with style:" current-style)
-      (try
-        (let [map-config (if (= current-style "raster-style")
-                           (do
-                             (js/console.log "Using raster config with OSM tiles")
-                             ;; Create complete raster style configuration
-                             (clj->js {:container "map-container"
-                                       :style {:version 8
-                                               :name "OSM Bright"
-                                               :center (clj->js eiffel-tower-coords)
-                                               :zoom 15
-                                               :pitch 45
-                                               :bearing 0
-                                               :sources {:osm {:type "raster"
-                                                               :tiles ["https://tile.openstreetmap.de/{z}/{x}/{y}.png"]
-                                                               :tileSize 256
-                                                               :attribution "© OpenStreetMap contributors"}}
-                                               :layers [{:id "osm-tiles"
-                                                         :type "raster"
-                                                         :source "osm"
-                                                         :minzoom 0
-                                                         :maxzoom 19}]}
-                                       :attributionControl true
-                                       :maxZoom 19
-                                       :minZoom 0}))
-                           (do
-                             (js/console.log "Using vector config with URL:" current-style)
-                             (clj->js {:container "map-container"
-                                       :style current-style
-                                       :center (clj->js eiffel-tower-coords)
-                                       :zoom 15
-                                       :pitch 45
-                                       :bearing 0
-                                       :attributionControl true
-                                       :maxZoom 19
-                                       :minZoom 0})))
+  (let [map-obj (map-engine/init-map)]
+    (when map-obj
+      ;; Set up map load handler
+      (map-engine/on-map-load
+       (fn [map-instance]
+         (js/console.log "Map successfully loaded")
+         
+         ;; Load GLTF model after map is ready
+         (threejs/load-gltf-model
+          "/models/eiffel_tower/scene.gltf"
+          (fn [gltf-model]
+            (js/console.log "Eiffel Tower model loaded successfully")
+            (re-frame/dispatch [:set-model-loaded true])
+            (re-frame/dispatch [:set-loaded-model gltf-model])
+            (set! (.-pearlMapModel js/window) gltf-model)
+            (js/console.log "Model stored as window.pearlMapModel for rendering")))
+         
+         ;; Don't add buildings layer here - it will be handled by style change logic
+         ;; This prevents the error when using raster style which doesn't have the composite source
+         )))
+    
+    ;; Set up error handler
+    (map-engine/on-map-error
+     (fn [e]
+       (js/console.error "Map loading error:" e)))))
 
-              ;; Create map instance using imported maplibre module
-              map-obj (maplibre/Map. map-config)]
-
-          ;; Store map instance in re-frame and set global reference
-          (re-frame/dispatch [:set-map-instance map-obj])
-          (set! (.-pearlMapInstance js/window) map-obj)
-          (js/console.log "Map instance stored globally as window.pearlMapInstance")
-
-          ;; Add navigation controls for better UX
-          (.addControl map-obj (maplibre/NavigationControl.))
-
-          ;; Add scale control
-          (.addControl map-obj (maplibre/ScaleControl.))
-
-          ;; Handle map load completion
-          (.on map-obj "load"
-               (fn []
-                 (js/console.log "Map successfully loaded")
-                 (js/console.log "Current style:" current-style)
-
-                 ;; Load GLTF model after map is ready
-                 (threejs/load-gltf-model
-                  "/models/eiffel_tower/scene.gltf"
-                  (fn [gltf-model]
-                    (js/console.log "Eiffel Tower model loaded successfully")
-                    (re-frame/dispatch [:set-model-loaded true])
-                    (re-frame/dispatch [:set-loaded-model gltf-model])
-                    ;; Store model reference globally for future rendering
-                    (set! (.-pearlMapModel js/window) gltf-model)
-                    (js/console.log "Model stored as window.pearlMapModel for rendering")))
-
-                 ;; Add buildings layer for vector styles
-                 (when (and (not= current-style "raster-style")
-                            (not (.getLayer map-obj "buildings")))
-                   (try
-                     (.addLayer map-obj
-                                (clj->js
-                                 {:id "buildings"
-                                  :type "fill"
-                                  :source "composite"
-                                  :source-layer "building"
-                                  :filter ["==" "extrude" "true"]
-                                  :paint {:fill-color "#f0f0f0"
-                                          :fill-opacity 0.7
-                                          :fill-outline-color "#cccccc"}}))
-                     (js/console.log "Buildings layer added successfully")
-                     (catch js/Error e
-                       (js/console.warn "Could not add buildings layer:" e))))))
-          ;; Handle map errors
-          (.on map-obj "error"
-               (fn [e]
-                 (js/console.error "Map loading error:" e)
-                 (js/console.error "Error details:" (.-error e)))))
-        (catch js/Error e
-          (js/console.error "Failed to initialize map:" e)
-          (js/console.error "Stack trace:" (.-stack e)))))))
-
-;; Add error handling to style switching function
 (defn change-map-style [style-url]
-  ;; Dispatch the style change first
   (re-frame/dispatch [:set-current-style style-url])
-  ;; Get the current map instance from the app-db directly instead of using subscribe
-  ;; This avoids the warning about using subscribe outside of reactive context
-  (let [db @re-frame.db/app-db
-        map-inst (:map-instance db)]
-    (when map-inst
-      (let [^js js-map-inst map-inst]
-        (try
-          ;; Check if it's raster style
-          (if (= style-url "raster-style")
-            ;; For raster styles, need to recreate map instance
-            (do
-              (when map-inst
-                (.remove ^js js-map-inst))  ;; Remove existing map
-              (re-frame/dispatch [:set-map-instance nil])
-              ;; Use requestAnimationFrame to ensure DOM is ready
-              (.requestAnimationFrame js/window init-map))
-            ;; For vector styles, use standard setStyle method
-            (.setStyle ^js js-map-inst style-url))
-
-          (js/console.log "Style changed to:" style-url)
-          (catch js/Error e
-            (js/console.error "Failed to change style:" e)))))))
+  (map-engine/change-map-style style-url))
 
 ;; Add style control UI component
 (defn style-controls []

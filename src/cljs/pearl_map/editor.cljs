@@ -1,8 +1,7 @@
 (ns pearl-map.editor
   (:require [reagent.core :as reagent]
-            [clojure.string :as str])
-  (:require ["color" :as color]
-            ["@maplibre/maplibre-gl-style-spec" :as style-spec]))
+            [clojure.string :as str]
+            [pearl-map.services.map-engine :as map-engine]))
 
 ;; Default building style configurations
 (def default-building-styles
@@ -13,54 +12,13 @@
           :fill-opacity 0.8
           :fill-outline-color "#4a5568"}})
 
-;; Add debug function to check style-spec module
-(defn debug-style-spec-module []
-  "Debug function to check style-spec module availability"
-  (js/console.log "=== DEBUG: style-spec module analysis ===")
-  (js/console.log "style-spec module:" style-spec)
-  (when style-spec
-    (js/console.log "Module type:" (type style-spec))
-    (js/console.log "Available keys:" (js/Object.keys style-spec))
-    (js/console.log "validateStyleMin function:" (.-validateStyleMin style-spec))
-    (js/console.log "validateStyleMin type:" (when (.-validateStyleMin style-spec) (type (.-validateStyleMin style-spec))))))
-
 (defn validate-style [style]
-  "Validate style using official MapLibre validation"
-  (try
-    (js/console.log "=== Starting style validation ===")
-    (js/console.log "Style to validate:" (clj->js style))
+  "Validate style using map-engine's validation"
+  (map-engine/validate-style style))
 
-    ;; Use official validation directly, assuming it's always available
-    (let [complete-style (clj->js
-                          {:version 8
-                           :name "Building Style Validation"
-                           :sources {:dummy-source {:type "geojson"
-                                                    :data {:type "FeatureCollection"
-                                                           :features []}}}
-                           :layers [{:id "validation-layer"
-                                     :type "fill"
-                                     :source "dummy-source"
-                                     :paint style}]})
-          validation-result ((.-validateStyleMin style-spec) complete-style)]
-
-      (js/console.log "Validation result:" validation-result)
-
-      ;; validateStyleMin returns error array, empty array means validation passed
-      (if (and (array? validation-result) (== (.-length validation-result) 0))
-        true
-        (do
-          (js/console.error "Validation errors:" validation-result)
-          false)))
-
-    (catch js/Error e
-      (js/console.error "Style validation failed:" e)
-      false)))
-
-;; Shared MapLibre parsing utilities
+;; Use map-engine for zoom
 (defn get-current-zoom []
-  "Get current zoom level from map instance"
-  (let [map-inst (.-pearlMapInstance js/window)]
-    (when map-inst (.getZoom map-inst))))
+  (map-engine/get-current-zoom))
 
 (defn parse-maplibre-stops [stops-obj]
   "Parse MapLibre stops format and return interpolated value"
@@ -104,7 +62,7 @@
                         (recur (cons [z2 v2] more))))))))
       (throw (js/Error. (str "Unsupported expression format: " (js/JSON.stringify expr)))))))
 
-;; Color conversion functions
+;; Color conversion functions - use map-engine's functions
 (defn rgba-to-hex [color-value]
   "Convert color value to hex format - handle various MapLibre color formats"
   (try
@@ -113,13 +71,10 @@
       (and (string? color-value) (str/starts-with? color-value "#"))
       color-value
 
-      ;; 2. RGBA/RGB string format
+      ;; 2. RGBA/RGB string format - use map-engine's function
       (and (string? color-value) (or (str/includes? color-value "rgba")
                                      (str/includes? color-value "rgb")))
-      (-> (color color-value)
-          (.hex)
-          (.toString)
-          (.toLowerCase))
+      (map-engine/rgba-to-hex color-value)
 
       ;; 3. MapLibre expression format: ["interpolate", "linear", "zoom", ...]
       (and (object? color-value) (.-expression color-value))
@@ -177,78 +132,60 @@
   (when hex-str
     (if (str/starts-with? hex-str "rgba")
       hex-str
-      (let [opacity-value (get-opacity-value opacity)
-            color-obj (color hex-str)
-            rgb-obj (.rgb color-obj)
-            rgba-obj (.alpha rgb-obj opacity-value)]
-        (.string rgba-obj)))))
+      (let [opacity-value (get-opacity-value opacity)]
+        (map-engine/hex-to-rgba hex-str opacity-value)))))
 
 ;; Current editing style state - use defonce to preserve state during hot reload
 (defonce current-editing-style (reagent/atom (:light default-building-styles)))
 
 (defn get-current-building-styles []
-  "Get current building styles from the map instance - throw errors on failure"
   (js/console.log "=== DEBUG: Starting get-current-building-styles ===")
-  (let [map-inst (.-pearlMapInstance js/window)
-        building-layer-ids ["building" "building-top"]]
-    (js/console.log "Map instance available:" (boolean map-inst))
-    (when map-inst
-      (js/console.log "Map loaded status:" (.-loaded map-inst))
-      (let [styles (atom {})]
-        ;; Check each building layer
-        (doseq [layer-id building-layer-ids]
-          (let [layer-exists (.getLayer map-inst layer-id)]
-            (js/console.log "Layer" layer-id "exists:" layer-exists)
-            (when layer-exists
-              ;; Get layer's paint properties
-              (doseq [style-key [:fill-color :fill-opacity :fill-outline-color]]
-                (let [current-value (.getPaintProperty map-inst layer-id (name style-key))]
-                  (js/console.log "Style" style-key "value:" current-value "type:" (type current-value))
-                  (when current-value
-                    ;; Process different types of values - throw errors on failure
-                    (let [processed-value (cond
-                                            (#{:fill-color :fill-outline-color} style-key)
-                                            (rgba-to-hex current-value)
+  (let [styles (atom {})]
+    ;; Check each building layer
+    (doseq [layer-id ["building" "building-top"]]
+      (doseq [style-key [:fill-color :fill-opacity :fill-outline-color]]
+        (try
+          (let [current-value (map-engine/get-paint-property layer-id (name style-key))]
+            (js/console.log "Style" style-key "value:" current-value "type:" (type current-value))
+            (when current-value
+              (let [processed-value (cond
+                                      (#{:fill-color :fill-outline-color} style-key)
+                                      (map-engine/rgba-to-hex current-value)
 
-                                            (= style-key :fill-opacity)
-                                            (get-opacity-value current-value)
+                                      (= style-key :fill-opacity)
+                                      (get-opacity-value current-value)
 
-                                            :else current-value)]
-                      (js/console.log "Processed value:" processed-value)
-                      (swap! styles assoc style-key processed-value))))))))
-        (js/console.log "Final styles object:" @styles)
-        @styles))))
+                                      :else current-value)]
+                (js/console.log "Processed value:" processed-value)
+                (swap! styles assoc style-key processed-value))))
+          (catch js/Error e
+            (js/console.warn (str "Could not get property " style-key " for layer " layer-id ":") e)))))
+    (js/console.log "Final styles object:" @styles)
+    @styles))
 
 (defn apply-current-style []
-  "Apply the current editing style to the map buildings with proper error handling"
   (try
-    (let [map-inst (.-pearlMapInstance js/window)
-          style @current-editing-style]
-      (when map-inst
-        (if (.-loaded map-inst)
-          ;; Validate style before applying
-          (let [validation-result (validate-style style)]
-            (if validation-result
-              (let [building-layer-ids ["building" "building-top"]]
-                (doseq [layer-id building-layer-ids]
-                  (when (.getLayer map-inst layer-id)
-                    (doseq [[style-key style-value] style]
-                      (let [final-value (cond
-                                          (#{:fill-color :fill-outline-color} style-key)
-                                          (hex-to-rgba style-value (:fill-opacity style))
+    (let [style @current-editing-style
+          validation-result (map-engine/validate-style style)]
+      (if validation-result
+        (doseq [layer-id ["building" "building-top"]]
+          (try
+            (doseq [[style-key style-value] style]
+              (let [final-value (cond
+                                  (#{:fill-color :fill-outline-color} style-key)
+                                  (map-engine/hex-to-rgba style-value (:fill-opacity style))
 
-                                          (= style-key :fill-opacity)
-                                          style-value
+                                  (= style-key :fill-opacity)
+                                  style-value
 
-                                          :else style-value)]
-                        (.setPaintProperty map-inst layer-id (name style-key) final-value))))))
-              (do
-                (js/console.error "Style validation failed - not applying changes")
-                false)))
-          (js/console.warn "Map is not loaded yet"))))
+                                  :else style-value)]
+                (map-engine/set-paint-property layer-id (name style-key) final-value)))
+            (catch js/Error e
+              (js/console.warn (str "Could not apply style to layer " layer-id ":") e))))
+        (js/console.error "Style validation failed - not applying changes")))
     (catch js/Error e
       (js/console.error "Failed to apply building style:" e)
-      (throw e))))  ;; Re-throw error instead of failing silently
+      (throw e))))
 
 (defn update-building-style [style-key value]
   "Update building style and apply to map"
@@ -296,8 +233,7 @@
      {:component-did-mount
       (fn []
         (reset! mounted true)
-        (setup-map-listener)
-        (debug-style-spec-module))
+        (setup-map-listener))
       :component-will-unmount
       (fn []
         (reset! mounted false))
