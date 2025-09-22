@@ -1,5 +1,6 @@
 (ns pearl-map.services.map-engine
   (:require [re-frame.core :as re-frame]
+            [re-frame.db :refer [app-db]]
             [reagent.core :as reagent]
             ["maplibre-gl" :as maplibre]
             ["color" :as color]
@@ -14,15 +15,16 @@
    :dark "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
    :light "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"})
 
-;; Map instance management
-(defonce map-instance (atom nil))
-(defonce custom-layers (atom {}))
-
+;; Map instance management - now handled by re-frame
 (defn get-map-instance []
-  @map-instance)
+  (:map-instance @app-db))
+
+;; Custom layers management - now handled by re-frame
+(defn get-custom-layers []
+  (:custom-layers @app-db))
 
 (defn set-map-instance! [instance]
-  (reset! map-instance instance)
+  (re-frame/dispatch [:set-map-instance instance])
   (set! (.-pearlMapInstance js/window) instance))
 
 ;; Map initialization
@@ -125,10 +127,10 @@
 
 ;; Custom layer management
 (defn register-custom-layer [layer-id layer-impl]
-  (swap! custom-layers assoc layer-id layer-impl))
+  (re-frame/dispatch [:register-custom-layer layer-id layer-impl]))
 
 (defn unregister-custom-layer [layer-id]
-  (swap! custom-layers dissoc layer-id))
+  (re-frame/dispatch [:unregister-custom-layer layer-id]))
 
 (defn add-custom-layer [layer-id layer-impl before-id]
   (when-let [^js map-obj (get-map-instance)]
@@ -160,7 +162,7 @@
       (if (= style-url "raster-style")
         (do
           ;; Store current custom layers before removing
-          (let [current-layers @custom-layers]
+          (let [current-layers (get-custom-layers)]
             (.remove map-obj)
             (set-map-instance! nil)
             (re-frame/dispatch [:set-map-instance nil])
@@ -180,7 +182,7 @@
             true))
         (do
           ;; For vector styles, we need to re-add custom layers after style change
-          (let [current-layers @custom-layers]
+          (let [current-layers (get-custom-layers)]
             ;; First remove all custom layers
             (doseq [[layer-id _] current-layers]
               (remove-custom-layer layer-id))

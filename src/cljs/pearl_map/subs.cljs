@@ -30,3 +30,9 @@
  :editing-style-value
  (fn [db [_ key]]
    (get-in db [:editing-style key])))
+
+;; Add custom layers subscription
+(re-frame/reg-sub
+ :custom-layers
+ (fn [db]
+   (:custom-layers db)))
