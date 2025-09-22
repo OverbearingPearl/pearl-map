@@ -54,6 +54,10 @@
   (re-frame/dispatch [:set-current-style style-url])
   (map-engine/change-map-style style-url))
 
+(defn add-example-custom-layer []
+  (let [custom-layer (map-engine/create-example-custom-layer)]
+    (map-engine/add-custom-layer "example-custom-layer" custom-layer nil)))
+
 ;; Add style control UI component
 (defn style-controls []
   (let [current-style @(re-frame/subscribe [:current-style])]
@@ -78,6 +82,10 @@
                :style {:margin "5px" :padding "8px 12px" :border "none"
                        :border-radius "3px" :background "#f8f9fa" :color "black"
                        :cursor "pointer"}} "Light Style"]
+     [:button {:on-click #(add-example-custom-layer)
+               :style {:margin "5px" :padding "8px 12px" :border "none"
+                       :border-radius "3px" :background "#28a745" :color "white"
+                       :cursor "pointer"}} "Add Custom Layer"]
      [:div {:style {:margin-top "10px" :font-size "12px" :color "#666"}}
       "Current: " (str current-style)]]))
 

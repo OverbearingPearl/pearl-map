@@ -15,6 +15,7 @@
 
 ;; Map instance management
 (defonce map-instance (atom nil))
+(defonce custom-layers (atom {}))
 
 (defn get-map-instance []
   @map-instance)
@@ -121,19 +122,61 @@
           (js/console.warn "Could not add buildings layer:" e)
           false)))))
 
+;; Custom layer management
+(defn register-custom-layer [layer-id layer-impl]
+  (swap! custom-layers assoc layer-id layer-impl))
+
+(defn unregister-custom-layer [layer-id]
+  (swap! custom-layers dissoc layer-id))
+
+(defn add-custom-layer [layer-id layer-impl before-id]
+  (when-let [^js map-obj (get-map-instance)]
+    (try
+      (.addLayer map-obj layer-impl before-id)
+      (register-custom-layer layer-id layer-impl)
+      (js/console.log (str "Custom layer " layer-id " added successfully"))
+      true
+      (catch js/Error e
+        (js/console.error (str "Failed to add custom layer " layer-id ":") e)
+        false))))
+
+(defn remove-custom-layer [layer-id]
+  (when-let [^js map-obj (get-map-instance)]
+    (when (.getLayer map-obj layer-id)
+      (try
+        (.removeLayer map-obj layer-id)
+        (unregister-custom-layer layer-id)
+        (js/console.log (str "Custom layer " layer-id " removed successfully"))
+        true
+        (catch js/Error e
+          (js/console.error (str "Failed to remove custom layer " layer-id ":") e)
+          false)))))
+
 ;; Style management
 (defn change-map-style [style-url]
   (when-let [^js map-obj (get-map-instance)]
     (try
       (if (= style-url "raster-style")
         (do
-          (.remove map-obj)
-          (set-map-instance! nil)
-          (re-frame/dispatch [:set-map-instance nil])
-          (js/setTimeout init-map 100)
-          true)
+          ;; Store current custom layers before removing
+          (let [current-layers @custom-layers]
+            (.remove map-obj)
+            (set-map-instance! nil)
+            (re-frame/dispatch [:set-map-instance nil])
+            (js/setTimeout
+             (fn []
+               (init-map)
+               ;; Re-add custom layers after new map loads
+               (js/setTimeout
+                (fn []
+                  (when-let [new-map-obj (get-map-instance)]
+                    (doseq [[layer-id layer-impl] current-layers]
+                      (add-custom-layer layer-id layer-impl nil))))
+                500))
+             100)
+            true))
         (do
-          ;; Set the new style
+          ;; For vector styles, custom layers persist automatically
           (.setStyle map-obj style-url)
           ;; Add buildings layer after the new style is loaded, only if it's not a raster style
           (.once map-obj "idle"
@@ -206,6 +249,21 @@
             rgb-obj (.rgb color-obj)
             rgba-obj (.alpha rgb-obj opacity)]
         (.string rgba-obj)))))
+
+;; Example custom layer implementation
+(defn create-example-custom-layer []
+  (let [layer-impl #js {:id "example-custom-layer"
+                        :type "custom"
+                        :renderingMode "3d"
+                        :onAdd (fn [map gl]
+                                 (js/console.log "Custom layer added")
+                                 ;; Setup code here
+                                 )
+                        :render (fn [gl matrix]
+                                  (js/console.log "Rendering custom layer")
+                                  ;; Rendering code here
+                                  )}]
+    layer-impl))
 
 ;; Style validation
 (defn validate-style [style]
