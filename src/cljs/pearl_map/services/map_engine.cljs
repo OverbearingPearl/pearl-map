@@ -1,5 +1,6 @@
 (ns pearl-map.services.map-engine
   (:require [re-frame.core :as re-frame]
+            [reagent.core :as reagent]
             ["maplibre-gl" :as maplibre]
             ["color" :as color]
             ["@maplibre/maplibre-gl-style-spec" :as style-spec]))
@@ -163,27 +164,39 @@
             (.remove map-obj)
             (set-map-instance! nil)
             (re-frame/dispatch [:set-map-instance nil])
-            (js/setTimeout
+            ;; Use reagent/next-tick for the first delay (init map after removal)
+            (reagent/next-tick
              (fn []
                (init-map)
-               ;; Re-add custom layers after new map loads
-               (js/setTimeout
+               ;; Use another next-tick to add custom layers after map initialization
+               (reagent/next-tick
                 (fn []
                   (when-let [new-map-obj (get-map-instance)]
-                    (doseq [[layer-id layer-impl] current-layers]
-                      (add-custom-layer layer-id layer-impl nil))))
-                500))
-             100)
+                    ;; Wait for the map to be idle before adding custom layers
+                    (.once new-map-obj "idle"
+                           (fn []
+                             (doseq [[layer-id layer-impl] current-layers]
+                               (add-custom-layer layer-id layer-impl nil)))))))))
             true))
         (do
-          ;; For vector styles, custom layers persist automatically
-          (.setStyle map-obj style-url)
-          ;; Add buildings layer after the new style is loaded, only if it's not a raster style
-          (.once map-obj "idle"
-                 (fn []
-                   ;; Check if the style is not raster before trying to add buildings layer
-                   (when (not= (.getStyle map-obj) "raster-style")
-                     (add-buildings-layer))))
+          ;; For vector styles, we need to re-add custom layers after style change
+          (let [current-layers @custom-layers]
+            ;; First remove all custom layers
+            (doseq [[layer-id _] current-layers]
+              (remove-custom-layer layer-id))
+
+            ;; Change the style
+            (.setStyle map-obj style-url)
+
+            ;; Re-add custom layers after the new style is loaded
+            (.once map-obj "idle"
+                   (fn []
+                     ;; Add buildings layer if it's not a raster style
+                     (when (not= (.getStyle map-obj) "raster-style")
+                       (add-buildings-layer))
+                     ;; Re-add all custom layers
+                     (doseq [[layer-id layer-impl] current-layers]
+                       (add-custom-layer layer-id layer-impl nil)))))
           true))
       (catch js/Error e
         (js/console.error "Failed to change style:" e)
@@ -257,12 +270,61 @@
                         :renderingMode "3d"
                         :onAdd (fn [map gl]
                                  (js/console.log "Custom layer added")
-                                 ;; Setup code here
-                                 )
+                                 ;; 'gl' is the WebGL context, not a canvas
+                                 (let [context gl
+                                       vertex-shader (.createShader context (.-VERTEX_SHADER context))
+                                       fragment-shader (.createShader context (.-FRAGMENT_SHADER context))
+                                       program (.createProgram context)]
+                                   ;; Simple vertex shader
+                                   (.shaderSource context vertex-shader "
+                                     attribute vec2 a_position;
+                                     void main() {
+                                       gl_Position = vec4(a_position, 0.0, 1.0);
+                                     }
+                                   ")
+                                   (.compileShader context vertex-shader)
+
+                                   ;; Fragment shader with red semi-transparent color
+                                   (.shaderSource context fragment-shader "
+                                     precision mediump float;
+                                     void main() {
+                                       gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5); // Red with 50% opacity
+                                     }
+                                   ")
+                                   (.compileShader context fragment-shader)
+
+                                   (.attachShader context program vertex-shader)
+                                   (.attachShader context program fragment-shader)
+                                   (.linkProgram context program)
+
+                                   ;; Store program in layer instance using JavaScript's 'this'
+                                   (set! (.-program (js* "this")) program)
+                                   (set! (.-context (js* "this")) context)))
                         :render (fn [gl matrix]
                                   (js/console.log "Rendering custom layer")
-                                  ;; Rendering code here
-                                  )}]
+                                  ;; Use js* to access JavaScript's 'this'
+                                  (let [context (.-context (js* "this"))
+                                        program (.-program (js* "this"))]
+                                    (when (and context program)
+                                      (.useProgram context program)
+
+                                      ;; Define a simple rectangle covering the viewport
+                                      (let [position-attribute (.getAttribLocation context program "a_position")
+                                            position-buffer (.createBuffer context)
+                                            ;; Create the positions array without inline comments
+                                            positions (js/Float32Array. [-1.0 -1.0     ;; bottom left
+                                                                         1.0 -1.0     ;; bottom right
+                                                                         -1.0  1.0     ;; top left
+                                                                         1.0  1.0])]  ;; top right
+
+                                        (.bindBuffer context (.-ARRAY_BUFFER context) position-buffer)
+                                        (.bufferData context (.-ARRAY_BUFFER context) positions (.-STATIC_DRAW context))
+
+                                        (.enableVertexAttribArray context position-attribute)
+                                        (.vertexAttribPointer context position-attribute 2 (.-FLOAT context) false 0 0)
+
+                                        ;; Draw the rectangle
+                                        (.drawArrays context (.-TRIANGLE_STRIP context) 0 4)))))}]
     layer-impl))
 
 ;; Style validation
