@@ -272,7 +272,6 @@
                         :renderingMode "3d"
                         :onAdd (fn [map gl]
                                  (js/console.log "Custom layer added")
-                                 ;; 'gl' is the WebGL context, not a canvas
                                  (let [context gl
                                        vertex-shader (.createShader context (.-VERTEX_SHADER context))
                                        fragment-shader (.createShader context (.-FRAGMENT_SHADER context))
@@ -286,11 +285,11 @@
                                    ")
                                    (.compileShader context vertex-shader)
 
-                                   ;; Fragment shader with red semi-transparent color
+                                   ;; Fragment shader with solid yellow color
                                    (.shaderSource context fragment-shader "
                                      precision mediump float;
                                      void main() {
-                                       gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5); // Red with 50% opacity
+                                       gl_FragColor = vec4(1.0, 1.0, 0.0, 1.0); // Solid yellow
                                      }
                                    ")
                                    (.compileShader context fragment-shader)
@@ -299,25 +298,22 @@
                                    (.attachShader context program fragment-shader)
                                    (.linkProgram context program)
 
-                                   ;; Store program in layer instance using JavaScript's 'this'
                                    (set! (.-program (js* "this")) program)
                                    (set! (.-context (js* "this")) context)))
                         :render (fn [gl matrix]
                                   (js/console.log "Rendering custom layer")
-                                  ;; Use js* to access JavaScript's 'this'
                                   (let [context (.-context (js* "this"))
                                         program (.-program (js* "this"))]
                                     (when (and context program)
                                       (.useProgram context program)
 
-                                      ;; Define a simple rectangle covering the viewport
+                                      ;; Define a triangle in the center of the viewport
                                       (let [position-attribute (.getAttribLocation context program "a_position")
                                             position-buffer (.createBuffer context)
-                                            ;; Create the positions array without inline comments
-                                            positions (js/Float32Array. [-1.0 -1.0     ;; bottom left
-                                                                         1.0 -1.0     ;; bottom right
-                                                                         -1.0  1.0     ;; top left
-                                                                         1.0  1.0])]  ;; top right
+                                            ;; Triangle vertices centered at (0,0)
+                                            positions (js/Float32Array. [0.0  0.5    ; top center
+                                                                         -0.5 -0.5   ; bottom left
+                                                                         0.5 -0.5])]  ; bottom right
 
                                         (.bindBuffer context (.-ARRAY_BUFFER context) position-buffer)
                                         (.bufferData context (.-ARRAY_BUFFER context) positions (.-STATIC_DRAW context))
@@ -325,8 +321,8 @@
                                         (.enableVertexAttribArray context position-attribute)
                                         (.vertexAttribPointer context position-attribute 2 (.-FLOAT context) false 0 0)
 
-                                        ;; Draw the rectangle
-                                        (.drawArrays context (.-TRIANGLE_STRIP context) 0 4)))))}]
+                                        ;; Draw the triangle
+                                        (.drawArrays context (.-TRIANGLES context) 0 3)))))}]
     layer-impl))
 
 ;; Style validation
