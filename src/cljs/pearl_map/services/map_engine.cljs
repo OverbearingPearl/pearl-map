@@ -237,18 +237,120 @@
     (.setBearing map-obj bearing-angle)))
 
 ;; Color conversion utilities
-(defn rgba-to-hex [color-value]
+(defn parse-color-expression [color-value current-zoom]
+  "Parse MapLibre color expression and return hex color for current zoom level"
   (try
     (cond
+      ;; 1. Already a hex string
       (and (string? color-value) (.startsWith color-value "#"))
       color-value
 
+      ;; 2. RGBA/RGB string format
       (and (string? color-value) (or (.includes color-value "rgba")
                                      (.includes color-value "rgb")))
       (-> (color color-value)
           (.hex)
           (.toString)
           (.toLowerCase))
+
+      ;; 3. MapLibre expression format: ["interpolate", "linear", "zoom", ...]
+      (and (object? color-value) (.-expression color-value))
+      (let [expr (.-expression color-value)]
+        (if (and (array? expr)
+                 (= (aget expr 0) "interpolate")
+                 (= (aget expr 1) "linear")
+                 (= (aget expr 2) "zoom"))
+          (let [stops (drop 3 (array-seq expr))
+                stop-pairs (partition 2 stops)]
+            (if (empty? stop-pairs)
+              (throw (js/Error. "Empty expression stops"))
+              (let [first-pair (first stop-pairs)
+                    last-pair (last stop-pairs)]
+                (cond
+                  (<= current-zoom (first first-pair)) (second first-pair)
+                  (>= current-zoom (first last-pair)) (second last-pair)
+                  :else (loop [[[z1 v1] [z2 v2] & more] stop-pairs]
+                          (if (and z2 (>= current-zoom z1) (< current-zoom z2))
+                            (let [interpolated-value (+ v1 (* (- current-zoom z1) (/ (- v2 v1) (- z2 z1))))]
+                              (if (string? v1)
+                                ;; For colors, we need to interpolate each channel
+                                (let [color1 (color v1)
+                                      color2 (color v2)
+                                      ratio (/ (- current-zoom z1) (- z2 z1))
+                                      r (+ (.red color1) (* ratio (- (.red color2) (.red color1))))
+                                      g (+ (.green color1) (* ratio (- (.green color2) (.green color1))))
+                                      b (+ (.blue color1) (* ratio (- (.blue color2) (.blue color1))))]
+                                  (-> (color (clj->js {:r r :g g :b b}))
+                                      (.hex)
+                                      (.toString)
+                                      (.toLowerCase)))
+                                interpolated-value))
+                            (recur (cons [z2 v2] more))))))))
+          (throw (js/Error. (str "Unsupported expression format: " (js/JSON.stringify expr))))))
+
+      ;; 4. MapLibre stops format: {"stops": [[zoom, color], ...]}
+      (and (object? color-value) (.-stops color-value))
+      (let [stops (.-stops color-value)
+            sorted-stops (sort-by first (js->clj stops))]
+        (if (empty? sorted-stops)
+          (throw (js/Error. "Empty stops array"))
+          (let [first-stop (first sorted-stops)
+                last-stop (last sorted-stops)]
+            (cond
+              (<= current-zoom (first first-stop)) (second first-stop)
+              (>= current-zoom (first last-stop)) (second last-stop)
+              :else (loop [[[z1 v1] & rest-stops] sorted-stops]
+                      (when (and rest-stops (first (first rest-stops)))
+                        (let [[z2 v2] (first rest-stops)]
+                          (if (and (>= current-zoom z1) (< current-zoom z2))
+                            (let [ratio (/ (- current-zoom z1) (- z2 z1))]
+                              (if (string? v1)
+                                ;; For colors, interpolate each channel
+                                (let [color1 (color v1)
+                                      color2 (color v2)
+                                      r (+ (.red color1) (* ratio (- (.red color2) (.red color1))))
+                                      g (+ (.green color1) (* ratio (- (.green color2) (.green color1))))
+                                      b (+ (.blue color1) (* ratio (- (.blue color2) (.blue color1))))]
+                                  (-> (color (clj->js {:r r :g g :b b}))
+                                      (.hex)
+                                      (.toString)
+                                      (.toLowerCase)))
+                                (+ v1 (* ratio (- v2 v1)))))
+                            (recur rest-stops)))))))))
+
+      ;; 5. Other object formats - try to convert to string
+      (object? color-value)
+      (let [str-value (str color-value)]
+        (if (.startsWith str-value "#")
+          str-value
+          (throw (js/Error. (str "Unsupported color object format: " (js/JSON.stringify color-value))))))
+
+      ;; 6. Other types
+      :else
+      (throw (js/Error. (str "Invalid color value type: " (type color-value) " - " color-value))))
+    (catch js/Error e
+      (js/console.error "Failed to parse color expression:" e "Value:" color-value)
+      (throw e))))
+
+(defn rgba-to-hex [color-value]
+  "Convert color value to hex format - handle various MapLibre color formats"
+  (try
+    (cond
+      ;; 1. Already a hex string
+      (and (string? color-value) (.startsWith color-value "#"))
+      color-value
+
+      ;; 2. RGBA/RGB string format
+      (and (string? color-value) (or (.includes color-value "rgba")
+                                     (.includes color-value "rgb")))
+      (-> (color color-value)
+          (.hex)
+          (.toString)
+          (.toLowerCase))
+
+      ;; 3. MapLibre expression/object format - parse for current zoom
+      (object? color-value)
+      (parse-color-expression color-value (get-current-zoom))
 
       :else
       (throw (js/Error. (str "Unsupported color format: " color-value))))
