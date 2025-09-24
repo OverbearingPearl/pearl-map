@@ -3,7 +3,6 @@
             ["three/addons/loaders/GLTFLoader.js" :as GLTFLoader]
             [re-frame.core :as re-frame]))
 
-;; Global GLTF loader instance
 (defonce gltf-loader (new (.-GLTFLoader GLTFLoader)))
 
 (defn load-gltf-model
@@ -18,7 +17,6 @@
            (js/console.log "GLTF model loaded successfully")
            (success-callback gltf))
          (fn [progress]
-           ;; Progress callback - can be used for loading indicators
            (js/console.log "Loading progress:" progress))
          (fn [error]
            (js/console.error "Failed to load GLTF model:" error)
@@ -41,14 +39,12 @@
 
 ;; Model management functions
 (defn add-model-to-scene
-  "Add a loaded GLTF model to the Three.js scene"
   [scene gltf-model]
   (when (and scene gltf-model (.-scene gltf-model))
     (.add scene (.-scene gltf-model))
     (js/console.log "Model added to scene")))
 
 (defn remove-model-from-scene
-  "Remove a model from the Three.js scene"
   [scene gltf-model]
   (when (and scene gltf-model (.-scene gltf-model))
     (.remove scene (.-scene gltf-model))
@@ -56,11 +52,9 @@
 
 ;; Animation and interaction utilities
 (defn setup-model-animation
-  "Set up animations for the loaded model if available"
   [gltf-model]
   (when (and gltf-model (.-animations gltf-model) (> (.-length (.-animations gltf-model)) 0))
     (js/console.log "Model animations available:" (.-length (.-animations gltf-model)))
-    ;; Animation setup would go here
     ))
 
 ;; Error handling utilities

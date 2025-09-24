@@ -6,20 +6,16 @@
             ["color" :as color]
             ["@maplibre/maplibre-gl-style-spec" :as style-spec]))
 
-;; Eiffel Tower coordinates for Paris focus [longitude, latitude]
 (def eiffel-tower-coords [2.2945 48.8584])
 
-;; Style URLs configuration
 (def style-urls
   {:basic "raster-style"
    :dark "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
    :light "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"})
 
-;; Map instance management - now handled by re-frame
 (defn get-map-instance []
   (:map-instance @app-db))
 
-;; Custom layers management - now handled by re-frame
 (defn get-custom-layers []
   (:custom-layers @app-db))
 

@@ -5,7 +5,6 @@
             [clojure.string :as str]
             [pearl-map.services.map-engine :as map-engine]))
 
-;; Default building style configurations
 (def default-building-styles
   {:light {:fill-color "#f0f0f0"
            :fill-opacity 0.7
@@ -15,18 +14,12 @@
           :fill-outline-color "#4a5568"}})
 
 (defn validate-style [style]
-  "Validate style using map-engine's validation"
   (map-engine/validate-style style))
 
-;; Use map-engine for zoom
 (defn get-current-zoom []
   (map-engine/get-current-zoom))
 
-
-;; Color conversion functions - use map-engine's functions
-
 (defn get-opacity-value [opacity]
-  "Get actual opacity value from MapLibre opacity object for current zoom level"
   (cond
     ;; 1. Simple number
     (number? opacity) opacity
@@ -72,44 +65,32 @@
                           (+ v1 (* (- current-zoom z1) (/ (- v2 v1) (- z2 z1))))
                           (recur (cons [z2 v2] more))))))))
         (throw (js/Error. (str "Unsupported expression format: " (js/JSON.stringify expr))))))
-
-    ;; 4. Other formats - throw error instead of returning default value
     (object? opacity) (throw (js/Error. (str "Unsupported opacity object format: " (js/JSON.stringify opacity))))
-
     :else (throw (js/Error. (str "Invalid opacity value type: " (type opacity))))))
 
 (defn hex-to-rgba [hex-str opacity]
-  "Convert hex string to rgba format for MapLibre - throw error on failure"
   (when hex-str
     (if (str/starts-with? hex-str "rgba")
       hex-str
       (let [opacity-value (get-opacity-value opacity)]
         (map-engine/hex-to-rgba hex-str opacity-value)))))
 
-;; Remove the reagent atom and use re-frame instead
 (defn get-current-building-styles []
-  (js/console.log "=== DEBUG: Starting get-current-building-styles ===")
   (let [styles (atom {})]
-    ;; Check each building layer
     (doseq [layer-id ["building" "building-top"]]
       (doseq [style-key [:fill-color :fill-opacity :fill-outline-color]]
         (try
           (let [current-value (map-engine/get-paint-property layer-id (name style-key))]
-            (js/console.log "Style" style-key "value:" current-value "type:" (type current-value))
             (when current-value
               (let [processed-value (cond
                                       (#{:fill-color :fill-outline-color} style-key)
                                       (map-engine/rgba-to-hex current-value)
-
                                       (= style-key :fill-opacity)
                                       (get-opacity-value current-value)
-
                                       :else current-value)]
-                (js/console.log "Processed value:" processed-value)
                 (swap! styles assoc style-key processed-value))))
           (catch js/Error e
             (js/console.warn (str "Could not get property " style-key " for layer " layer-id ":") e)))))
-    (js/console.log "Final styles object:" @styles)
     @styles))
 
 (defn apply-current-style [style]
@@ -122,10 +103,8 @@
               (let [final-value (cond
                                   (#{:fill-color :fill-outline-color} style-key)
                                   (map-engine/hex-to-rgba style-value (:fill-opacity style))
-
                                   (= style-key :fill-opacity)
                                   style-value
-
                                   :else style-value)]
                 (map-engine/set-paint-property layer-id (name style-key) final-value)))
             (catch js/Error e
@@ -136,52 +115,34 @@
       (throw e))))
 
 (defn update-building-style [style-key value]
-  "Update building style and apply to map"
-  ;; Check for empty values
   (when (and value (not (str/blank? value)))
-    ;; Handle different types of values
     (let [processed-value (cond
                             (#{:fill-color :fill-outline-color} style-key)
                             (if (string? value)
                               (map-engine/rgba-to-hex value)
                               (throw (js/Error. (str "Color value must be string, got: " (type value)))))
-
                             (= style-key :fill-opacity)
                             (if (number? value)
                               value
-                              (js/parseFloat value))  ;; Try to parse if it's a string
-
+                              (js/parseFloat value))
                             :else value)]
       (re-frame/dispatch [:update-editing-style style-key processed-value])
-      ;; Get the updated style from the database to apply
       (let [updated-style (assoc @re-frame.db/app-db :editing-style
                                  (assoc (:editing-style @re-frame.db/app-db) style-key processed-value))]
         (apply-current-style (:editing-style updated-style))))))
 
-;; Add a function to check if we should listen for map load events
 (defn setup-map-listener []
-  "Setup listener to automatically apply styles when map loads"
-  (js/console.log "=== DEBUG: Setting up map listener ===")
   (let [map-inst (.-pearlMapInstance js/window)]
-    (js/console.log "Map instance in setup:" (boolean map-inst))
     (when map-inst
-      (js/console.log "Map already loaded:" (.-loaded map-inst))
-      ;; Remove any existing listeners to avoid duplicates
       (.off map-inst "load")
       (.on map-inst "load"
            (fn []
-             (js/console.log "Map loaded event received")
-             ;; Get current styles and update editor state
              (when-let [current-styles (get-current-building-styles)]
-               (js/console.log "Updating editor state with:" current-styles)
-               ;; Update each style key individually using re-frame
                (doseq [[style-key style-value] current-styles]
                  (re-frame/dispatch [:update-editing-style style-key style-value]))
-               ;; Apply the current styles
                (apply-current-style current-styles)))))))
 
 (defn building-style-editor []
-  "Building style editor component"
   (let [mounted (reagent/atom false)]
     (reagent/create-class
      {:component-did-mount
@@ -205,14 +166,12 @@
                          :width "300px"
                          :box-shadow "0 2px 10px rgba(0,0,0,0.1)"}}
            [:h3 {:style {:margin "0 0 15px 0" :color "#333"}} "Building Style Editor"]
-
            [:div {:style {:margin-bottom "10px"}}
             [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Fill Color"]
             [:input {:type "color"
                      :value (or (:fill-color editing-style) "#f0f0f0")
                      :on-change #(update-building-style :fill-color (-> % .-target .-value))
                      :style {:width "100%" :height "30px"}}]]
-
            [:div {:style {:margin-bottom "10px"}}
             [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Opacity"]
             [:input {:type "range"
@@ -221,14 +180,12 @@
                      :on-change #(update-building-style :fill-opacity (js/parseFloat (-> % .-target .-value)))
                      :style {:width "100%"}}]
             [:span {:style {:font-size "12px"}} (str "Opacity: " (:fill-opacity editing-style))]]
-
            [:div {:style {:margin-bottom "15px"}}
             [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Outline Color"]
             [:input {:type "color"
                      :value (or (:fill-outline-color editing-style) "#cccccc")
                      :on-change #(update-building-style :fill-outline-color (-> % .-target .-value))
                      :style {:width "100%" :height "30px"}}]]
-
            [:div {:style {:display "flex" :gap "10px" :margin-bottom "15px" :flex-wrap "wrap"}}
             [:button {:on-click #(do
                                    (re-frame/dispatch [:set-editing-style (:light default-building-styles)])
@@ -240,21 +197,16 @@
                                    (apply-current-style (:dark default-building-styles)))
                       :style {:padding "8px 12px" :border "none" :border-radius "4px"
                               :background "#343a40" :color "white" :cursor "pointer"}} "Dark Theme"]
-            ;; Add refresh current styles button
             [:button {:on-click #(when-let [current-styles (get-current-building-styles)]
-                                   ;; Update each style key individually
                                    (doseq [[style-key style-value] current-styles]
                                      (re-frame/dispatch [:update-editing-style style-key style-value]))
-                                   ;; Apply the refreshed styles
                                    (apply-current-style current-styles))
                       :style {:padding "8px 12px" :border "none" :border-radius "4px"
                               :background "#28a745" :color "white" :cursor "pointer"}} "Refresh Styles"]]
-
            [:div {:style {:padding-top "15px" :border-top "1px solid #eee"}}
             [:p {:style {:color "#666" :font-size "12px" :margin "0 0 10px 0" :font-weight "bold"}}
              "Buildings Status:"]
             [:p {:style {:color "#666" :font-size "11px" :margin "0" :font-style "italic"}}
              "Only works with Dark or Light vector styles"]
-            ;; Add current style status display
             [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
              "Current: " (pr-str (select-keys editing-style [:fill-color :fill-opacity :fill-outline-color]))]]]))})))
