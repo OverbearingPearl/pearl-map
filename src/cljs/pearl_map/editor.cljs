@@ -1,5 +1,7 @@
 (ns pearl-map.editor
   (:require [reagent.core :as reagent]
+            [re-frame.core :as re-frame]
+            [re-frame.db :refer [app-db]]
             [clojure.string :as str]
             [pearl-map.services.map-engine :as map-engine]))
 
@@ -84,9 +86,7 @@
       (let [opacity-value (get-opacity-value opacity)]
         (map-engine/hex-to-rgba hex-str opacity-value)))))
 
-;; Current editing style state - use defonce to preserve state during hot reload
-(defonce current-editing-style (reagent/atom (:light default-building-styles)))
-
+;; Remove the reagent atom and use re-frame instead
 (defn get-current-building-styles []
   (js/console.log "=== DEBUG: Starting get-current-building-styles ===")
   (let [styles (atom {})]
@@ -112,10 +112,9 @@
     (js/console.log "Final styles object:" @styles)
     @styles))
 
-(defn apply-current-style []
+(defn apply-current-style [style]
   (try
-    (let [style @current-editing-style
-          validation-result (map-engine/validate-style style)]
+    (let [validation-result (map-engine/validate-style style)]
       (if validation-result
         (doseq [layer-id ["building" "building-top"]]
           (try
@@ -153,8 +152,11 @@
                               (js/parseFloat value))  ;; Try to parse if it's a string
 
                             :else value)]
-      (swap! current-editing-style assoc style-key processed-value)
-      (apply-current-style))))
+      (re-frame/dispatch [:update-editing-style style-key processed-value])
+      ;; Get the updated style from the database to apply
+      (let [updated-style (assoc @re-frame.db/app-db :editing-style
+                                 (assoc (:editing-style @re-frame.db/app-db) style-key processed-value))]
+        (apply-current-style (:editing-style updated-style))))))
 
 ;; Add a function to check if we should listen for map load events
 (defn setup-map-listener []
@@ -172,8 +174,11 @@
              ;; Get current styles and update editor state
              (when-let [current-styles (get-current-building-styles)]
                (js/console.log "Updating editor state with:" current-styles)
-               (reset! current-editing-style current-styles))
-             (apply-current-style))))))
+               ;; Update each style key individually using re-frame
+               (doseq [[style-key style-value] current-styles]
+                 (re-frame/dispatch [:update-editing-style style-key style-value]))
+               ;; Apply the current styles
+               (apply-current-style current-styles)))))))
 
 (defn building-style-editor []
   "Building style editor component"
@@ -188,67 +193,68 @@
         (reset! mounted false))
       :reagent-render
       (fn []
-        [:div {:style {:position "absolute"
-                       :top "100px"
-                       :right "20px"
-                       :z-index 1000
-                       :background "rgba(255,255,255,0.95)"
-                       :padding "15px"
-                       :border-radius "8px"
-                       :font-family "Arial, sans-serif"
-                       :width "300px"
-                       :box-shadow "0 2px 10px rgba(0,0,0,0.1)"}}
-         [:h3 {:style {:margin "0 0 15px 0" :color "#333"}} "Building Style Editor"]
+        (let [editing-style @(re-frame/subscribe [:editing-style])]
+          [:div {:style {:position "absolute"
+                         :top "100px"
+                         :right "20px"
+                         :z-index 1000
+                         :background "rgba(255,255,255,0.95)"
+                         :padding "15px"
+                         :border-radius "8px"
+                         :font-family "Arial, sans-serif"
+                         :width "300px"
+                         :box-shadow "0 2px 10px rgba(0,0,0,0.1)"}}
+           [:h3 {:style {:margin "0 0 15px 0" :color "#333"}} "Building Style Editor"]
 
-         [:div {:style {:margin-bottom "10px"}}
-          [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Fill Color"]
-          [:input {:type "color"
-                   :value (or (:fill-color @current-editing-style) "#f0f0f0")
-                   :on-change #(update-building-style :fill-color (-> % .-target .-value))
-                   :style {:width "100%" :height "30px"}}]]
+           [:div {:style {:margin-bottom "10px"}}
+            [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Fill Color"]
+            [:input {:type "color"
+                     :value (or (:fill-color editing-style) "#f0f0f0")
+                     :on-change #(update-building-style :fill-color (-> % .-target .-value))
+                     :style {:width "100%" :height "30px"}}]]
 
-         [:div {:style {:margin-bottom "10px"}}
-          [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Opacity"]
-          [:input {:type "range"
-                   :min "0" :max "1" :step "0.1"
-                   :value (:fill-opacity @current-editing-style)
-                   :on-change #(update-building-style :fill-opacity (js/parseFloat (-> % .-target .-value)))
-                   :style {:width "100%"}}]
-          [:span {:style {:font-size "12px"}} (str "Opacity: " (:fill-opacity @current-editing-style))]]
+           [:div {:style {:margin-bottom "10px"}}
+            [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Opacity"]
+            [:input {:type "range"
+                     :min "0" :max "1" :step "0.1"
+                     :value (:fill-opacity editing-style)
+                     :on-change #(update-building-style :fill-opacity (js/parseFloat (-> % .-target .-value)))
+                     :style {:width "100%"}}]
+            [:span {:style {:font-size "12px"}} (str "Opacity: " (:fill-opacity editing-style))]]
 
-         [:div {:style {:margin-bottom "15px"}}
-          [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Outline Color"]
-          [:input {:type "color"
-                   :value (or (:fill-outline-color @current-editing-style) "#cccccc")
-                   :on-change #(update-building-style :fill-outline-color (-> % .-target .-value))
-                   :style {:width "100%" :height "30px"}}]]
+           [:div {:style {:margin-bottom "15px"}}
+            [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Outline Color"]
+            [:input {:type "color"
+                     :value (or (:fill-outline-color editing-style) "#cccccc")
+                     :on-change #(update-building-style :fill-outline-color (-> % .-target .-value))
+                     :style {:width "100%" :height "30px"}}]]
 
-         [:div {:style {:display "flex" :gap "10px" :margin-bottom "15px" :flex-wrap "wrap"}}
-          [:button {:on-click #(do
-                                 (reset! current-editing-style (:light default-building-styles))
-                                 (apply-current-style))
-                    :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                            :background "#007bff" :color "white" :cursor "pointer"}} "Light Theme"]
-          [:button {:on-click #(do
-                                 (reset! current-editing-style (:dark default-building-styles))
-                                 (apply-current-style))
-                    :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                            :background "#343a40" :color "white" :cursor "pointer"}} "Dark Theme"]
-          ;; Add refresh current styles button
-          [:button {:on-click #(when-let [current-styles (get-current-building-styles)]
-                                 (reset! current-editing-style current-styles)
-                                 ;; Force re-render by ensuring opacity is a number
-                                 (when-let [opacity (:fill-opacity current-styles)]
-                                   (when (object? opacity)
-                                     (swap! current-editing-style assoc :fill-opacity (get-opacity-value opacity)))))
-                    :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                            :background "#28a745" :color "white" :cursor "pointer"}} "Refresh Styles"]]
+           [:div {:style {:display "flex" :gap "10px" :margin-bottom "15px" :flex-wrap "wrap"}}
+            [:button {:on-click #(do
+                                   (re-frame/dispatch [:set-editing-style (:light default-building-styles)])
+                                   (apply-current-style (:light default-building-styles)))
+                      :style {:padding "8px 12px" :border "none" :border-radius "4px"
+                              :background "#007bff" :color "white" :cursor "pointer"}} "Light Theme"]
+            [:button {:on-click #(do
+                                   (re-frame/dispatch [:set-editing-style (:dark default-building-styles)])
+                                   (apply-current-style (:dark default-building-styles)))
+                      :style {:padding "8px 12px" :border "none" :border-radius "4px"
+                              :background "#343a40" :color "white" :cursor "pointer"}} "Dark Theme"]
+            ;; Add refresh current styles button
+            [:button {:on-click #(when-let [current-styles (get-current-building-styles)]
+                                   ;; Update each style key individually
+                                   (doseq [[style-key style-value] current-styles]
+                                     (re-frame/dispatch [:update-editing-style style-key style-value]))
+                                   ;; Apply the refreshed styles
+                                   (apply-current-style current-styles))
+                      :style {:padding "8px 12px" :border "none" :border-radius "4px"
+                              :background "#28a745" :color "white" :cursor "pointer"}} "Refresh Styles"]]
 
-         [:div {:style {:padding-top "15px" :border-top "1px solid #eee"}}
-          [:p {:style {:color "#666" :font-size "12px" :margin "0 0 10px 0" :font-weight "bold"}}
-           "Buildings Status:"]
-          [:p {:style {:color "#666" :font-size "11px" :margin "0" :font-style "italic"}}
-           "Only works with Dark or Light vector styles"]
-          ;; Add current style status display
-          [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
-           "Current: " (pr-str (select-keys @current-editing-style [:fill-color :fill-opacity :fill-outline-color]))]]])})))
+           [:div {:style {:padding-top "15px" :border-top "1px solid #eee"}}
+            [:p {:style {:color "#666" :font-size "12px" :margin "0 0 10px 0" :font-weight "bold"}}
+             "Buildings Status:"]
+            [:p {:style {:color "#666" :font-size "11px" :margin "0" :font-style "italic"}}
+             "Only works with Dark or Light vector styles"]
+            ;; Add current style status display
+            [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
+             "Current: " (pr-str (select-keys editing-style [:fill-color :fill-opacity :fill-outline-color]))]]]))})))
