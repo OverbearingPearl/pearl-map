@@ -1,7 +1,6 @@
 (ns pearl-map.editor
   (:require [reagent.core :as reagent]
             [re-frame.core :as re-frame]
-            [re-frame.db :refer [app-db]]
             [clojure.string :as str]
             [pearl-map.services.map-engine :as map-engine]))
 

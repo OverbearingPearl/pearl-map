@@ -2,17 +2,13 @@
   (:require [reagent.core :as reagent]
             [reagent.dom.client :as rdomc]
             [re-frame.core :as re-frame]
-            [re-frame.db :refer [app-db]]
             [pearl-map.events :as events]
             [pearl-map.subs :as subs]
             [pearl-map.editor :refer [building-style-editor]]
             [pearl-map.services.model-loader :as model-loader]
             [pearl-map.services.map-engine :as map-engine]))
 
-;; Use Reagent's React 18 root instance management
 (def react-root (atom nil))
-
-;; Use the style URLs from map-engine
 (def style-urls map-engine/style-urls)
 
 (defn map-container []
@@ -26,29 +22,17 @@
 (defn init-map []
   (let [map-obj (map-engine/init-map)]
     (when map-obj
-      ;; Set up map load handler
       (map-engine/on-map-load
        (fn [map-instance]
-         (js/console.log "Map successfully loaded")
-
-         ;; Load GLTF model after map is ready
          (model-loader/load-gltf-model
           "/models/eiffel_tower/scene.gltf"
           (fn [gltf-model]
-            (js/console.log "Eiffel Tower model loaded successfully")
             (re-frame/dispatch [:set-model-loaded true])
             (re-frame/dispatch [:set-loaded-model gltf-model])
-            (set! (.-pearlMapModel js/window) gltf-model)
-            (js/console.log "Model stored as window.pearlMapModel for rendering")))
-
-         ;; Don't add buildings layer here - it will be handled by style change logic
-         ;; This prevents the error when using raster style which doesn't have the composite source
-         )))
-
-    ;; Set up error handler
-    (map-engine/on-map-error
-     (fn [e]
-       (js/console.error "Map loading error:" e)))))
+            (set! (.-pearlMapModel js/window) gltf-model)))))
+      (map-engine/on-map-error
+       (fn [e]
+         (js/console.error "Map loading error:" e))))))
 
 (defn change-map-style [style-url]
   (re-frame/dispatch [:set-current-style style-url])
@@ -58,7 +42,6 @@
   (let [custom-layer (map-engine/create-example-custom-layer)]
     (map-engine/add-custom-layer "example-custom-layer" custom-layer nil)))
 
-;; Add style control UI component
 (defn style-controls []
   (let [current-style @(re-frame/subscribe [:current-style])]
     [:div {:style {:position "absolute"
@@ -89,7 +72,6 @@
      [:div {:style {:margin-top "10px" :font-size "12px" :color "#666"}}
       "Current: " (str current-style)]]))
 
-;; Add debug info component to help diagnose issues
 (defn debug-info []
   (let [map-instance @(re-frame/subscribe [:map-instance])
         model-loaded @(re-frame/subscribe [:model-loaded])]
@@ -107,11 +89,9 @@
      [:div "3D Model: " (if model-loaded "Loaded" "Not Loaded")]]))
 
 (defn home-page []
-  "Main home page component with integrated 3D map"
   (reagent/create-class
    {:component-did-mount
     (fn []
-      ;; Initialize re-frame db and map
       (re-frame/dispatch-sync [:initialize-db])
       (init-map))
     :reagent-render
@@ -131,30 +111,20 @@
         [:p {:style {:margin "2px 0 0 0" :fontSize "0.8em" :color "#999"}}
          "Using MapLibre demo vector service"]]
        [style-controls]
-       [pearl-map.editor/building-style-editor]
+       [building-style-editor]
        [map-container]
-       [debug-info]])}))  ; Add debug info panel
+       [debug-info]])}))
 
 (defn mount-root []
-  "Mount the root component using Reagent's React 18 API"
   (let [app-element (.getElementById js/document "app")
         root (rdomc/create-root app-element)]
     (reset! react-root root)
     (rdomc/render root [home-page])))
 
 (defn ^:dev/after-load reload []
-  "Hot-reload function using Reagent's React 18 API"
-  (js/console.log "Hot-reloading application...")
-
-  ;; Simply re-render the root component to pick up any code changes
-  ;; The map instance and its state are preserved
   (when @react-root
-    (rdomc/render @react-root [home-page]))
-
-  (js/console.log "Hot-reload complete"))
+    (rdomc/render @react-root [home-page])))
 
 (defn init []
-  "Application initialization entry point"
-  (js/console.log "Initializing Pearl Map application with re-frame...")
   (re-frame/clear-subscription-cache!)
   (mount-root))
