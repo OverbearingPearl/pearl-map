@@ -369,62 +369,114 @@
 
 ;; Example custom layer implementation
 (defn create-example-custom-layer []
-  (let [layer-impl #js {:id "example-custom-layer"
-                        :type "custom"
-                        :renderingMode "3d"
-                        :onAdd (fn [map gl]
-                                 (js/console.log "Custom layer added")
-                                 (let [context gl
-                                       vertex-shader (.createShader context (.-VERTEX_SHADER context))
-                                       fragment-shader (.createShader context (.-FRAGMENT_SHADER context))
-                                       program (.createProgram context)]
-                                   ;; Simple vertex shader
-                                   (.shaderSource context vertex-shader "
-                                     attribute vec2 a_position;
-                                     void main() {
-                                       gl_Position = vec4(a_position, 0.0, 1.0);
-                                     }
-                                   ")
-                                   (.compileShader context vertex-shader)
+  (let [layer-impl (js-obj)]
+    ;; Set properties on the layer-impl object
+    (set! (.-id layer-impl) "example-custom-layer")
+    (set! (.-type layer-impl) "custom")
+    (set! (.-renderingMode layer-impl) "3d")
 
-                                   ;; Fragment shader with solid yellow color
-                                   (.shaderSource context fragment-shader "
-                                     precision mediump float;
-                                     void main() {
-                                       gl_FragColor = vec4(1.0, 1.0, 0.0, 1.0); // Solid yellow
-                                     }
-                                   ")
-                                   (.compileShader context fragment-shader)
+    (set! (.-onAdd layer-impl)
+          (fn [map gl]
+            (js/console.log "Custom layer added")
+            ;; Create a local object to store layer state
+            (let [^js layer-state #js {}
+                  ^js context gl
+                  ^js vertex-shader (.createShader context (.-VERTEX_SHADER context))
+                  ^js fragment-shader (.createShader context (.-FRAGMENT_SHADER context))
+                  ^js program (.createProgram context)]
+              ;; Vertex shader for 3D coordinates in world space
+              (.shaderSource context vertex-shader "
+                uniform mat4 u_matrix;
+                attribute vec3 a_pos;
+                void main() {
+                  gl_Position = u_matrix * vec4(a_pos, 1.0);
+                }
+              ")
+              (.compileShader context vertex-shader)
 
-                                   (.attachShader context program vertex-shader)
-                                   (.attachShader context program fragment-shader)
-                                   (.linkProgram context program)
+              ;; Fragment shader with semi-transparent yellow color
+              (.shaderSource context fragment-shader "
+                precision mediump float;
+                void main() {
+                  gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5); // Semi-transparent yellow
+                }
+              ")
+              (.compileShader context fragment-shader)
+              (.attachShader context program vertex-shader)
+              (.attachShader context program fragment-shader)
+              (.linkProgram context program)
 
-                                   (set! (.-program (js* "this")) program)
-                                   (set! (.-context (js* "this")) context)))
-                        :render (fn [gl matrix]
-                                  (js/console.log "Rendering custom layer")
-                                  (let [context (.-context (js* "this"))
-                                        program (.-program (js* "this"))]
-                                    (when (and context program)
-                                      (.useProgram context program)
+              ;; Use geographic coordinates around the Eiffel Tower
+              ;; Convert longitude/latitude to Mercator coordinates
+              (let [eiffel-lng 2.2945
+                    eiffel-lat 48.8584
+                    lng-lat #js {:lng eiffel-lng :lat eiffel-lat}
+                    mercator-coords (.fromLngLat maplibre/MercatorCoordinate lng-lat 0)
+                    merc-x (.-x mercator-coords)
+                    merc-y (.-y mercator-coords)
+                    merc-z (.-z mercator-coords)
+                    ;; Use a much larger offset to make the triangle clearly visible
+                    offset 0.01
+                    positions (js/Float32Array. [
+                                                 merc-x (+ merc-y offset) merc-z  ;; Top point
+                                                 (- merc-x offset) (- merc-y offset) merc-z  ;; Bottom-left
+                                                 (+ merc-x offset) (- merc-y offset) merc-z   ;; Bottom-right
+                                                 ])
+                    position-buffer (.createBuffer context)]
+                (js/console.log "Using geographic coordinates for Eiffel Tower triangle")
+                (js/console.log "Mercator coordinates:" merc-x merc-y merc-z)
+                (js/console.log "Triangle vertices:"
+                                merc-x merc-y merc-z
+                                (- merc-x offset) (- merc-y offset) merc-z
+                                (+ merc-x offset) (- merc-y offset) merc-z)
+                (.bindBuffer context (.-ARRAY_BUFFER context) position-buffer)
+                (.bufferData context (.-ARRAY_BUFFER context) positions (.-STATIC_DRAW context))
+                ;; Store properties on the layer state object
+                (set! (.-position-buffer layer-state) position-buffer))
 
-                                      ;; Define a triangle in the center of the viewport
-                                      (let [position-attribute (.getAttribLocation context program "a_position")
-                                            position-buffer (.createBuffer context)
-                                            ;; Triangle vertices centered at (0,0)
-                                            positions (js/Float32Array. [0.0  0.5    ; top center
-                                                                         -0.5 -0.5   ; bottom left
-                                                                         0.5 -0.5])]  ; bottom right
+              ;; Store properties on the layer state object
+              (set! (.-program layer-state) program)
+              (set! (.-context layer-state) context)
+              (set! (.-map layer-state) map)
+              ;; Attach the layer state to the layer implementation
+              (set! (.-layer-state layer-impl) layer-state))))
 
-                                        (.bindBuffer context (.-ARRAY_BUFFER context) position-buffer)
-                                        (.bufferData context (.-ARRAY_BUFFER context) positions (.-STATIC_DRAW context))
+    (set! (.-render layer-impl)
+          (fn [gl matrix]
+            (js/console.log "Rendering custom layer at Eiffel Tower coordinates")
+            (let [^js layer-state (.-layer-state layer-impl)
+                  ^js context (.-context layer-state)
+                  ^js program (.-program layer-state)
+                  ^js position-buffer (.-position-buffer layer-state)]
+              (when (and context program)
+                ;; Enable depth testing
+                (.enable context (.-DEPTH_TEST context))
+                (.depthFunc context (.-LEQUAL context))
+                ;; Enable blending for transparency
+                (.enable context (.-BLEND context))
+                (.blendFunc context (.-SRC_ALPHA context) (.-ONE_MINUS_SRC_ALPHA context))
 
-                                        (.enableVertexAttribArray context position-attribute)
-                                        (.vertexAttribPointer context position-attribute 2 (.-FLOAT context) false 0 0)
+                (.useProgram context program)
 
-                                        ;; Draw the triangle
-                                        (.drawArrays context (.-TRIANGLES context) 0 3)))))}]
+                ;; Get the matrix uniform location
+                (let [matrix-uniform (.getUniformLocation context program "u_matrix")]
+                  (.uniformMatrix4fv context matrix-uniform false matrix))
+
+                ;; Bind the position buffer
+                (.bindBuffer context (.-ARRAY_BUFFER context) position-buffer)
+
+                ;; Set up the attribute pointer
+                (let [position-attribute (.getAttribLocation context program "a_pos")]
+                  (.enableVertexAttribArray context position-attribute)
+                  (.vertexAttribPointer context position-attribute 3 (.-FLOAT context) false 0 0)
+
+                  ;; Draw the triangle - we have 3 vertices
+                  (.drawArrays context (.-TRIANGLES context) 0 3)
+
+                  ;; Check for WebGL errors
+                  (let [error (.getError context)]
+                    (when (not= error (.-NO_ERROR context))
+                      (js/console.error "WebGL error after drawing:", error))))))))
     layer-impl))
 
 ;; Style validation
