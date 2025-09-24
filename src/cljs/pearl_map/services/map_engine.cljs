@@ -159,47 +159,68 @@
 (defn change-map-style [style-url]
   (when-let [^js map-obj (get-map-instance)]
     (try
-      (if (= style-url "raster-style")
-        (do
-          ;; Store current custom layers before removing
-          (let [current-layers (get-custom-layers)]
+      ;; Store current state before making any changes
+      (let [current-center (.getCenter map-obj)
+            current-zoom (.getZoom map-obj)
+            current-pitch (.getPitch map-obj)
+            current-bearing (.getBearing map-obj)
+            current-layers (get-custom-layers)
+            ;; Clamp zoom level to valid ranges
+            clamped-zoom (cond
+                           ;; Raster style typically supports 0-19
+                           (= style-url "raster-style") (max 0 (min 19 current-zoom))
+                           ;; Vector styles may have different ranges, but let's use a safe range
+                           :else (max 0 (min 22 current-zoom)))]
+
+        (if (= style-url "raster-style")
+          (do
+            ;; Remove the current map instance
             (.remove map-obj)
             (set-map-instance! nil)
             (re-frame/dispatch [:set-map-instance nil])
-            ;; Use reagent/next-tick for the first delay (init map after removal)
+
+            ;; Initialize new raster map
             (reagent/next-tick
              (fn []
                (init-map)
-               ;; Use another next-tick to add custom layers after map initialization
                (reagent/next-tick
                 (fn []
                   (when-let [new-map-obj (get-map-instance)]
-                    ;; Wait for the map to be idle before adding custom layers
-                    (.once new-map-obj "idle"
+                    ;; Wait for the map to load before restoring state
+                    (.once new-map-obj "load"
                            (fn []
+                             ;; Restore view state with clamped zoom
+                             (.setCenter new-map-obj current-center)
+                             (.setZoom new-map-obj clamped-zoom)
+                             (.setPitch new-map-obj current-pitch)
+                             (.setBearing new-map-obj current-bearing)
+
+                             ;; Re-add custom layers
                              (doseq [[layer-id layer-impl] current-layers]
                                (add-custom-layer layer-id layer-impl nil)))))))))
-            true))
-        (do
-          ;; For vector styles, we need to re-add custom layers after style change
-          (let [current-layers (get-custom-layers)]
-            ;; First remove all custom layers
+            true)
+          (do
+            ;; For vector styles, use setStyle which preserves the view state
+            ;; Remove custom layers first
             (doseq [[layer-id _] current-layers]
               (remove-custom-layer layer-id))
 
             ;; Change the style
             (.setStyle map-obj style-url)
 
-            ;; Re-add custom layers after the new style is loaded
+            ;; Re-add custom layers and restore buildings layer after style loads
             (.once map-obj "idle"
                    (fn []
-                     ;; Add buildings layer if it's not a raster style
-                     (when (not= (.getStyle map-obj) "raster-style")
-                       (add-buildings-layer))
-                     ;; Re-add all custom layers
+                     ;; Add buildings layer for vector styles
+                     (add-buildings-layer)
+                     ;; Re-add custom layers
                      (doseq [[layer-id layer-impl] current-layers]
-                       (add-custom-layer layer-id layer-impl nil)))))
-          true))
+                       (add-custom-layer layer-id layer-impl nil))
+                     ;; Ensure zoom level is within bounds for the new style
+                     (let [current-zoom-after (.getZoom map-obj)]
+                       (when (or (< current-zoom-after 0) (> current-zoom-after 22))
+                         (.setZoom map-obj clamped-zoom)))))
+            true)))
       (catch js/Error e
         (js/console.error "Failed to change style:" e)
         false))))
