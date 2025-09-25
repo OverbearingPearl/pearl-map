@@ -60,19 +60,41 @@ pearl-map/
 │   │   └── build.clj                        # Build tasks and utilities [EXISTS]
 │   └── cljs/                                # Frontend ClojureScript code
 │       └── pearl_map/                       # Frontend main namespace
-│           ├── core.cljs                    # Frontend core [EXISTS]
-│           ├── editor.cljs                  # Style editor component [EXISTS]
-│           ├── events.cljs                  # re-frame events [TO BE CREATED]
-│           ├── subs.cljs                    # re-frame subscriptions [TO BE CREATED]
-│           ├── views/                       # React components
-│           │   ├── map.cljs                 # Map component [TO BE CREATED]
-│           │   ├── editor.cljs              # Style editor component [EXISTS]
-│           │   ├── ui.cljs                  # UI components [TO BE CREATED]
-│           │   └── layout.cljs              # Layout components [TO BE CREATED]
-│           ├── api.cljs                     # API client [TO BE CREATED]
-│           └── services/                    # Frontend services
-│               ├── map_engine.cljs          # Map engine wrapper [TO BE CREATED]
-│               └── model_loader.cljs        # Three.js model loading integration [IMPLEMENTED]
+│           ├── core.cljs                    # Application entry point and configuration [EXISTS]
+│           ├── app/                         # Application core (re-frame architecture)
+│           │   ├── db.cljs                  # Database schema and initial state [TO BE CREATED]
+│           │   ├── events.cljs              # Global event handlers [TO BE CREATED]
+│           │   └── subs.cljs                # Global subscriptions [TO BE CREATED]
+│           ├── features/                    # Feature modules (re-frame standard organization)
+│           │   ├── map-view/                # Map view feature module
+│           │   │   ├── events.cljs          # Map-specific event handlers [TO BE CREATED]
+│           │   │   ├── subs.cljs            # Map-specific subscriptions [TO BE CREATED]
+│           │   │   └── views.cljs           # Map view components [TO BE CREATED]
+│           │   ├── style-editor/            # Style editing feature module
+│           │   │   ├── events.cljs          # Style editor event handlers [TO BE CREATED]
+│           │   │   ├── subs.cljs            # Style editor subscriptions [TO BE CREATED]
+│           │   │   └── views.cljs           # Style editor components [TO BE CREATED - functionality in editor.cljs]
+│           │   └── 3d-models/               # 3D models feature module
+│           │       ├── events.cljs          # 3D model event handlers [TO BE CREATED]
+│           │       ├── subs.cljs            # 3D model subscriptions [TO BE CREATED]
+│           │       └── views.cljs           # 3D model components [TO BE CREATED]
+│           ├── components/                  # Reusable UI components
+│           │   ├── ui/                      # Base UI components
+│           │   │   ├── buttons.cljs         # Button components [TO BE CREATED]
+│           │   │   ├── controls.cljs        # Control components [TO BE CREATED]
+│           │   │   └── layout.cljs          # Layout components [TO BE CREATED]
+│           │   └── map/                     # Map-specific UI components
+│           │       ├── container.cljs       # Map container component [TO BE CREATED]
+│           │       ├── controls.cljs        # Map control components [TO BE CREATED]
+│           │       └── debug.cljs           # Debug information component [TO BE CREATED]
+│           ├── services/                    # External service integrations
+│           │   ├── map_engine.cljs          # Map engine service [IMPLEMENTED]
+│           │   ├── model_loader.cljs        # Model loading service [IMPLEMENTED]
+│           │   └── api.cljs                 # API client [TO BE CREATED]
+│           └── utils/                       # Utility functions
+│               ├── colors.cljs              # Color utilities [TO BE CREATED]
+│               ├── geometry.cljs            # Geometry utilities [TO BE CREATED]
+│               └── validation.cljs          # Validation utilities [TO BE CREATED]
 ├── resources/                               # Source resource files (git tracked)
 │   ├── config/                              # Configuration files [TO BE CREATED]
 │   │   ├── config.edn                       # Base configuration [TO BE CREATED]

@@ -60,19 +60,41 @@ pearl-map/
 │   │   └── build.clj                        # 构建任务和工具 [已存在]
 │   └── cljs/                                # 前端 ClojureScript 代码
 │       └── pearl_map/                       # 前端主命名空间
-│           ├── core.cljs                    # 前端核心 [已存在]
-│           ├── editor.cljs                  # 样式编辑器组件 [已存在]
-│           ├── events.cljs                  # re-frame 事件 [待建]
-│           ├── subs.cljs                    # re-frame 订阅 [待建]
-│           ├── views/                       # React 组件
-│           │   ├── map.cljs                 # 地图组件 [待建]
-│           │   ├── editor.cljs              # 样式编辑器组件 [已存在]
-│           │   ├── ui.cljs                  # UI 组件 [待建]
-│           │   └── layout.cljs              # 布局组件 [待建]
-│           ├── api.cljs                     # API 客户端 [待建]
-│           └── services/                    # 前端服务
-│               ├── map_engine.cljs          # 地图引擎封装 [待建]
-│               └── model_loader.cljs        # Three.js 模型加载集成 [已实现]
+│           ├── core.cljs                    # 应用入口点和配置 [已存在]
+│           ├── app/                         # 应用核心 (re-frame 架构)
+│           │   ├── db.cljs                  # 数据库模式和初始状态 [待建]
+│           │   ├── events.cljs              # 全局事件处理器 [待建]
+│           │   └── subs.cljs                # 全局订阅 [待建]
+│           ├── features/                    # 功能模块 (re-frame 标准组织方式)
+│           │   ├── map-view/                # 地图视图功能模块
+│           │   │   ├── events.cljs          # 地图特定事件处理器 [待建]
+│           │   │   ├── subs.cljs            # 地图特定订阅 [待建]
+│           │   │   └── views.cljs           # 地图视图组件 [待建]
+│           │   ├── style-editor/            # 样式编辑功能模块
+│           │   │   ├── events.cljs          # 样式编辑器事件处理器 [待建]
+│           │   │   ├── subs.cljs            # 样式编辑器订阅 [待建]
+│           │   │   └── views.cljs           # 样式编辑器组件 [待建 - 功能在 editor.cljs]
+│           │   └── 3d-models/               # 3D 模型功能模块
+│           │       ├── events.cljs          # 3D 模型事件处理器 [待建]
+│           │       ├── subs.cljs            # 3D 模型订阅 [待建]
+│           │       └── views.cljs           # 3D 模型组件 [待建]
+│           ├── components/                  # 可复用 UI 组件
+│           │   ├── ui/                      # 基础 UI 组件
+│           │   │   ├── buttons.cljs         # 按钮组件 [待建]
+│           │   │   ├── controls.cljs        # 控件组件 [待建]
+│           │   │   └── layout.cljs          # 布局组件 [待建]
+│           │   └── map/                     # 地图特定 UI 组件
+│           │       ├── container.cljs       # 地图容器组件 [待建]
+│           │       ├── controls.cljs        # 地图控制组件 [待建]
+│           │       └── debug.cljs           # 调试信息组件 [待建]
+│           ├── services/                    # 外部服务集成
+│           │   ├── map_engine.cljs          # 地图引擎服务 [已实现]
+│           │   ├── model_loader.cljs        # 模型加载服务 [已实现]
+│           │   └── api.cljs                 # API 客户端 [待建]
+│           └── utils/                       # 工具函数
+│               ├── colors.cljs              # 颜色工具 [待建]
+│               ├── geometry.cljs            # 几何工具 [待建]
+│               └── validation.cljs          # 验证工具 [待建]
 ├── resources/                               # 源代码资源文件（git 跟踪）
 │   ├── config/                              # 配置文件 [待建]
 │   │   ├── config.edn                       # 基础配置 [待建]
