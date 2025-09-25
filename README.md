@@ -531,6 +531,90 @@ The Eiffel Tower GLTF model has been successfully loaded and integrated into the
 - Implement 3D model rendering and placement on the map
 - Add model loading status indicators
 
+## 🎨 Map Styles & Layer Architecture
+
+### Style System
+
+Pearl-Map supports three map styles, each with different technical implementations:
+
+**1. Raster Style**
+- **Technology**: Based on OpenStreetMap raster tiles
+- **Data Source**: German mirror tile service (`tile.openstreetmap.de`)
+- **Layers**: Single raster layer (`osm-tiles`)
+- **Characteristics**: Simple and stable, but does not support building style editing
+
+**2. Vector Styles**
+- **Dark Style**: Carto Dark Matter (`dark-matter-gl-style`)
+- **Light Style**: Carto Positron (`positron-gl-style`)
+- **Data Source**: CartoCDN vector tile service
+- **Layers**: Contains dozens of implicit layers (roads, water, buildings, etc.)
+- **Characteristics**: Supports real-time building style editing
+
+### Layer Architecture
+
+**Standard Layer Stack**:
+```
+Top:    Custom Layers     (Fully custom WebGL rendering)
+        ↓
+        Building Layers   (User-editable building styles)
+        ↓
+        Vector Layers     (Roads, labels, etc. provided by CartoCDN)
+        ↓
+Bottom: Base Layer        (Raster or vector base map)
+```
+
+**Key Layer Descriptions**:
+
+| Layer Type | Quantity | Control Method | Function |
+|------------|----------|----------------|----------|
+| **Implicit Vector Layers** | 20+ | Automatically managed by CartoCDN | Provides complete map experience |
+| **Building Layers** | 2 | Real-time user editing | Building style customization |
+| **Custom Layers** | Extensible | Direct WebGL control | 3D effects and custom rendering |
+
+### Building Style Editor Technical Implementation
+
+The editor implements real-time building style editing through **layer overriding technology**:
+
+```clojure
+;; Override CartoCDN's default building styles
+:fill-color "#f0f0f0"      ; User-editable fill color
+:fill-opacity 0.7          ; Real-time transparency control
+:fill-outline-color "#cccccc" ; Outline color customization
+```
+
+**Technical Principles**:
+- Utilizes CartoCDN's vector data source (`composite`)
+- But uses custom paint styles to override default values
+- Supports real-time preview for color pickers and opacity sliders
+
+### Custom Layer Advanced Capabilities
+
+Custom Layer provides **capabilities beyond standard map rendering**:
+
+```clojure
+;; Fully custom WebGL rendering pipeline
+(set! (.-render layer-impl) (fn [gl matrix]
+  ;; Direct control over each frame's rendering
+  (.drawArrays gl (.-TRIANGLES gl) 0 3)))
+```
+
+**Potential Application Scenarios**:
+- 3D building model integration (alternative to Three.js solution)
+- Real-time particle effects (rain, snow, smoke)
+- Custom data visualization overlays
+- Interactive 3D object rendering
+
+### Style Switching Mechanism
+
+The system employs an **intelligent style switching strategy**:
+
+```clojure
+;; Raster ↔ Vector switching: Completely rebuild map instance
+;; Vector ↔ Vector switching: Keep map instance, only update style
+```
+
+This design ensures smooth transitions and functional compatibility between different style types.
+
 ## 🎯 Conclusion
 
 This development strategy follows a low-risk, high-iteration-speed approach. Each phase builds upon previous work, maximizing code reuse and leveraging the full potential of the Clojure/Script ecosystem. The hybrid mobile approach in Phase 3 provides the most efficient path to cross-platform presence.
