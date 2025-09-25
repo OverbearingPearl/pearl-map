@@ -8,7 +8,11 @@
             [pearl-map.services.model-loader :as model-loader]
             [pearl-map.services.map-engine :as map-engine]))
 
-(def react-root (atom nil))
+(defonce react-root
+  (delay
+    (let [app-element (.getElementById js/document "app")]
+      (when app-element
+        (rdomc/create-root app-element)))))
 (def style-urls map-engine/style-urls)
 
 (defn map-container []
@@ -116,14 +120,13 @@
        [debug-info]])}))
 
 (defn mount-root []
-  (let [app-element (.getElementById js/document "app")
-        root (rdomc/create-root app-element)]
-    (reset! react-root root)
-    (rdomc/render root [home-page])))
+  (let [root @react-root]
+    (when root
+      (rdomc/render root [home-page]))))
 
 (defn ^:dev/after-load reload []
-  (when @react-root
-    (rdomc/render @react-root [home-page])))
+  (when-let [root @react-root]
+    (rdomc/render root [home-page])))
 
 (defn init []
   (re-frame/clear-subscription-cache!)
