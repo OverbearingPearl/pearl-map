@@ -59,6 +59,7 @@ Thumbs.db
 
 # Aider
 .aider*
+.aidermacs.prompting.md
 
 # Node.js
 node_modules/
