@@ -23,54 +23,39 @@
   (re-frame/dispatch [:set-map-instance instance])
   (set! (.-pearlMapInstance js/window) instance))
 
-(defn create-raster-config []
-  (clj->js {:container "map-container"
-            :style {:version 8
-                    :name "OSM Bright"
-                    :center (clj->js eiffel-tower-coords)
-                    :zoom 15
-                    :pitch 45
-                    :bearing 0
-                    :sources {:osm {:type "raster"
-                                    :tiles ["https://tile.openstreetmap.de/{z}/{x}/{y}.png"]
-                                    :tileSize 256
-                                    :attribution "© OpenStreetMap contributors"}}
-                    :layers [{:id "osm-tiles"
-                              :type "raster"
-                              :source "osm"
-                              :minzoom 0
-                              :maxzoom 19}]}
-            :attributionControl true
-            :maxZoom 19
-            :minZoom 0}))
-
-(defn create-vector-config [style-url]
-  (clj->js {:container "map-container"
-            :style style-url
-            :center (clj->js eiffel-tower-coords)
-            :zoom 15
-            :pitch 45
-            :bearing 0
-            :attributionControl true
-            :maxZoom 19
-            :minZoom 0}))
+(defn create-config [style-url]
+  (let [base-config {:container "map-container"
+                     :center (clj->js eiffel-tower-coords)
+                     :zoom 15
+                     :pitch 45
+                     :bearing 0
+                     :attributionControl true
+                     :maxZoom 19
+                     :minZoom 0}]
+    (if (= style-url "raster-style")
+      (clj->js (assoc base-config
+                      :style {:version 8
+                              :name "OSM Bright"
+                              :sources {:osm {:type "raster"
+                                              :tiles ["https://tile.openstreetmap.de/{z}/{x}/{y}.png"]
+                                              :tileSize 256
+                                              :attribution "© OpenStreetMap contributors"}}
+                              :layers [{:id "osm-tiles"
+                                        :type "raster"
+                                        :source "osm"
+                                        :minzoom 0
+                                        :maxzoom 19}]}))
+      (clj->js (assoc base-config :style style-url)))))
 
 (defn init-map []
-  (let [current-style "raster-style"
-        map-element (.getElementById js/document "map-container")]
+  (let [map-element (.getElementById js/document "map-container")]
     (when map-element
-      (try
-        (let [map-config (if (= current-style "raster-style")
-                           (create-raster-config)
-                           (create-vector-config current-style))
-              map-obj (maplibre/Map. map-config)]
-          (set-map-instance! map-obj)
-          (re-frame/dispatch [:set-map-instance map-obj])
-          (.addControl map-obj (maplibre/NavigationControl.))
-          (.addControl map-obj (maplibre/ScaleControl.))
-          map-obj)
-        (catch js/Error e
-          nil)))))
+      (let [map-config (create-config "raster-style")
+            map-obj (maplibre/Map. map-config)]
+        (set-map-instance! map-obj)
+        (.addControl map-obj (maplibre/NavigationControl.))
+        (.addControl map-obj (maplibre/ScaleControl.))
+        map-obj))))
 
 (defn on-map-load [callback]
   (when-let [^js map-obj (get-map-instance)]
@@ -82,28 +67,20 @@
 
 (defn add-buildings-layer []
   (when-let [^js map-obj (get-map-instance)]
-    (when (and map-obj (not= (.getStyle map-obj) "raster-style"))
-      (try
-        (.once map-obj "idle"
-               (fn []
-                 (let [sources (js->clj (.getSources map-obj))]
-                   (when (get sources "composite")
-                     (try
-                       (when-not (.getLayer map-obj "buildings")
-                         (.addLayer map-obj
-                                    (clj->js
-                                     {:id "buildings"
-                                      :type "fill"
-                                      :source "composite"
-                                      :source-layer "building"
-                                      :filter ["==" "extrude" "true"]
-                                      :paint {:fill-color "#f0f0f0"
-                                              :fill-opacity 0.7
-                                              :fill-outline-color "#cccccc"}})))
-                       (catch js/Error _))))))
-        true
-        (catch js/Error _
-          false)))))
+    (.once map-obj "idle"
+           (fn []
+             (when (get (js->clj (.getSources map-obj)) "composite")
+               (when-not (.getLayer map-obj "buildings")
+                 (.addLayer map-obj
+                            (clj->js
+                             {:id "buildings"
+                              :type "fill"
+                              :source "composite"
+                              :source-layer "building"
+                              :filter ["==" "extrude" "true"]
+                              :paint {:fill-color "#f0f0f0"
+                                      :fill-opacity 0.7
+                                      :fill-outline-color "#cccccc"}}))))))))
 
 (defn register-custom-layer [layer-id layer-impl]
   (re-frame/dispatch [:register-custom-layer layer-id layer-impl]))
@@ -131,51 +108,46 @@
           false)))))
 
 (defn change-map-style [style-url]
-  (when-let [^js map-obj (get-map-instance)]
-    (try
-      (let [current-center (.getCenter map-obj)
-            current-zoom (.getZoom map-obj)
-            current-pitch (.getPitch map-obj)
-            current-bearing (.getBearing map-obj)
-            current-layers (get-custom-layers)
-            clamped-zoom (cond
-                           (= style-url "raster-style") (max 0 (min 19 current-zoom))
-                           :else (max 0 (min 22 current-zoom)))]
-        (if (= style-url "raster-style")
-          (do
-            (.remove map-obj)
-            (set-map-instance! nil)
-            (re-frame/dispatch [:set-map-instance nil])
-            (reagent/next-tick
-             (fn []
-               (init-map)
-               (reagent/next-tick
-                (fn []
-                  (when-let [new-map-obj (get-map-instance)]
-                    (.once new-map-obj "load"
-                           (fn []
-                             (.setCenter new-map-obj current-center)
-                             (.setZoom new-map-obj clamped-zoom)
-                             (.setPitch new-map-obj current-pitch)
-                             (.setBearing new-map-obj current-bearing)
-                             (doseq [[layer-id layer-impl] current-layers]
-                               (add-custom-layer layer-id layer-impl nil)))))))))
-            true)
-          (do
-            (doseq [[layer-id _] current-layers]
-              (remove-custom-layer layer-id))
-            (.setStyle map-obj style-url)
-            (.once map-obj "idle"
-                   (fn []
-                     (add-buildings-layer)
-                     (doseq [[layer-id layer-impl] current-layers]
-                       (add-custom-layer layer-id layer-impl nil))
-                     (let [current-zoom-after (.getZoom map-obj)]
-                       (when (or (< current-zoom-after 0) (> current-zoom-after 22))
-                         (.setZoom map-obj clamped-zoom)))))
-            true)))
-      (catch js/Error e
-        false))))
+  (let [^js map-obj (get-map-instance)
+        current-center (.getCenter map-obj)
+        current-zoom (.getZoom map-obj)
+        current-pitch (.getPitch map-obj)
+        current-bearing (.getBearing map-obj)
+        current-layers (get-custom-layers)
+        clamped-zoom (if (= style-url "raster-style")
+                       (max 0 (min 19 current-zoom))
+                       (max 0 (min 22 current-zoom)))]
+
+    (if (= style-url "raster-style")
+      (do
+        (.remove map-obj)
+        (set-map-instance! nil)
+        (reagent/next-tick
+         (fn []
+           (init-map)
+           (reagent/next-tick
+            (fn []
+              (when-let [new-map-obj (get-map-instance)]
+                (.once new-map-obj "load"
+                       (fn []
+                         (.setCenter new-map-obj current-center)
+                         (.setZoom new-map-obj clamped-zoom)
+                         (.setPitch new-map-obj current-pitch)
+                         (.setBearing new-map-obj current-bearing)
+                         (doseq [[layer-id layer-impl] current-layers]
+                           (add-custom-layer layer-id layer-impl nil))))))))))
+      (do
+        (doseq [[layer-id _] current-layers]
+          (remove-custom-layer layer-id))
+        (.setStyle map-obj style-url)
+        (.once map-obj "idle"
+               (fn []
+                 (add-buildings-layer)
+                 (doseq [[layer-id layer-impl] current-layers]
+                   (add-custom-layer layer-id layer-impl nil))
+                 (let [current-zoom-after (.getZoom map-obj)]
+                   (when (or (< current-zoom-after 0) (> current-zoom-after 22))
+                     (.setZoom map-obj clamped-zoom)))))))))
 
 (defn get-paint-property [layer-id property-name]
   (when-let [^js map-obj (get-map-instance)]
@@ -207,103 +179,55 @@
   (when-let [^js map-obj (get-map-instance)]
     (.setBearing map-obj bearing-angle)))
 
-(defn parse-color-expression [color-value current-zoom]
-  (try
+(defn parse-color-stops [stops current-zoom]
+  (let [sorted-stops (sort-by first stops)]
     (cond
-      (and (string? color-value) (.startsWith color-value "#"))
-      color-value
-      (and (string? color-value) (or (.includes color-value "rgba")
-                                     (.includes color-value "rgb")))
-      (-> (color color-value)
-          (.hex)
-          (.toString)
-          (.toLowerCase))
-      (and (object? color-value) (.-expression color-value))
-      (let [expr (.-expression color-value)]
-        (if (and (array? expr)
-                 (= (aget expr 0) "interpolate")
-                 (= (aget expr 1) "linear")
-                 (= (aget expr 2) "zoom"))
-          (let [stops (drop 3 (array-seq expr))
-                stop-pairs (partition 2 stops)]
-            (if (empty? stop-pairs)
-              (throw (js/Error. "Empty expression stops"))
-              (let [first-pair (first stop-pairs)
-                    last-pair (last stop-pairs)]
-                (cond
-                  (<= current-zoom (first first-pair)) (second first-pair)
-                  (>= current-zoom (first last-pair)) (second last-pair)
-                  :else (loop [[[z1 v1] [z2 v2] & more] stop-pairs]
-                          (if (and z2 (>= current-zoom z1) (< current-zoom z2))
-                            (let [interpolated-value (+ v1 (* (- current-zoom z1) (/ (- v2 v1) (- z2 z1))))]
-                              (if (string? v1)
-                                (let [color1 (color v1)
-                                      color2 (color v2)
-                                      ratio (/ (- current-zoom z1) (- z2 z1))
-                                      r (+ (.red color1) (* ratio (- (.red color2) (.red color1))))
-                                      g (+ (.green color1) (* ratio (- (.green color2) (.green color1))))
-                                      b (+ (.blue color1) (* ratio (- (.blue color2) (.blue color1))))]
-                                  (-> (color (clj->js {:r r :g g :b b}))
-                                      (.hex)
-                                      (.toString)
-                                      (.toLowerCase)))
-                                interpolated-value))
-                            (recur (cons [z2 v2] more))))))))
-          (throw (js/Error. (str "Unsupported expression format: " (js/JSON.stringify expr))))))
-      (and (object? color-value) (.-stops color-value))
-      (let [stops (.-stops color-value)
-            sorted-stops (sort-by first (js->clj stops))]
-        (if (empty? sorted-stops)
-          (throw (js/Error. "Empty stops array"))
-          (let [first-stop (first sorted-stops)
-                last-stop (last sorted-stops)]
-            (cond
-              (<= current-zoom (first first-stop)) (second first-stop)
-              (>= current-zoom (first last-stop)) (second last-stop)
-              :else (loop [[[z1 v1] & rest-stops] sorted-stops]
-                      (when (and rest-stops (first (first rest-stops)))
-                        (let [[z2 v2] (first rest-stops)]
-                          (if (and (>= current-zoom z1) (< current-zoom z2))
-                            (let [ratio (/ (- current-zoom z1) (- z2 z1))]
-                              (if (string? v1)
-                                (let [color1 (color v1)
-                                      color2 (color v2)
-                                      r (+ (.red color1) (* ratio (- (.red color2) (.red color1))))
-                                      g (+ (.green color1) (* ratio (- (.green color2) (.green color1))))
-                                      b (+ (.blue color1) (* ratio (- (.blue color2) (.blue color1))))]
-                                  (-> (color (clj->js {:r r :g g :b b}))
-                                      (.hex)
-                                      (.toString)
-                                      (.toLowerCase)))
-                                (+ v1 (* ratio (- v2 v1)))))
-                            (recur rest-stops)))))))))
-      (object? color-value)
-      (let [str-value (str color-value)]
-        (if (.startsWith str-value "#")
-          str-value
-          (throw (js/Error. (str "Unsupported color object format: " (js/JSON.stringify color-value))))))
-      :else
-      (throw (js/Error. (str "Invalid color value type: " (type color-value) " - " color-value))))
-    (catch js/Error e
-      (throw e))))
+      (empty? sorted-stops) (throw (js/Error. "Empty stops array"))
+      (<= current-zoom (ffirst sorted-stops)) (second (first sorted-stops))
+      (>= current-zoom (first (last sorted-stops))) (second (last sorted-stops))
+      :else (loop [[[z1 v1] & rest-stops] sorted-stops]
+              (when-let [[z2 v2] (first rest-stops)]
+                (if (and (>= current-zoom z1) (< current-zoom z2))
+                  (let [ratio (/ (- current-zoom z1) (- z2 z1))]
+                    (if (string? v1)
+                      (let [color1 (color v1)
+                            color2 (color v2)
+                            r (+ (.red color1) (* ratio (- (.red color2) (.red color1))))
+                            g (+ (.green color1) (* ratio (- (.green color2) (.green color1))))
+                            b (+ (.blue color1) (* ratio (- (.blue color2) (.blue color1))))]
+                        (-> (color (clj->js {:r r :g g :b b}))
+                            (.hex)
+                            (.toString)
+                            (.toLowerCase)))
+                      (+ v1 (* ratio (- v2 v1)))))
+                  (recur rest-stops)))))))
+
+(defn parse-color-expression [color-value current-zoom]
+  (cond
+    (and (string? color-value) (.startsWith color-value "#")) color-value
+    (and (string? color-value) (or (.includes color-value "rgba")
+                                   (.includes color-value "rgb")))
+    (-> (color color-value) (.hex) (.toString) (.toLowerCase))
+    (and (object? color-value) (.-expression color-value))
+    (let [expr (.-expression color-value)]
+      (if (and (array? expr)
+               (= (aget expr 0) "interpolate")
+               (= (aget expr 1) "linear")
+               (= (aget expr 2) "zoom"))
+        (parse-color-stops (partition 2 (drop 3 (array-seq expr))) current-zoom)
+        (throw (js/Error. (str "Unsupported expression format: " (js/JSON.stringify expr))))))
+    (and (object? color-value) (.-stops color-value))
+    (parse-color-stops (js->clj (.-stops color-value)) current-zoom)
+    :else (throw (js/Error. (str "Invalid color value: " color-value)))))
 
 (defn rgba-to-hex [color-value]
-  (try
-    (cond
-      (and (string? color-value) (.startsWith color-value "#"))
-      color-value
-      (and (string? color-value) (or (.includes color-value "rgba")
-                                     (.includes color-value "rgb")))
-      (-> (color color-value)
-          (.hex)
-          (.toString)
-          (.toLowerCase))
-      (object? color-value)
-      (parse-color-expression color-value (get-current-zoom))
-      :else
-      (throw (js/Error. (str "Unsupported color format: " color-value))))
-    (catch js/Error e
-      (throw e))))
+  (cond
+    (and (string? color-value) (.startsWith color-value "#")) color-value
+    (and (string? color-value) (or (.includes color-value "rgba")
+                                   (.includes color-value "rgb")))
+    (-> (color color-value) (.hex) (.toString) (.toLowerCase))
+    (object? color-value) (parse-color-expression color-value (get-current-zoom))
+    :else (throw (js/Error. (str "Unsupported color format: " color-value)))))
 
 (defn hex-to-rgba [hex-str opacity]
   (when hex-str
