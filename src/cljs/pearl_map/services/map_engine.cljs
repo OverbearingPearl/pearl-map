@@ -184,7 +184,7 @@
   (when-let [^js map-obj (get-map-instance)]
     (.setBearing map-obj bearing-angle)))
 
-(defn parse-color-stops [stops current-zoom]
+(defn- parse-color-stops [stops current-zoom]
   (let [sorted-stops (sort-by first stops)]
     (cond
       (empty? sorted-stops) (throw (js/Error. "Empty stops array"))
@@ -207,32 +207,34 @@
                       (+ v1 (* ratio (- v2 v1)))))
                   (recur rest-stops)))))))
 
+(defn- parse-expression-color [color-value current-zoom]
+  (let [expr (.-expression color-value)]
+    (if (and (array? expr)
+             (= (aget expr 0) "interpolate")
+             (= (aget expr 1) "linear")
+             (= (aget expr 2) "zoom"))
+      (parse-color-stops (partition 2 (drop 3 (array-seq expr))) current-zoom)
+      (throw (js/Error. (str "Unsupported expression format: " (js/JSON.stringify expr)))))))
+
+(defn- parse-stops-color [color-value current-zoom]
+  (parse-color-stops (js->clj (.-stops color-value)) current-zoom))
+
+(defn- parse-string-color [color-value]
+  (cond
+    (.startsWith color-value "#") color-value
+    (or (.includes color-value "rgba") (.includes color-value "rgb"))
+    (-> (color color-value) (.hex) (.toString) (.toLowerCase))
+    :else (throw (js/Error. (str "Invalid color string: " color-value)))))
+
 (defn parse-color-expression [color-value current-zoom]
   (cond
-    (and (string? color-value) (.startsWith color-value "#")) color-value
-    (and (string? color-value) (or (.includes color-value "rgba")
-                                   (.includes color-value "rgb")))
-    (-> (color color-value) (.hex) (.toString) (.toLowerCase))
-    (and (object? color-value) (.-expression color-value))
-    (let [expr (.-expression color-value)]
-      (if (and (array? expr)
-               (= (aget expr 0) "interpolate")
-               (= (aget expr 1) "linear")
-               (= (aget expr 2) "zoom"))
-        (parse-color-stops (partition 2 (drop 3 (array-seq expr))) current-zoom)
-        (throw (js/Error. (str "Unsupported expression format: " (js/JSON.stringify expr))))))
-    (and (object? color-value) (.-stops color-value))
-    (parse-color-stops (js->clj (.-stops color-value)) current-zoom)
+    (string? color-value) (parse-string-color color-value)
+    (and (object? color-value) (.-expression color-value)) (parse-expression-color color-value current-zoom)
+    (and (object? color-value) (.-stops color-value)) (parse-stops-color color-value current-zoom)
     :else (throw (js/Error. (str "Invalid color value: " color-value)))))
 
 (defn rgba-to-hex [color-value]
-  (cond
-    (and (string? color-value) (.startsWith color-value "#")) color-value
-    (and (string? color-value) (or (.includes color-value "rgba")
-                                   (.includes color-value "rgb")))
-    (-> (color color-value) (.hex) (.toString) (.toLowerCase))
-    (object? color-value) (parse-color-expression color-value (get-current-zoom))
-    :else (throw (js/Error. (str "Unsupported color format: " color-value)))))
+  (parse-color-expression color-value (get-current-zoom)))
 
 (defn hex-to-rgba [hex-str opacity]
   (when hex-str
