@@ -107,47 +107,52 @@
         (catch js/Error e
           false)))))
 
-(defn change-map-style [style-url]
-  (let [^js map-obj (get-map-instance)
-        current-center (.getCenter map-obj)
-        current-zoom (.getZoom map-obj)
-        current-pitch (.getPitch map-obj)
-        current-bearing (.getBearing map-obj)
-        current-layers (get-custom-layers)
-        clamped-zoom (if (= style-url "raster-style")
-                       (max 0 (min 19 current-zoom))
-                       (max 0 (min 22 current-zoom)))]
+(defn- reset-map-with-raster-style [center zoom pitch bearing layers]
+  (let [^js map-obj (get-map-instance)]
+    (.remove map-obj)
+    (set-map-instance! nil)
+    (reagent/next-tick
+     (fn []
+       (init-map)
+       (reagent/next-tick
+        (fn []
+          (when-let [new-map-obj (get-map-instance)]
+            (.once new-map-obj "load"
+                   (fn []
+                     (.setCenter new-map-obj center)
+                     (.setZoom new-map-obj zoom)
+                     (.setPitch new-map-obj pitch)
+                     (.setBearing new-map-obj bearing)
+                     (doseq [[layer-id layer-impl] layers]
+                       (add-custom-layer layer-id layer-impl nil)))))))))))
 
-    (if (= style-url "raster-style")
-      (do
-        (.remove map-obj)
-        (set-map-instance! nil)
-        (reagent/next-tick
-         (fn []
-           (init-map)
-           (reagent/next-tick
-            (fn []
-              (when-let [new-map-obj (get-map-instance)]
-                (.once new-map-obj "load"
-                       (fn []
-                         (.setCenter new-map-obj current-center)
-                         (.setZoom new-map-obj clamped-zoom)
-                         (.setPitch new-map-obj current-pitch)
-                         (.setBearing new-map-obj current-bearing)
-                         (doseq [[layer-id layer-impl] current-layers]
-                           (add-custom-layer layer-id layer-impl nil))))))))))
-      (do
-        (doseq [[layer-id _] current-layers]
-          (remove-custom-layer layer-id))
-        (.setStyle map-obj style-url)
-        (.once map-obj "idle"
-               (fn []
-                 (add-buildings-layer)
-                 (doseq [[layer-id layer-impl] current-layers]
-                   (add-custom-layer layer-id layer-impl nil))
-                 (let [current-zoom-after (.getZoom map-obj)]
-                   (when (or (< current-zoom-after 0) (> current-zoom-after 22))
-                     (.setZoom map-obj clamped-zoom)))))))))
+(defn- switch-to-vector-style [style-url layers clamped-zoom]
+  (let [^js map-obj (get-map-instance)]
+    (doseq [[layer-id _] layers]
+      (remove-custom-layer layer-id))
+    (.setStyle map-obj style-url)
+    (.once map-obj "idle"
+           (fn []
+             (add-buildings-layer)
+             (doseq [[layer-id layer-impl] layers]
+               (add-custom-layer layer-id layer-impl nil))
+             (let [current-zoom-after (.getZoom map-obj)]
+               (when (or (< current-zoom-after 0) (> current-zoom-after 22))
+                 (.setZoom map-obj clamped-zoom)))))))
+
+(defn change-map-style [style-url]
+  (when-let [^js map-obj (get-map-instance)]
+    (let [current-center (.getCenter map-obj)
+          current-zoom (.getZoom map-obj)
+          current-pitch (.getPitch map-obj)
+          current-bearing (.getBearing map-obj)
+          current-layers (get-custom-layers)
+          clamped-zoom (if (= style-url "raster-style")
+                         (max 0 (min 19 current-zoom))
+                         (max 0 (min 22 current-zoom)))]
+      (if (= style-url "raster-style")
+        (reset-map-with-raster-style current-center clamped-zoom current-pitch current-bearing current-layers)
+        (switch-to-vector-style style-url current-layers clamped-zoom)))))
 
 (defn get-paint-property [layer-id property-name]
   (when-let [^js map-obj (get-map-instance)]
