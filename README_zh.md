@@ -66,15 +66,15 @@ pearl-map/
 │           │   ├── events.cljs              # 全局事件处理器 [待建]
 │           │   └── subs.cljs                # 全局订阅 [待建]
 │           ├── features/                    # 功能模块 (re-frame 标准组织方式)
-│           │   ├── map-view/                # 地图视图功能模块
+│           │   ├── map_view/                # 地图视图功能模块
 │           │   │   ├── events.cljs          # 地图特定事件处理器 [待建]
 │           │   │   ├── subs.cljs            # 地图特定订阅 [待建]
 │           │   │   └── views.cljs           # 地图视图组件 [待建]
-│           │   ├── style-editor/            # 样式编辑功能模块
+│           │   ├── style_editor/            # 样式编辑功能模块
 │           │   │   ├── events.cljs          # 样式编辑器事件处理器 [待建]
 │           │   │   ├── subs.cljs            # 样式编辑器订阅 [待建]
 │           │   │   └── views.cljs           # 样式编辑器组件 [待建 - 功能在 editor.cljs]
-│           │   └── 3d-models/               # 3D 模型功能模块
+│           │   └── 3d_models/               # 3D 模型功能模块
 │           │       ├── events.cljs          # 3D 模型事件处理器 [待建]
 │           │       ├── subs.cljs            # 3D 模型订阅 [待建]
 │           │       └── views.cljs           # 3D 模型组件 [待建]

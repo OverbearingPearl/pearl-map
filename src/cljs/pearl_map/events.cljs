@@ -1,5 +1,7 @@
 (ns pearl-map.events
-  (:require [re-frame.core :as re-frame]))
+  (:require [re-frame.core :as re-frame]
+            [pearl-map.utils.colors :as colors]
+            [pearl-map.services.map-engine :as map-engine]))
 
 (re-frame/reg-event-db
  :set-map-instance
@@ -22,14 +24,14 @@
    (assoc db :loaded-model model)))
 
 (re-frame/reg-event-db
- :set-editing-style
+ :style-editor/set-editing-style
  (fn [db [_ style]]
-   (assoc db :editing-style style)))
+   (assoc db :style-editor/editing-style style)))
 
 (re-frame/reg-event-db
- :update-editing-style
+ :style-editor/update-editing-style
  (fn [db [_ key value]]
-   (assoc-in db [:editing-style key] value)))
+   (assoc-in db [:style-editor/editing-style key] value)))
 
 (re-frame/reg-event-db
  :register-custom-layer
@@ -46,6 +48,73 @@
  (fn [db _]
    (assoc db :custom-layers {})))
 
+(re-frame/reg-event-fx
+ :style-editor/on-map-load
+ (fn [{:keys [db]} _]
+   {:db db
+    :fx [[:dispatch [:style-editor/load-current-styles]]]}))
+
+(re-frame/reg-event-fx
+ :style-editor/load-current-styles
+ (fn [{:keys [db]} _]
+   (let [current-zoom (map-engine/get-current-zoom)
+         layer-ids ["building" "building-top"]
+         style-keys [:fill-color :fill-opacity :fill-outline-color]
+         current-styles (->> layer-ids
+                           (mapcat (fn [layer-id]
+                                     (->> style-keys
+                                          (map (fn [style-key]
+                                                 (when-let [current-value (map-engine/get-paint-property layer-id (name style-key))]
+                                                   [style-key (colors/parse-color-expression current-value current-zoom)])))
+                                          (remove nil?))))
+                           (into {}))]
+     {:db (reduce (fn [current-db [style-key style-value]]
+                    (assoc-in current-db [:style-editor/editing-style style-key] style-value))
+                  db
+                  current-styles)
+      :fx [[:dispatch [:style-editor/apply-current-styles current-styles]]]})))
+
+(re-frame/reg-event-fx
+ :style-editor/apply-current-styles
+ (fn [_ [_ styles]]
+   {:fx [[:dispatch-later {:ms 100 :dispatch [:style-editor/actually-apply-styles styles]}]]}))
+
+(re-frame/reg-event-fx
+ :style-editor/update-and-apply-style
+ (fn [{:keys [db]} [_ style-key value]]
+   (let [updated-style (assoc (:style-editor/editing-style db) style-key value)]
+     {:db (assoc db :style-editor/editing-style updated-style)
+      :fx [[:dispatch-later {:ms 100 :dispatch [:style-editor/actually-apply-styles updated-style]}]]})))
+
+(re-frame/reg-event-fx
+ :style-editor/set-and-apply-style
+ (fn [{:keys [db]} [_ style]]
+   {:db (assoc db :style-editor/editing-style style)
+    :fx [[:dispatch-later {:ms 100 :dispatch [:style-editor/actually-apply-styles style]}]]}))
+
+(re-frame/reg-event-fx
+ :style-editor/load-and-apply-current-styles
+ (fn [{:keys [db]} _]
+   (let [current-zoom (map-engine/get-current-zoom)
+         layer-ids ["building" "building-top"]
+         style-keys [:fill-color :fill-opacity :fill-outline-color]
+         current-styles (->> layer-ids
+                           (mapcat (fn [layer-id]
+                                     (->> style-keys
+                                          (map (fn [style-key]
+                                                 (when-let [current-value (map-engine/get-paint-property layer-id (name style-key))]
+                                                   [style-key (colors/parse-color-expression current-value current-zoom)])))
+                                          (remove nil?))))
+                           (into {}))]
+     {:db (assoc db :style-editor/editing-style current-styles)
+      :fx [[:dispatch-later {:ms 100 :dispatch [:style-editor/actually-apply-styles current-styles]}]]})))
+
+(re-frame/reg-event-fx
+ :style-editor/actually-apply-styles
+ (fn [_ [_ styles]]
+   (pearl-map.features.style-editor.views/apply-current-style styles)
+   {}))
+
 (re-frame/reg-event-db
  :initialize-db
  (fn [_ _]
@@ -54,6 +123,6 @@
     :model-loaded false
     :loaded-model nil
     :custom-layers {}
-    :editing-style {:fill-color "#f0f0f0"
-                    :fill-opacity 0.7
-                    :fill-outline-color "#cccccc"}}))
+    :style-editor/editing-style {:fill-color "#f0f0f0"
+                                 :fill-opacity 0.7
+                                 :fill-outline-color "#cccccc"}}))

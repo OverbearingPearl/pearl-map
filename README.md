@@ -66,15 +66,15 @@ pearl-map/
 │           │   ├── events.cljs              # Global event handlers [TO BE CREATED]
 │           │   └── subs.cljs                # Global subscriptions [TO BE CREATED]
 │           ├── features/                    # Feature modules (re-frame standard organization)
-│           │   ├── map-view/                # Map view feature module
+│           │   ├── map_view/                # Map view feature module
 │           │   │   ├── events.cljs          # Map-specific event handlers [TO BE CREATED]
 │           │   │   ├── subs.cljs            # Map-specific subscriptions [TO BE CREATED]
 │           │   │   └── views.cljs           # Map view components [TO BE CREATED]
-│           │   ├── style-editor/            # Style editing feature module
+│           │   ├── style_editor/            # Style editing feature module
 │           │   │   ├── events.cljs          # Style editor event handlers [TO BE CREATED]
 │           │   │   ├── subs.cljs            # Style editor subscriptions [TO BE CREATED]
 │           │   │   └── views.cljs           # Style editor components [TO BE CREATED - functionality in editor.cljs]
-│           │   └── 3d-models/               # 3D models feature module
+│           │   └── 3d_models/               # 3D models feature module
 │           │       ├── events.cljs          # 3D model event handlers [TO BE CREATED]
 │           │       ├── subs.cljs            # 3D model subscriptions [TO BE CREATED]
 │           │       └── views.cljs           # 3D model components [TO BE CREATED]

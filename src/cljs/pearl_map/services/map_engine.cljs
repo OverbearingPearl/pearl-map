@@ -123,6 +123,7 @@
       (register-custom-layer layer-id layer-impl))))
 
 (defn- reapply-custom-layers! [layers]
+  (clear-custom-layers)
   (doseq [[layer-id layer-impl] layers]
     (add-custom-layer layer-id layer-impl nil)))
 
@@ -188,72 +189,6 @@
 (defn set-bearing [bearing-angle]
   (when-let [^js map-obj (get-map-instance)]
     (.setBearing map-obj bearing-angle)))
-
-(defn- interpolate-color-values [color1 color2 ratio]
-  (let [c1 (color color1)
-        c2 (color color2)
-        r (+ (.red c1) (* ratio (- (.red c2) (.red c1))))
-        g (+ (.green c1) (* ratio (- (.green c2) (.green c1))))
-        b (+ (.blue c1) (* ratio (- (.blue c2) (.blue c1))))]
-    (-> (color (clj->js {:r r :g g :b b}))
-        (.hex)
-        (.toString)
-        (.toLowerCase))))
-
-(defn- parse-color-stops [stops current-zoom]
-  (let [sorted-stops (sort-by first stops)]
-    (cond
-      (empty? sorted-stops) nil
-      (<= current-zoom (ffirst sorted-stops)) (second (first sorted-stops))
-      (>= current-zoom (first (last sorted-stops))) (second (last sorted-stops))
-      :else (let [[[z1 v1] [z2 v2]] (loop [[stop & rest-stops] sorted-stops]
-                                      (let [next-stop (first rest-stops)]
-                                        (if (and (>= current-zoom (first stop)) 
-                                                 (< current-zoom (first next-stop)))
-                                          [stop next-stop]
-                                          (recur rest-stops))))
-                  ratio (/ (- current-zoom z1) (- z2 z1))]
-              (if (string? v1)
-                (interpolate-color-values v1 v2 ratio)
-                (+ v1 (* ratio (- v2 v1))))))))
-
-(defn- parse-expression-color [color-value current-zoom]
-  (let [expr (.-expression color-value)]
-    (if (and (array? expr)
-             (= (aget expr 0) "interpolate")
-             (= (aget expr 1) "linear")
-             (= (aget expr 2) "zoom"))
-      (parse-color-stops (partition 2 (drop 3 (array-seq expr))) current-zoom)
-      (throw (js/Error. (str "Unsupported expression format: " (js/JSON.stringify expr)))))))
-
-(defn- parse-stops-color [color-value current-zoom]
-  (parse-color-stops (js->clj (.-stops color-value)) current-zoom))
-
-(defn- parse-string-color [color-value]
-  (cond
-    (.startsWith color-value "#") color-value
-    (or (.includes color-value "rgba") (.includes color-value "rgb"))
-    (-> (color color-value) (.hex) (.toString) (.toLowerCase))
-    :else (throw (js/Error. (str "Invalid color string: " color-value)))))
-
-(defn parse-color-expression [color-value current-zoom]
-  (cond
-    (string? color-value) (parse-string-color color-value)
-    (.-expression color-value) (parse-expression-color color-value current-zoom)
-    (.-stops color-value) (parse-stops-color color-value current-zoom)
-    :else (throw (js/Error. (str "Invalid color value: " color-value)))))
-
-(defn rgba-to-hex [color-value]
-  (parse-color-expression color-value (get-current-zoom)))
-
-(defn hex-to-rgba [hex-str opacity]
-  (when hex-str
-    (if (.startsWith hex-str "rgba")
-      hex-str
-      (let [color-obj (color hex-str)
-            rgb-obj (.rgb color-obj)
-            rgba-obj (.alpha rgb-obj opacity)]
-        (.string rgba-obj)))))
 
 (defn- create-shader-program [context vertex-source fragment-source]
   (let [vertex-shader (.createShader context (.-VERTEX_SHADER context))

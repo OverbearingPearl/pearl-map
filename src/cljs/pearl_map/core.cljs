@@ -4,7 +4,7 @@
             [re-frame.core :as re-frame]
             [pearl-map.events :as events]
             [pearl-map.subs :as subs]
-            [pearl-map.editor :refer [building-style-editor]]
+            [pearl-map.features.style-editor.views :refer [building-style-editor]]
             [pearl-map.services.model-loader :as model-loader]
             [pearl-map.services.map-engine :as map-engine]))
 

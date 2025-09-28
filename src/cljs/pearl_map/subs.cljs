@@ -22,14 +22,9 @@
    (:loaded-model db)))
 
 (re-frame/reg-sub
- :editing-style
+ :style-editor/editing-style
  (fn [db]
-   (:editing-style db)))
-
-(re-frame/reg-sub
- :editing-style-value
- (fn [db [_ key]]
-   (get-in db [:editing-style key])))
+   (:style-editor/editing-style db)))
 
 (re-frame/reg-sub
  :custom-layers
