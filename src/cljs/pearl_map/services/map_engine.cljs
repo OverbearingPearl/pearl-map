@@ -88,71 +88,76 @@
 (defn unregister-custom-layer [layer-id]
   (re-frame/dispatch [:unregister-custom-layer layer-id]))
 
-(defn add-custom-layer [layer-id layer-impl before-id]
-  (when-let [^js map-obj (get-map-instance)]
-    (try
-      (.addLayer map-obj layer-impl before-id)
-      (register-custom-layer layer-id layer-impl)
-      true
-      (catch js/Error e
-        false))))
-
 (defn remove-custom-layer [layer-id]
-  (when-let [^js map-obj (get-map-instance)]
-    (when (.getLayer map-obj layer-id)
-      (try
-        (.removeLayer map-obj layer-id)
-        (unregister-custom-layer layer-id)
-        true
-        (catch js/Error e
-          false)))))
+  (let [^js map-obj (get-map-instance)]
+    (.removeLayer map-obj layer-id)
+    (unregister-custom-layer layer-id)))
 
-(defn- reset-map-with-raster-style [center zoom pitch bearing layers]
+(defn- get-current-map-state []
+  (let [^js map-obj (get-map-instance)]
+    {:center (.getCenter map-obj)
+     :zoom (.getZoom map-obj)
+     :pitch (.getPitch map-obj)
+     :bearing (.getBearing map-obj)
+     :layers (get-custom-layers)}))
+
+(defn- apply-map-state! [state]
+  (let [^js map-obj (get-map-instance)]
+    (.setCenter map-obj (:center state))
+    (.setZoom map-obj (:zoom state))
+    (.setPitch map-obj (:pitch state))
+    (.setBearing map-obj (:bearing state))))
+
+(defn- clear-custom-layers []
+  (let [^js map-obj (get-map-instance)
+        layers (get-custom-layers)]
+    (doseq [[layer-id _] layers]
+      (when (.getLayer map-obj layer-id)
+        (.removeLayer map-obj layer-id)))
+    (re-frame/dispatch [:clear-custom-layers])))
+
+(defn add-custom-layer [layer-id layer-impl before-id]
+  (let [^js map-obj (get-map-instance)]
+    (when-not (.getLayer map-obj layer-id)
+      (.addLayer map-obj layer-impl before-id)
+      (register-custom-layer layer-id layer-impl))))
+
+(defn- reapply-custom-layers! [layers]
+  (doseq [[layer-id layer-impl] layers]
+    (add-custom-layer layer-id layer-impl nil)))
+
+(defn- switch-to-raster-style [current-state]
   (let [^js map-obj (get-map-instance)]
     (.remove map-obj)
     (set-map-instance! nil)
+    (re-frame/dispatch [:clear-custom-layers])
     (reagent/next-tick
      (fn []
        (init-map)
        (reagent/next-tick
         (fn []
-          (when-let [new-map-obj (get-map-instance)]
+          (let [new-map-obj (get-map-instance)]
             (.once new-map-obj "load"
                    (fn []
-                     (.setCenter new-map-obj center)
-                     (.setZoom new-map-obj zoom)
-                     (.setPitch new-map-obj pitch)
-                     (.setBearing new-map-obj bearing)
-                     (doseq [[layer-id layer-impl] layers]
-                       (add-custom-layer layer-id layer-impl nil)))))))))))
+                     (apply-map-state! current-state)
+                     (reapply-custom-layers! (:layers current-state)))))))))))
 
-(defn- switch-to-vector-style [style-url layers clamped-zoom]
+(defn- switch-to-vector-style [current-state style-url]
   (let [^js map-obj (get-map-instance)]
-    (doseq [[layer-id _] layers]
-      (remove-custom-layer layer-id))
+    (clear-custom-layers)
     (.setStyle map-obj style-url)
     (.once map-obj "idle"
            (fn []
              (add-buildings-layer)
-             (doseq [[layer-id layer-impl] layers]
-               (add-custom-layer layer-id layer-impl nil))
-             (let [current-zoom-after (.getZoom map-obj)]
-               (when (or (< current-zoom-after 0) (> current-zoom-after 22))
-                 (.setZoom map-obj clamped-zoom)))))))
+             (reapply-custom-layers! (:layers current-state))
+             (apply-map-state! current-state)))))
 
 (defn change-map-style [style-url]
-  (when-let [^js map-obj (get-map-instance)]
-    (let [current-center (.getCenter map-obj)
-          current-zoom (.getZoom map-obj)
-          current-pitch (.getPitch map-obj)
-          current-bearing (.getBearing map-obj)
-          current-layers (get-custom-layers)
-          clamped-zoom (if (= style-url "raster-style")
-                         (max 0 (min 19 current-zoom))
-                         (max 0 (min 22 current-zoom)))]
-      (if (= style-url "raster-style")
-        (reset-map-with-raster-style current-center clamped-zoom current-pitch current-bearing current-layers)
-        (switch-to-vector-style style-url current-layers clamped-zoom)))))
+  (let [^js map-obj (get-map-instance)
+        current-state (get-current-map-state)]
+    (if (= style-url "raster-style")
+      (switch-to-raster-style current-state)
+      (switch-to-vector-style current-state style-url))))
 
 (defn get-paint-property [layer-id property-name]
   (when-let [^js map-obj (get-map-instance)]
@@ -184,28 +189,33 @@
   (when-let [^js map-obj (get-map-instance)]
     (.setBearing map-obj bearing-angle)))
 
+(defn- interpolate-color-values [color1 color2 ratio]
+  (let [c1 (color color1)
+        c2 (color color2)
+        r (+ (.red c1) (* ratio (- (.red c2) (.red c1))))
+        g (+ (.green c1) (* ratio (- (.green c2) (.green c1))))
+        b (+ (.blue c1) (* ratio (- (.blue c2) (.blue c1))))]
+    (-> (color (clj->js {:r r :g g :b b}))
+        (.hex)
+        (.toString)
+        (.toLowerCase))))
+
 (defn- parse-color-stops [stops current-zoom]
   (let [sorted-stops (sort-by first stops)]
     (cond
-      (empty? sorted-stops) (throw (js/Error. "Empty stops array"))
+      (empty? sorted-stops) nil
       (<= current-zoom (ffirst sorted-stops)) (second (first sorted-stops))
       (>= current-zoom (first (last sorted-stops))) (second (last sorted-stops))
-      :else (loop [[[z1 v1] & rest-stops] sorted-stops]
-              (when-let [[z2 v2] (first rest-stops)]
-                (if (and (>= current-zoom z1) (< current-zoom z2))
-                  (let [ratio (/ (- current-zoom z1) (- z2 z1))]
-                    (if (string? v1)
-                      (let [color1 (color v1)
-                            color2 (color v2)
-                            r (+ (.red color1) (* ratio (- (.red color2) (.red color1))))
-                            g (+ (.green color1) (* ratio (- (.green color2) (.green color1))))
-                            b (+ (.blue color1) (* ratio (- (.blue color2) (.blue color1))))]
-                        (-> (color (clj->js {:r r :g g :b b}))
-                            (.hex)
-                            (.toString)
-                            (.toLowerCase)))
-                      (+ v1 (* ratio (- v2 v1)))))
-                  (recur rest-stops)))))))
+      :else (let [[[z1 v1] [z2 v2]] (loop [[stop & rest-stops] sorted-stops]
+                                      (let [next-stop (first rest-stops)]
+                                        (if (and (>= current-zoom (first stop)) 
+                                                 (< current-zoom (first next-stop)))
+                                          [stop next-stop]
+                                          (recur rest-stops))))
+                  ratio (/ (- current-zoom z1) (- z2 z1))]
+              (if (string? v1)
+                (interpolate-color-values v1 v2 ratio)
+                (+ v1 (* ratio (- v2 v1))))))))
 
 (defn- parse-expression-color [color-value current-zoom]
   (let [expr (.-expression color-value)]
@@ -229,8 +239,8 @@
 (defn parse-color-expression [color-value current-zoom]
   (cond
     (string? color-value) (parse-string-color color-value)
-    (and (object? color-value) (.-expression color-value)) (parse-expression-color color-value current-zoom)
-    (and (object? color-value) (.-stops color-value)) (parse-stops-color color-value current-zoom)
+    (.-expression color-value) (parse-expression-color color-value current-zoom)
+    (.-stops color-value) (parse-stops-color color-value current-zoom)
     :else (throw (js/Error. (str "Invalid color value: " color-value)))))
 
 (defn rgba-to-hex [color-value]
@@ -245,6 +255,57 @@
             rgba-obj (.alpha rgb-obj opacity)]
         (.string rgba-obj)))))
 
+(defn- create-shader-program [context vertex-source fragment-source]
+  (let [vertex-shader (.createShader context (.-VERTEX_SHADER context))
+        fragment-shader (.createShader context (.-FRAGMENT_SHADER context))
+        program (.createProgram context)]
+    (.shaderSource context vertex-shader vertex-source)
+    (.compileShader context vertex-shader)
+    (.shaderSource context fragment-shader fragment-source)
+    (.compileShader context fragment-shader)
+    (.attachShader context program vertex-shader)
+    (.attachShader context program fragment-shader)
+    (.linkProgram context program)
+    program))
+
+(defn- create-example-geometry [context]
+  (let [eiffel-lng 2.2945
+        eiffel-lat 48.8584
+        lng-lat #js {:lng eiffel-lng :lat eiffel-lat}
+        mercator-coords (.fromLngLat maplibre/MercatorCoordinate lng-lat 0)
+        merc-x (.-x mercator-coords)
+        merc-y (.-y mercator-coords)
+        merc-z (.-z mercator-coords)
+        offset 0.01
+        positions (js/Float32Array. [merc-x (+ merc-y offset) merc-z
+                                     (- merc-x offset) (- merc-y offset) merc-z
+                                     (+ merc-x offset) (- merc-y offset) merc-z])
+        position-buffer (.createBuffer context)]
+    (.bindBuffer context (.-ARRAY_BUFFER context) position-buffer)
+    (.bufferData context (.-ARRAY_BUFFER context) positions (.-STATIC_DRAW context))
+    position-buffer))
+
+(defn- setup-layer-rendering [^js layer-impl]
+  (set! (.-render layer-impl)
+        (fn [^js gl ^js matrix]
+          (let [layer-state (.-layer-state layer-impl)
+                context (.-context layer-state)
+                program (.-program layer-state)
+                position-buffer (.-position-buffer layer-state)]
+            (when (and context program)
+              (.enable context (.-DEPTH_TEST context))
+              (.depthFunc context (.-LEQUAL context))
+              (.enable context (.-BLEND context))
+              (.blendFunc context (.-SRC_ALPHA context) (.-ONE_MINUS_SRC_ALPHA context))
+              (.useProgram context program)
+              (let [matrix-uniform (.getUniformLocation context program "u_matrix")]
+                (.uniformMatrix4fv context matrix-uniform false matrix))
+              (.bindBuffer context (.-ARRAY_BUFFER context) position-buffer)
+              (let [position-attribute (.getAttribLocation context program "a_pos")]
+                (.enableVertexAttribArray context position-attribute)
+                (.vertexAttribPointer context position-attribute 3 (.-FLOAT context) false 0 0)
+                (.drawArrays context (.-TRIANGLES context) 0 3)))))))
+
 (defn create-example-custom-layer []
   (let [layer-impl (js-obj)]
     (set! (.-id layer-impl) "example-custom-layer")
@@ -254,67 +315,16 @@
           (fn [map gl]
             (let [^js layer-state #js {}
                   ^js context gl
-                  ^js vertex-shader (.createShader context (.-VERTEX_SHADER context))
-                  ^js fragment-shader (.createShader context (.-FRAGMENT_SHADER context))
-                  ^js program (.createProgram context)]
-              (.shaderSource context vertex-shader "
-                uniform mat4 u_matrix;
-                attribute vec3 a_pos;
-                void main() {
-                  gl_Position = u_matrix * vec4(a_pos, 1.0);
-                }
-              ")
-              (.compileShader context vertex-shader)
-              (.shaderSource context fragment-shader "
-                precision mediump float;
-                void main() {
-                  gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);
-                }
-              ")
-              (.compileShader context fragment-shader)
-              (.attachShader context program vertex-shader)
-              (.attachShader context program fragment-shader)
-              (.linkProgram context program)
-              (let [eiffel-lng 2.2945
-                    eiffel-lat 48.8584
-                    lng-lat #js {:lng eiffel-lng :lat eiffel-lat}
-                    mercator-coords (.fromLngLat maplibre/MercatorCoordinate lng-lat 0)
-                    merc-x (.-x mercator-coords)
-                    merc-y (.-y mercator-coords)
-                    merc-z (.-z mercator-coords)
-                    offset 0.01
-                    positions (js/Float32Array. [merc-x (+ merc-y offset) merc-z
-                                                 (- merc-x offset) (- merc-y offset) merc-z
-                                                 (+ merc-x offset) (- merc-y offset) merc-z])
-                    position-buffer (.createBuffer context)]
-                (.bindBuffer context (.-ARRAY_BUFFER context) position-buffer)
-                (.bufferData context (.-ARRAY_BUFFER context) positions (.-STATIC_DRAW context))
-                (set! (.-position-buffer layer-state) position-buffer))
+                  vertex-source "uniform mat4 u_matrix; attribute vec3 a_pos; void main() { gl_Position = u_matrix * vec4(a_pos, 1.0); }"
+                  fragment-source "precision mediump float; void main() { gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5); }"
+                  program (create-shader-program context vertex-source fragment-source)
+                  position-buffer (create-example-geometry context)]
+              (set! (.-position-buffer layer-state) position-buffer)
               (set! (.-program layer-state) program)
               (set! (.-context layer-state) context)
               (set! (.-map layer-state) map)
               (set! (.-layer-state layer-impl) layer-state))))
-    (set! (.-render layer-impl)
-          (fn [gl matrix]
-            (let [^js layer-state (.-layer-state layer-impl)
-                  ^js context (.-context layer-state)
-                  ^js program (.-program layer-state)
-                  ^js position-buffer (.-position-buffer layer-state)]
-              (when (and context program)
-                (.enable context (.-DEPTH_TEST context))
-                (.depthFunc context (.-LEQUAL context))
-                (.enable context (.-BLEND context))
-                (.blendFunc context (.-SRC_ALPHA context) (.-ONE_MINUS_SRC_ALPHA context))
-                (.useProgram context program)
-                (let [matrix-uniform (.getUniformLocation context program "u_matrix")]
-                  (.uniformMatrix4fv context matrix-uniform false matrix))
-                (.bindBuffer context (.-ARRAY_BUFFER context) position-buffer)
-                (let [position-attribute (.getAttribLocation context program "a_pos")]
-                  (.enableVertexAttribArray context position-attribute)
-                  (.vertexAttribPointer context position-attribute 3 (.-FLOAT context) false 0 0)
-                  (.drawArrays context (.-TRIANGLES context) 0 3)
-                  (let [error (.getError context)]
-                    (when (not= error (.-NO_ERROR context)))))))))
+    (setup-layer-rendering layer-impl)
     layer-impl))
 
 (defn validate-style [style]

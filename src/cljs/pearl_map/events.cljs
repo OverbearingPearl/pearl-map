@@ -42,6 +42,11 @@
    (update db :custom-layers dissoc layer-id)))
 
 (re-frame/reg-event-db
+ :clear-custom-layers
+ (fn [db _]
+   (assoc db :custom-layers {})))
+
+(re-frame/reg-event-db
  :initialize-db
  (fn [_ _]
    {:map-instance nil
