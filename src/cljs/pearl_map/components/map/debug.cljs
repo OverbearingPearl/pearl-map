@@ -3,7 +3,7 @@
 
 (defn debug-info []
   (let [map-instance @(re-frame/subscribe [:map-instance])
-        model-loaded @(re-frame/subscribe [:model-loaded])]
+        model-loaded @(re-frame/subscribe [:models-3d/model-loaded])]
     [:div {:style {:position "absolute"
                    :bottom "20px"
                    :left "20px"

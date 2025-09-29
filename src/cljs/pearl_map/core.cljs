@@ -6,7 +6,9 @@
             [pearl-map.app.subs :as app-subs]
             [pearl-map.features.map-view.views :refer [home-page]]
             [pearl-map.features.style-editor.events :as style-editor-events]
-            [pearl-map.features.style-editor.subs :as style-editor-subs]))
+            [pearl-map.features.style-editor.subs :as style-editor-subs]
+            [pearl-map.features.models-3d.events :as models-3d-events]
+            [pearl-map.features.models-3d.subs :as models-3d-subs]))
 
 (defonce react-root
   (delay

@@ -20,7 +20,7 @@
            (js/console.log "Loading progress:" progress))
          (fn [error]
            (js/console.error "Failed to load GLTF model:" error)
-           (re-frame/dispatch [:set-model-load-error (str "Model loading failed: " error)]))))
+           (re-frame/dispatch [:models-3d/set-model-load-error (str "Model loading failed: " error)]))))
 
 ;; Model positioning and scaling utilities
 (defn position-model-at-coordinates

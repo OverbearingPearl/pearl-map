@@ -18,16 +18,6 @@
    (assoc db :current-style style-url)))
 
 (re-frame/reg-event-db
- :set-model-loaded
- (fn [db [_ loaded?]]
-   (assoc db :model-loaded loaded?)))
-
-(re-frame/reg-event-db
- :set-loaded-model
- (fn [db [_ model]]
-   (assoc db :loaded-model model)))
-
-(re-frame/reg-event-db
  :register-custom-layer
  (fn [db [_ layer-id layer-impl]]
    (update db :custom-layers assoc layer-id layer-impl)))

@@ -74,7 +74,7 @@ pearl-map/
 │           │   │   ├── events.cljs          # Style editor event handlers [TO BE CREATED]
 │           │   │   ├── subs.cljs            # Style editor subscriptions [TO BE CREATED]
 │           │   │   └── views.cljs           # Style editor components [TO BE CREATED - functionality in editor.cljs]
-│           │   └── 3d_models/               # 3D models feature module
+│           │   └── models_3d/               # 3D models feature module
 │           │       ├── events.cljs          # 3D model event handlers [TO BE CREATED]
 │           │       ├── subs.cljs            # 3D model subscriptions [TO BE CREATED]
 │           │       └── views.cljs           # 3D model components [TO BE CREATED]

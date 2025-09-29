@@ -3,9 +3,10 @@
 (def default-db
   {:map-instance nil
    :current-style "raster-style"
-   :model-loaded false
-   :loaded-model nil
    :custom-layers {}
    :style-editor/editing-style {:fill-color "#f0f0f0"
                                 :fill-opacity 0.7
-                                :fill-outline-color "#cccccc"}})
+                                :fill-outline-color "#cccccc"}
+   :models-3d/model-loaded false
+   :models-3d/loaded-model nil
+   :models-3d/model-load-error nil})

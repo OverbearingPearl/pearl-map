@@ -5,7 +5,8 @@
             [pearl-map.components.map.controls :refer [style-controls]]
             [pearl-map.components.map.debug :refer [debug-info]]
             [pearl-map.features.map-view.events :as map-events]
-            [pearl-map.features.style-editor.views :refer [building-style-editor]]))
+            [pearl-map.features.style-editor.views :refer [building-style-editor]]
+            [pearl-map.features.models-3d.views :refer [model-controls]]))
 
 (defn home-page []
   (reagent/create-class
@@ -30,6 +31,7 @@
         [:p {:style {:margin "2px 0 0 0" :fontSize "0.8em" :color "#999"}}
          "Using MapLibre demo vector service"]]
        [style-controls]
+       [model-controls]
        [building-style-editor]
        [map-container]
        [debug-info]])}))

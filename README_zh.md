@@ -74,7 +74,7 @@ pearl-map/
 │           │   │   ├── events.cljs          # 样式编辑器事件处理器 [待建]
 │           │   │   ├── subs.cljs            # 样式编辑器订阅 [待建]
 │           │   │   └── views.cljs           # 样式编辑器组件 [待建 - 功能在 editor.cljs]
-│           │   └── 3d_models/               # 3D 模型功能模块
+│           │   └── models_3d/               # 3D 模型功能模块
 │           │       ├── events.cljs          # 3D 模型事件处理器 [待建]
 │           │       ├── subs.cljs            # 3D 模型订阅 [待建]
 │           │       └── views.cljs           # 3D 模型组件 [待建]

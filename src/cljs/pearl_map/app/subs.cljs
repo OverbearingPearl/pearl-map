@@ -12,16 +12,6 @@
    (:current-style db)))
 
 (re-frame/reg-sub
- :model-loaded
- (fn [db]
-   (:model-loaded db)))
-
-(re-frame/reg-sub
- :loaded-model
- (fn [db]
-   (:loaded-model db)))
-
-(re-frame/reg-sub
  :custom-layers
  (fn [db]
    (:custom-layers db)))
