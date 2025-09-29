@@ -96,14 +96,12 @@
             (println "✓ Copied/overwritten GLTFLoader.js to:" (.getAbsolutePath target-file)))))
       (println "⚠️  GLTFLoader not found in node_modules, please run 'npm install'"))))
 
-;; Update main function to include threejs copying
 (defn -main [& args]
   (copy-maplibre-css)
   (copy-gltf-files)
-  (copy-threejs-files))  ; Keep this line
+  (copy-threejs-files))
 
-;; Update build-hook to include threejs copying
 (defn ^:export build-hook []
   (copy-maplibre-css)
   (copy-gltf-files)
-  (copy-threejs-files))  ; Keep this line
+  (copy-threejs-files))

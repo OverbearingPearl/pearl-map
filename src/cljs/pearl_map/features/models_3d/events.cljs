@@ -25,11 +25,15 @@
 (re-frame/reg-event-fx
  :models-3d/load-eiffel-tower
  (fn [{:keys [db]} _]
+   (re-frame/dispatch [:models-3d/clear-model-load-error])
    (model-loader/load-gltf-model
     "/models/eiffel_tower/scene.gltf"
     (fn [gltf-model]
       (re-frame/dispatch [:models-3d/set-model-loaded true])
       (re-frame/dispatch [:models-3d/set-loaded-model gltf-model])
       (re-frame/dispatch [:models-3d/clear-model-load-error])
-      (set! (.-pearlMapModel js/window) gltf-model)))
+      (set! (.-pearlMapModel js/window) gltf-model))
+    (fn [error]
+      (re-frame/dispatch [:models-3d/set-model-load-error (str "Model loading failed: " error)])
+      (re-frame/dispatch [:models-3d/set-model-loaded false])))
    {:db db}))

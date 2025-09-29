@@ -8,7 +8,7 @@
 (defn load-gltf-model
   "Load a GLTF model from the given URL and call the success callback with the loaded model.
    Handles errors and dispatches appropriate re-frame events."
-  [url success-callback]
+  [url success-callback error-callback]
   (js/console.log (str "Loading GLTF model from: " url))
 
   (.load gltf-loader
@@ -20,14 +20,13 @@
            (js/console.log "Loading progress:" progress))
          (fn [error]
            (js/console.error "Failed to load GLTF model:" error)
-           (re-frame/dispatch [:models-3d/set-model-load-error (str "Model loading failed: " error)]))))
+           (re-frame/dispatch [:models-3d/set-model-load-error (str "Model loading failed: " error)])
+           (when error-callback (error-callback error)))))
 
 ;; Model positioning and scaling utilities
 (defn position-model-at-coordinates
   "Position a 3D model at specific geographic coordinates"
   [model longitude latitude elevation]
-  ;; This would need to be implemented based on your coordinate system
-  ;; For now, just set a basic position
   (set! (.-position model) (three/Vector3. 0 elevation 0))
   model)
 
@@ -54,10 +53,9 @@
 (defn setup-model-animation
   [gltf-model]
   (when (and gltf-model (.-animations gltf-model) (> (.-length (.-animations gltf-model)) 0))
-    (js/console.log "Model animations available:" (.-length (.-animations gltf-model)))
-    ))
+    (js/console.log "Model animations available:" (.-length (.-animations gltf-model)))))
 
 ;; Error handling utilities
 (defn clear-model-errors []
   "Clear any model loading errors"
-  (re-frame/dispatch [:clear-model-load-error]))
+  (re-frame/dispatch [:models-3d/clear-model-load-error]))
