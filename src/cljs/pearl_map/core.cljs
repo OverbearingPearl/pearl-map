@@ -2,8 +2,10 @@
   (:require [reagent.core :as reagent]
             [reagent.dom.client :as rdomc]
             [re-frame.core :as re-frame]
-            [pearl-map.events :as events]
-            [pearl-map.subs :as subs]
+            [pearl-map.app.events :as app-events]
+            [pearl-map.app.subs :as app-subs]
+            [pearl-map.features.style-editor.events :as style-editor-events]
+            [pearl-map.features.style-editor.subs :as style-editor-subs]
             [pearl-map.features.style-editor.views :refer [building-style-editor]]
             [pearl-map.services.model-loader :as model-loader]
             [pearl-map.services.map-engine :as map-engine]))

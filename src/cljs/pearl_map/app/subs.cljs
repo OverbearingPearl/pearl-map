@@ -1,4 +1,4 @@
-(ns pearl-map.subs
+(ns pearl-map.app.subs
   (:require [re-frame.core :as re-frame]))
 
 (re-frame/reg-sub
@@ -20,11 +20,6 @@
  :loaded-model
  (fn [db]
    (:loaded-model db)))
-
-(re-frame/reg-sub
- :style-editor/editing-style
- (fn [db]
-   (:style-editor/editing-style db)))
 
 (re-frame/reg-sub
  :custom-layers
