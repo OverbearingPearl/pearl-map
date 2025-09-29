@@ -158,16 +158,21 @@ pearl-map/
 - **`src/pearl_map/build.clj`**: Build tasks and utilities for the application
 - **`.gitignore`**: Git ignore rules for the project
 
-### Initial Implementation Status
+### Current Implementation Status
 
-The initial implementation focuses on Phase 1 of the development roadmap, specifically the Paris-focused MVP:
+The implementation has progressed significantly with a complete re-frame architecture and feature-based organization:
 
 **Core Features Implemented:**
+- ✅ Complete re-frame architecture with events, subscriptions, and views separation
+- ✅ Feature-based organization: map_view, style_editor, models_3d
+- ✅ Component-based UI structure with reusable map components
+- ✅ Service layer for external integrations (map-engine, model-loader)
+- ✅ Utility functions for colors, geometry, and validation
 - ✅ Basic React/Reagent component structure with home page
 - ✅ MapLibre GL JS integration with multiple style support
 - ✅ Eiffel Tower coordinates pre-configured as center point (2.2945°E, 48.8584°N)
 - ✅ Responsive map container with proper styling
-- ✅ Map instance state management using Reagent atoms
+- ✅ Map instance state management using re-frame
 - ✅ Style switching functionality (Basic/Dark/Light styles)
 - ✅ Navigation controls integration
 - ✅ Scale control integration
@@ -202,31 +207,55 @@ The initial implementation focuses on Phase 1 of the development roadmap, specif
 - Three.js GLTFLoader integration - IMPLEMENTED
 - Error handling for model loading - IMPLEMENTED
 
-**File Structure Added:**
+**File Structure Status:**
 ```
 src/
 ├── cljs/pearl_map/
-│   ├── core.cljs              # Main application entry point with complete map functionality
-│   ├── editor.cljs            # Building style editor component (IMPLEMENTED)
-│   └── (other files to be added)
+│   ├── core.cljs                    # Application entry point and configuration [IMPLEMENTED]
+│   ├── app/                         # Application core (re-frame architecture) [IMPLEMENTED]
+│   │   ├── db.cljs                  # Database schema and initial state [IMPLEMENTED]
+│   │   ├── events.cljs              # Global event handlers [IMPLEMENTED]
+│   │   └── subs.cljs                # Global subscriptions [IMPLEMENTED]
+│   ├── features/                    # Feature modules (re-frame standard organization) [IMPLEMENTED]
+│   │   ├── map_view/                # Map view feature module [IMPLEMENTED]
+│   │   │   ├── events.cljs          # Map-specific event handlers [IMPLEMENTED]
+│   │   │   ├── subs.cljs            # Map-specific subscriptions [IMPLEMENTED]
+│   │   │   └── views.cljs           # Map view components [IMPLEMENTED]
+│   │   ├── style_editor/            # Style editing feature module [IMPLEMENTED]
+│   │   │   ├── events.cljs          # Style editor event handlers [IMPLEMENTED]
+│   │   │   ├── subs.cljs            # Style editor subscriptions [IMPLEMENTED]
+│   │   │   └── views.cljs           # Style editor components [IMPLEMENTED]
+│   │   └── models_3d/               # 3D models feature module [IMPLEMENTED]
+│   │       ├── events.cljs          # 3D model event handlers [IMPLEMENTED]
+│   │       ├── subs.cljs            # 3D model subscriptions [IMPLEMENTED]
+│   │       └── views.cljs           # 3D model components [IMPLEMENTED]
+│   ├── components/                  # Reusable UI components [PARTIALLY IMPLEMENTED]
+│   │   ├── ui/                      # Base UI components [TO BE CREATED]
+│   │   │   ├── buttons.cljs         # Button components [TO BE CREATED]
+│   │   │   ├── controls.cljs        # Control components [TO BE CREATED]
+│   │   │   └── layout.cljs          # Layout components [TO BE CREATED]
+│   │   └── map/                     # Map-specific UI components [IMPLEMENTED]
+│   │       ├── container.cljs       # Map container component [IMPLEMENTED]
+│   │       ├── controls.cljs        # Map control components [IMPLEMENTED]
+│   │       └── debug.cljs           # Debug information component [IMPLEMENTED]
+│   ├── services/                    # External service integrations [PARTIALLY IMPLEMENTED]
+│   │   ├── map_engine.cljs          # Map engine service [IMPLEMENTED]
+│   │   ├── model_loader.cljs        # Model loading service [IMPLEMENTED]
+│   │   └── api.cljs                 # API client [TO BE CREATED]
+│   └── utils/                       # Utility functions [PARTIALLY IMPLEMENTED]
+│       ├── colors.cljs              # Color utilities [IMPLEMENTED]
+│       ├── geometry.cljs            # Geometry utilities [EMPTY - TO BE IMPLEMENTED]
+│       └── validation.cljs          # Validation utilities [EMPTY - TO BE IMPLEMENTED]
 └── pearl_map/
-    └── build.clj              # Build tasks and utilities (IMPLEMENTED)
-resources/
-├── public/
-│   ├── css/
-│   │   ├── maplibre-gl.css    # MapLibre styles (IMPLEMENTED)
-│   │   └── style.css          # Custom styles (IMPLEMENTED)
-│   ├── index.html             # HTML template (IMPLEMENTED)
-│   └── models/
-│       └── eiffel_tower/      # Eiffel Tower 3D model (IMPLEMENTED)
-│           ├── license.txt    # Model license (IMPLEMENTED)
-│           ├── scene.bin      # Model binary (IMPLEMENTED)
-│           └── scene.gltf     # Model GLTF (IMPLEMENTED)
+    └── build.clj                    # Build tasks and utilities [IMPLEMENTED]
 ```
 
 **Next Steps:**
-- Next: Add 3D model integration for Eiffel Tower (GLTF)
-- Next: Enhance UI styling and layout
+- Next: Implement base UI components (buttons, controls, layout)
+- Next: Complete geometry utilities implementation
+- Next: Complete validation utilities implementation
+- Next: Add API client service
+- Next: Enhance 3D model positioning and rendering
 - Next: Add tilt and rotation controls
 - Next: Expand style editor to support more properties
 

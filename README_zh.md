@@ -158,16 +158,21 @@ pearl-map/
 - **`src/pearl_map/build.clj`**: 应用程序的构建任务和工具
 - **`.gitignore`**: 项目的 Git 忽略规则
 
-### 初始实现状态
+### 当前实现状态
 
-初始实现专注于开发路线图的第一阶段，特别是以巴黎为重点的 MVP：
+实现已显著进展，具有完整的 re-frame 架构和基于功能的组织：
 
 **已实现的核心功能：**
+- ✅ 完整的 re-frame 架构，包含事件、订阅和视图分离
+- ✅ 基于功能的组织：map_view、style_editor、models_3d
+- ✅ 基于组件的 UI 结构，包含可重用的地图组件
+- ✅ 用于外部集成的服务层（map-engine、model-loader）
+- ✅ 颜色、几何和验证的工具函数
 - ✅ 基本的 React/Reagent 组件结构，包含主页
 - ✅ 集成 MapLibre GL JS 并支持多种样式
 - ✅ 预配置埃菲尔铁塔坐标为中心点 (2.2945°E, 48.8584°N)
 - ✅ 响应式地图容器，具有适当的样式
-- ✅ 使用 Reagent atoms 进行地图实例状态管理
+- ✅ 使用 re-frame 进行地图实例状态管理
 - ✅ 样式切换功能（基础/深色/浅色样式）
 - ✅ 导航控件集成
 - ✅ 比例尺控件集成
@@ -202,31 +207,55 @@ pearl-map/
 - Three.js GLTFLoader 集成 - 已实现
 - 模型加载错误处理 - 已实现
 
-**已添加的文件结构：**
+**文件结构状态：**
 ```
 src/
 ├── cljs/pearl_map/
-│   ├── core.cljs              # 主应用程序入口点，包含完整地图功能
-│   ├── editor.cljs            # 建筑样式编辑器组件（已实现）
-│   └── （其他文件待添加）
+│   ├── core.cljs                    # 应用入口点和配置 [已实现]
+│   ├── app/                         # 应用核心 (re-frame 架构) [已实现]
+│   │   ├── db.cljs                  # 数据库模式和初始状态 [已实现]
+│   │   ├── events.cljs              # 全局事件处理器 [已实现]
+│   │   └── subs.cljs                # 全局订阅 [已实现]
+│   ├── features/                    # 功能模块 (re-frame 标准组织方式) [已实现]
+│   │   ├── map_view/                # 地图视图功能模块 [已实现]
+│   │   │   ├── events.cljs          # 地图特定事件处理器 [已实现]
+│   │   │   ├── subs.cljs            # 地图特定订阅 [已实现]
+│   │   │   └── views.cljs           # 地图视图组件 [已实现]
+│   │   ├── style_editor/            # 样式编辑功能模块 [已实现]
+│   │   │   ├── events.cljs          # 样式编辑器事件处理器 [已实现]
+│   │   │   ├── subs.cljs            # 样式编辑器订阅 [已实现]
+│   │   │   └── views.cljs           # 样式编辑器组件 [已实现]
+│   │   └── models_3d/               # 3D 模型功能模块 [已实现]
+│   │       ├── events.cljs          # 3D 模型事件处理器 [已实现]
+│   │       ├── subs.cljs            # 3D 模型订阅 [已实现]
+│   │       └── views.cljs           # 3D 模型组件 [已实现]
+│   ├── components/                  # 可复用 UI 组件 [部分实现]
+│   │   ├── ui/                      # 基础 UI 组件 [待建]
+│   │   │   ├── buttons.cljs         # 按钮组件 [待建]
+│   │   │   ├── controls.cljs        # 控件组件 [待建]
+│   │   │   └── layout.cljs          # 布局组件 [待建]
+│   │   └── map/                     # 地图特定 UI 组件 [已实现]
+│   │       ├── container.cljs       # 地图容器组件 [已实现]
+│   │       ├── controls.cljs        # 地图控制组件 [已实现]
+│   │       └── debug.cljs           # 调试信息组件 [已实现]
+│   ├── services/                    # 外部服务集成 [部分实现]
+│   │   ├── map_engine.cljs          # 地图引擎服务 [已实现]
+│   │   ├── model_loader.cljs        # 模型加载服务 [已实现]
+│   │   └── api.cljs                 # API 客户端 [待建]
+│   └── utils/                       # 工具函数 [部分实现]
+│       ├── colors.cljs              # 颜色工具 [已实现]
+│       ├── geometry.cljs            # 几何工具 [空文件 - 待实现]
+│       └── validation.cljs          # 验证工具 [空文件 - 待实现]
 └── pearl_map/
-    └── build.clj              # 构建任务和工具（已实现）
-resources/
-├── public/
-│   ├── css/
-│   │   ├── maplibre-gl.css    # MapLibre 样式（已实现）
-│   │   └── style.css          # 自定义样式（已实现）
-│   ├── index.html             # HTML 模板（已实现）
-│   └── models/
-│       └── eiffel_tower/      # 埃菲尔铁塔 3D 模型（已实现）
-│           ├── license.txt    # 模型许可证（已实现）
-│           ├── scene.bin      # 模型二进制文件（已实现）
-│           └── scene.gltf     # 模型 GLTF 文件（已实现）
+    └── build.clj                    # 构建任务和工具 [已实现]
 ```
 
 **后续步骤：**
-- 下一步：添加埃菲尔铁塔的 3D 模型集成（GLTF）
-- 下一步：增强 UI 样式和布局
+- 下一步：实现基础 UI 组件（按钮、控件、布局）
+- 下一步：完成几何工具实现
+- 下一步：完成验证工具实现
+- 下一步：添加 API 客户端服务
+- 下一步：增强 3D 模型定位和渲染
 - 下一步：添加倾斜和旋转控件
 - 下一步：扩展样式编辑器支持更多属性
 
