@@ -53,10 +53,6 @@
         (println "⚠️  GLTF source directory not found:" (.getAbsolutePath source-dir))
         (println "Expected path:" (.getAbsolutePath source-dir))))))
 
-(defn -main [& args]
-  (copy-maplibre-css)
-  (copy-gltf-files))
-
 ;; Add Three.js file copying function with overwrite behavior
 (defn copy-threejs-files
   "Build hook to copy Three.js files from node_modules to target directory"
@@ -96,12 +92,13 @@
             (println "✓ Copied/overwritten GLTFLoader.js to:" (.getAbsolutePath target-file)))))
       (println "⚠️  GLTFLoader not found in node_modules, please run 'npm install'"))))
 
-(defn -main [& args]
-  (copy-maplibre-css)
-  (copy-gltf-files)
-  (copy-threejs-files))
-
 (defn ^:export build-hook []
   (copy-maplibre-css)
   (copy-gltf-files)
   (copy-threejs-files))
+
+;; Add the missing -main function
+(defn -main [& args]
+  (println "Running Pearl-Map build tasks...")
+  (build-hook)
+  (println "✓ Build tasks completed successfully"))
