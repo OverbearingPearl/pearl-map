@@ -2,6 +2,7 @@
   (:require [re-frame.core :as re-frame]
             [re-frame.db :as db]
             [reagent.core :as reagent]
+            [pearl-map.utils.geometry :as geom]
             ["maplibre-gl" :as maplibre]
             ["color" :as color]
             ["@maplibre/maplibre-gl-style-spec" :as style-spec]))
@@ -206,11 +207,7 @@
 (defn- create-example-geometry [context]
   (let [eiffel-lng 2.2945
         eiffel-lat 48.8584
-        lng-lat #js {:lng eiffel-lng :lat eiffel-lat}
-        mercator-coords (.fromLngLat maplibre/MercatorCoordinate lng-lat 0)
-        merc-x (.-x mercator-coords)
-        merc-y (.-y mercator-coords)
-        merc-z (.-z mercator-coords)
+        [merc-x merc-y merc-z] (geom/calculate-model-position eiffel-lng eiffel-lat 0)
         offset 0.01
         positions (js/Float32Array. [merc-x (+ merc-y offset) merc-z
                                      (- merc-x offset) (- merc-y offset) merc-z
