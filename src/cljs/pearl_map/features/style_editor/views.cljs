@@ -2,8 +2,7 @@
   (:require [reagent.core :as reagent]
             [re-frame.core :as re-frame]
             [clojure.string :as str]
-            [pearl-map.services.map-engine :as map-engine]
-            [pearl-map.utils.colors :as colors]))
+            [pearl-map.services.map-engine :as map-engine]))
 
 (def default-building-styles
   {:light {:fill-color "#f0f0f0"
@@ -25,7 +24,7 @@
                    (->> style-keys
                         (map (fn [style-key]
                                (when-let [current-value (map-engine/get-paint-property layer-id (name style-key))]
-                                 [style-key (colors/parse-color-expression current-value current-zoom)])))
+                                 [style-key (map-engine/parse-color-expression current-value current-zoom)])))
                         (remove nil?))))
          (into {}))))
 
@@ -37,7 +36,7 @@
         (doseq [layer-id ["building" "building-top"]]
           (try
             (doseq [[style-key style-value] style]
-              (let [final-value (colors/parse-color-expression style-value current-zoom)]
+              (let [final-value (map-engine/parse-color-expression style-value current-zoom)]
                 (map-engine/set-paint-property layer-id (name style-key) final-value)))
             (catch js/Error e
               (js/console.warn (str "Could not apply style to layer " layer-id ":") e))))
