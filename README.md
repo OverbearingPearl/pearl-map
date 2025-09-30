@@ -93,8 +93,7 @@ pearl-map/
 │           │   └── api.cljs                 # API client [TO BE CREATED]
 │           └── utils/                       # Utility functions
 │               ├── colors.cljs              # Color utilities [TO BE CREATED]
-│               ├── geometry.cljs            # Geometry utilities [TO BE CREATED]
-│               └── validation.cljs          # Validation utilities [TO BE CREATED]
+│               └── geometry.cljs            # Geometry utilities [TO BE CREATED]
 ├── resources/                               # Source resource files (git tracked)
 │   ├── config/                              # Configuration files [TO BE CREATED]
 │   │   ├── config.edn                       # Base configuration [TO BE CREATED]

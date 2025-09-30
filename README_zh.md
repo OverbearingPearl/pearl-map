@@ -93,8 +93,7 @@ pearl-map/
 │           │   └── api.cljs                 # API 客户端 [待建]
 │           └── utils/                       # 工具函数
 │               ├── colors.cljs              # 颜色工具 [待建]
-│               ├── geometry.cljs            # 几何工具 [待建]
-│               └── validation.cljs          # 验证工具 [待建]
+│               └── geometry.cljs            # 几何工具 [待建]
 ├── resources/                               # 源代码资源文件（git 跟踪）
 │   ├── config/                              # 配置文件 [待建]
 │   │   ├── config.edn                       # 基础配置 [待建]
