@@ -3,6 +3,12 @@
             [pearl-map.services.map-engine :as map-engine]
             [pearl-map.features.style-editor.views :as style-editor-views]))
 
+;; Layer state management
+(re-frame/reg-event-db
+ :style-editor/set-target-layer
+ (fn [db [_ layer-id]]
+   (assoc db :style-editor/target-layer layer-id)))
+
 (re-frame/reg-event-db
  :style-editor/set-editing-style
  (fn [db [_ style]]
@@ -14,13 +20,18 @@
    (assoc-in db [:style-editor/editing-style key] value)))
 
 (re-frame/reg-event-fx
+ :style-editor/switch-target-layer
+ (fn [{:keys [db]} [_ layer-id]]
+   (let [current-styles (style-editor-views/get-layer-styles layer-id)]
+     {:db (-> db
+              (assoc :style-editor/target-layer layer-id)
+              (assoc :style-editor/editing-style current-styles))})))
+
+(re-frame/reg-event-fx
  :style-editor/update-and-apply-style
  (fn [{:keys [db]} [_ style-key value]]
    (let [updated-style (assoc (:style-editor/editing-style db) style-key value)]
-     {:db (assoc db :style-editor/editing-style updated-style)
-      ;; Remove auto-apply to prevent breaking expressions
-      ;; :fx [[:dispatch-later {:ms 100 :dispatch [:style-editor/actually-apply-styles updated-style]}]]
-      })))
+     {:db (assoc db :style-editor/editing-style updated-style)})))
 
 (re-frame/reg-event-fx
  :style-editor/actually-apply-styles
@@ -50,10 +61,15 @@
    {:db (assoc db :style-editor/editing-style style)
     :fx [[:dispatch [:style-editor/apply-styles style]]]}))
 
+;; Add helper function to access get-layer-styles
+(defn get-layer-styles [layer-id]
+  (style-editor-views/get-layer-styles layer-id))
+
 (re-frame/reg-event-fx
  :style-editor/load-and-apply-current-styles
  (fn [{:keys [db]} _]
-   (let [current-styles (style-editor-views/get-current-building-styles)]
+   (let [target-layer (get db :style-editor/target-layer "building")
+         current-styles (get-layer-styles target-layer)]
      {:db (assoc db :style-editor/editing-style current-styles)
       :fx [[:dispatch [:style-editor/apply-styles current-styles]]]})))
 

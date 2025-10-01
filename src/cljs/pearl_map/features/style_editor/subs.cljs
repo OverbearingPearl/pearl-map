@@ -2,9 +2,16 @@
   (:require [re-frame.core :as re-frame]))
 
 (re-frame/reg-sub
+ :style-editor/target-layer
+ (fn [db]
+   (get db :style-editor/target-layer "building")))
+
+(re-frame/reg-sub
  :style-editor/editing-style
  (fn [db]
-   (:style-editor/editing-style db)))
+   (get db :style-editor/editing-style {:fill-color "#f0f0f0"
+                                        :fill-opacity 0.7
+                                        :fill-outline-color "#cccccc"})))
 
 (re-frame/reg-sub
  :style-editor/editing-style-value

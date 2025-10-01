@@ -15,82 +15,44 @@
            (some? (.-type x)))))
 
 (defn- evaluate [expr properties]
-  ;; Handle expression objects with stops and interpolation
   (cond
     ;; Handle stops expressions with interpolation
     (and (.-stops expr) (.-zoom properties))
     (let [stops (.-stops expr)
           zoom (.-zoom properties)
           base (or (.-base expr) 1)
-          stop-count (.-length stops)]
-
-      ;; DEBUG: Log the actual stops structure
-      (js/console.log "DEBUG expression stops:"
-                      "stops:" (js->clj stops)
-                      "zoom:" zoom
-                      "base:" base)
+          stop-count (alength stops)]
 
       (if (zero? stop-count)
         nil
-        ;; Find the appropriate stop range and interpolate
+        ;; Find the appropriate stop range
         (loop [i 0]
-          (if (< i (dec stop-count))
+          (cond
+            (>= i stop-count)
+            ;; Beyond all stops - use last value
+            (aget (aget stops (dec stop-count)) 1)
+
+            :else
             (let [current-stop (aget stops i)
-                  next-stop (aget stops (inc i))
-                  current-zoom-level (aget current-stop 0)
-                  current-value (aget current-stop 1)
-                  next-zoom-level (aget next-stop 0)
-                  next-value (aget next-stop 1)]
+                  current-zoom (aget current-stop 0)
+                  current-value (aget current-stop 1)]
+              (if (<= zoom current-zoom)
+                ;; Found the stop range
+                (if (zero? i)
+                  ;; Before first stop - use first value
+                  current-value
+                  ;; Interpolate between previous and current stop
+                  (let [prev-stop (aget stops (dec i))
+                        prev-zoom (aget prev-stop 0)
+                        prev-value (aget prev-stop 1)
+                        t (/ (- zoom prev-zoom) (- current-zoom prev-zoom))]
+                    (cond
+                      (and (number? prev-value) (number? current-value))
+                      (+ prev-value (* (- current-value prev-value) t))
 
-              (js/console.log "DEBUG checking stop range:"
-                              "i:" i
-                              "current-zoom:" current-zoom-level "current-value:" current-value
-                              "next-zoom:" next-zoom-level "next-value:" next-value
-                              "current-zoom <= zoom:" (<= current-zoom-level zoom)
-                              "zoom < next-zoom:" (< zoom next-zoom-level))
-
-              (if (and (<= current-zoom-level zoom)
-                       (< zoom next-zoom-level))
-                ;; Found the correct zoom range
-                ;; CRITICAL FIX: Only interpolate numeric values
-                (cond
-                  ;; Numeric interpolation
-                  (and (number? current-value) (number? next-value))
-                  (let [t (/ (- zoom current-zoom-level)
-                             (- next-zoom-level current-zoom-level))
-                        interpolated (if (= base 1)
-                                       ;; Linear interpolation
-                                       (+ (* (- 1 t) current-value)
-                                          (* t next-value))
-                                       ;; Exponential interpolation
-                                       (let [zoom-diff (- next-zoom-level current-zoom-level)
-                                             base-factor (js/Math.pow base t)]
-                                         (+ (* (- 1 base-factor) current-value)
-                                            (* base-factor next-value))))]
-                    (js/console.log "DEBUG numeric interpolation result:"
-                                    "t:" t
-                                    "interpolated:" interpolated)
-                    interpolated)
-
-                  ;; Color values - use current value (no interpolation)
-                  (and (string? current-value) (string? next-value))
-                  (do
-                    (js/console.log "DEBUG color values, using current:" current-value)
-                    current-value)
-
-                  ;; Fallback: use current value
-                  :else
-                  (do
-                    (js/console.log "DEBUG fallback, using current:" current-value)
-                    current-value))
-                (recur (inc i))))
-            ;; Use the last stop if we're beyond all stops
-            (let [last-stop (aget stops (dec stop-count))
-                  last-value (aget last-stop 1)]
-              (js/console.log "DEBUG using last stop:"
-                              "last-zoom:" (aget last-stop 0)
-                              "last-value:" last-value)
-              last-value)))))
+                      :else
+                      current-value)))
+                (recur (inc i))))))))
 
     ;; Handle literal values
     (.-value expr) (.-value expr)
@@ -256,16 +218,7 @@
 (defn get-paint-property [layer-id property-name]
   (when-let [^js map-obj (get-map-instance)]
     (when (.getLayer map-obj layer-id)
-      ;; Get the raw expression object, not the evaluated value
-      (let [raw-value (.getPaintProperty map-obj layer-id property-name)]
-        (js/console.log "DEBUG get-paint-property:"
-                        "layer:" layer-id
-                        "property:" property-name
-                        "raw-value:" raw-value
-                        "type:" (type raw-value)
-                        "isExpression:" (isExpression raw-value)
-                        "has-stops:" (and (object? raw-value) (.-stops raw-value)))
-        raw-value))))
+      (.getPaintProperty map-obj layer-id property-name))))
 
 (defn set-paint-property [layer-id property-name value]
   (when-let [^js map-obj (get-map-instance)]
@@ -414,34 +367,21 @@
 
 (defn parse-numeric-expression [numeric-value current-zoom]
   (when numeric-value
-    (js/console.log "DEBUG parse-numeric-expression:"
-                    "input:" numeric-value
-                    "zoom:" current-zoom
-                    "isExpression:" (isExpression numeric-value))
-
     (cond
-      ;; Use the actual expression evaluator for expressions
       (isExpression numeric-value)
       (try
         (let [result (evaluate numeric-value #js {:zoom current-zoom})]
-          (js/console.log "DEBUG expression evaluation result:"
-                          "zoom:" current-zoom
-                          "result:" result
-                          "result-type:" (type result))
           (cond
             (number? result) result
             (string? result) (let [parsed (js/parseFloat result)]
                                (if (js/isNaN parsed) nil parsed))
             :else nil))
         (catch js/Error e
-          (js/console.warn "Failed to evaluate numeric expression:" e numeric-value)
           nil))
 
-      ;; Handle simple numeric values
       (number? numeric-value)
       numeric-value
 
-      ;; Handle string values
       (string? numeric-value)
       (try
         (let [parsed (js/parseFloat numeric-value)]
@@ -449,7 +389,6 @@
         (catch js/Error e
           nil))
 
-      ;; Handle object values with default/value properties
       (object? numeric-value)
       (try
         (let [value (or (.-default numeric-value)
