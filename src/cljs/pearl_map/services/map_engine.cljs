@@ -7,6 +7,98 @@
             ["color" :as color]
             ["@maplibre/maplibre-gl-style-spec" :as style-spec]))
 
+;; Simplified expression handling - focus on basic value extraction
+(defn- isExpression [x]
+  (and (object? x)
+       (or (some? (.-stops x))
+           (some? (.-property x))
+           (some? (.-type x)))))
+
+(defn- evaluate [expr properties]
+  ;; Handle expression objects with stops and interpolation
+  (cond
+    ;; Handle stops expressions with interpolation
+    (and (.-stops expr) (.-zoom properties))
+    (let [stops (.-stops expr)
+          zoom (.-zoom properties)
+          base (or (.-base expr) 1)
+          stop-count (.-length stops)]
+
+      ;; DEBUG: Log the actual stops structure
+      (js/console.log "DEBUG expression stops:"
+                      "stops:" (js->clj stops)
+                      "zoom:" zoom
+                      "base:" base)
+
+      (if (zero? stop-count)
+        nil
+        ;; Find the appropriate stop range and interpolate
+        (loop [i 0]
+          (if (< i (dec stop-count))
+            (let [current-stop (aget stops i)
+                  next-stop (aget stops (inc i))
+                  current-zoom-level (aget current-stop 0)
+                  current-value (aget current-stop 1)
+                  next-zoom-level (aget next-stop 0)
+                  next-value (aget next-stop 1)]
+
+              (js/console.log "DEBUG checking stop range:"
+                              "i:" i
+                              "current-zoom:" current-zoom-level "current-value:" current-value
+                              "next-zoom:" next-zoom-level "next-value:" next-value
+                              "current-zoom <= zoom:" (<= current-zoom-level zoom)
+                              "zoom < next-zoom:" (< zoom next-zoom-level))
+
+              (if (and (<= current-zoom-level zoom)
+                       (< zoom next-zoom-level))
+                ;; Found the correct zoom range
+                ;; CRITICAL FIX: Only interpolate numeric values
+                (cond
+                  ;; Numeric interpolation
+                  (and (number? current-value) (number? next-value))
+                  (let [t (/ (- zoom current-zoom-level)
+                             (- next-zoom-level current-zoom-level))
+                        interpolated (if (= base 1)
+                                       ;; Linear interpolation
+                                       (+ (* (- 1 t) current-value)
+                                          (* t next-value))
+                                       ;; Exponential interpolation
+                                       (let [zoom-diff (- next-zoom-level current-zoom-level)
+                                             base-factor (js/Math.pow base t)]
+                                         (+ (* (- 1 base-factor) current-value)
+                                            (* base-factor next-value))))]
+                    (js/console.log "DEBUG numeric interpolation result:"
+                                    "t:" t
+                                    "interpolated:" interpolated)
+                    interpolated)
+
+                  ;; Color values - use current value (no interpolation)
+                  (and (string? current-value) (string? next-value))
+                  (do
+                    (js/console.log "DEBUG color values, using current:" current-value)
+                    current-value)
+
+                  ;; Fallback: use current value
+                  :else
+                  (do
+                    (js/console.log "DEBUG fallback, using current:" current-value)
+                    current-value))
+                (recur (inc i))))
+            ;; Use the last stop if we're beyond all stops
+            (let [last-stop (aget stops (dec stop-count))
+                  last-value (aget last-stop 1)]
+              (js/console.log "DEBUG using last stop:"
+                              "last-zoom:" (aget last-stop 0)
+                              "last-value:" last-value)
+              last-value)))))
+
+    ;; Handle literal values
+    (.-value expr) (.-value expr)
+    (.-default expr) (.-default expr)
+
+    ;; Handle direct values
+    :else expr))
+
 (def eiffel-tower-coords [2.2945 48.8584])
 
 (def style-urls
@@ -164,7 +256,16 @@
 (defn get-paint-property [layer-id property-name]
   (when-let [^js map-obj (get-map-instance)]
     (when (.getLayer map-obj layer-id)
-      (.getPaintProperty map-obj layer-id property-name))))
+      ;; Get the raw expression object, not the evaluated value
+      (let [raw-value (.getPaintProperty map-obj layer-id property-name)]
+        (js/console.log "DEBUG get-paint-property:"
+                        "layer:" layer-id
+                        "property:" property-name
+                        "raw-value:" raw-value
+                        "type:" (type raw-value)
+                        "isExpression:" (isExpression raw-value)
+                        "has-stops:" (and (object? raw-value) (.-stops raw-value)))
+        raw-value))))
 
 (defn set-paint-property [layer-id property-name value]
   (when-let [^js map-obj (get-map-instance)]
@@ -262,159 +363,117 @@
 (defn parse-color-expression [color-value current-zoom]
   (when color-value
     (cond
-      ;; Handle simple values
+      ;; Handle expression objects
+      (isExpression color-value)
+      (try
+        (let [result (evaluate color-value #js {:zoom current-zoom})]
+          (if (string? result)
+            result
+            (do
+              (js/console.warn "Expression evaluated to non-string color:" result)
+              nil)))
+        (catch js/Error e
+          (js/console.warn "Failed to evaluate color expression:" e)
+          nil))
+
+      ;; Handle simple color strings
       (string? color-value)
       (if (.startsWith color-value "#")
         color-value
         (try
-          (let [parsed (js/parseFloat color-value)]
-            (if (js/isNaN parsed)
-              (-> (color color-value)
-                  (.hex)
-                  (.toString)
-                  (.toLowerCase))
-              parsed))
+          (-> (color color-value)
+              (.hex)
+              (.toString)
+              (.toLowerCase))
           (catch js/Error e
-            (-> (color color-value)
-                (.hex)
-                (.toString)
-                (.toLowerCase)))))
+            (js/console.warn "Failed to parse color string:" color-value)
+            nil)))
 
+      ;; Handle numeric values (convert to hex)
       (number? color-value)
-      color-value
+      (try
+        (str "#" (.toString (js/Math.floor color-value) 16))
+        (catch js/Error e
+          (js/console.warn "Failed to convert numeric to color:" color-value)
+          nil))
 
-      ;; Handle expressions with stops (for both colors and numbers)
-      (and (object? color-value) (.-stops color-value))
-      (let [stops-array (.-stops color-value)
-            stops (js->clj stops-array)
-            sorted-stops (sort-by first stops)]
-        (if (empty? sorted-stops)
-          (throw (js/Error. "Empty stops array"))
-          (let [first-stop (first sorted-stops)
-                last-stop (last sorted-stops)]
-            (cond
-              (<= current-zoom (first first-stop)) (second first-stop)
-              (>= current-zoom (first last-stop)) (second last-stop)
-              :else
-              (loop [[[z1 v1] & rest-stops] sorted-stops]
-                (if (empty? rest-stops)
-                  (second first-stop)
-                  (let [[z2 v2] (first rest-stops)]
-                    (if (and (>= current-zoom z1) (<= current-zoom z2))
-                      ;; Interpolate between stops if we're in the range
-                      (let [base (or (.-base color-value) 1)
-                            t (/ (- current-zoom z1) (- z2 z1))
-                            ;; Apply exponential interpolation if base is not 1
-                            t' (if (= base 1)
-                                 t
-                                 (/ (- (js/Math.pow base t) 1) (- base 1)))]
-                        (cond
-                          ;; Handle numeric values (like opacity)
-                          (and (number? v1) (number? v2))
-                          (+ v1 (* t' (- v2 v1)))
-
-                          ;; Handle color values
-                          (and (string? v1) (string? v2))
-                          (let [color1 (color v1)
-                                color2 (color v2)
-                                mixed (.mix color1 color2 t')]
-                            (.string mixed))
-
-                          ;; Fallback to the lower stop's value
-                          :else v1))
-                      (recur rest-stops)))))))))
-
-      ;; Handle interpolate expressions - treat them the same as stops expressions
-      (and (object? color-value) (.-interpolate color-value))
-      (let [stops-array (.-stops color-value)
-            stops (js->clj stops-array)
-            sorted-stops (sort-by first stops)]
-        (if (empty? sorted-stops)
-          (throw (js/Error. "Empty stops array in interpolate expression"))
-          (let [first-stop (first sorted-stops)
-                last-stop (last sorted-stops)]
-            (cond
-              (<= current-zoom (first first-stop)) (second first-stop)
-              (>= current-zoom (first last-stop)) (second last-stop)
-              :else
-              (loop [[[z1 v1] & rest-stops] sorted-stops]
-                (if (empty? rest-stops)
-                  (second first-stop)
-                  (let [[z2 v2] (first rest-stops)]
-                    (if (and (>= current-zoom z1) (<= current-zoom z2))
-                      ;; Interpolate between stops if we're in the range
-                      (let [base (or (.-base color-value) 1)
-                            t (/ (- current-zoom z1) (- z2 z1))
-                            ;; Apply exponential interpolation if base is not 1
-                            t' (if (= base 1)
-                                 t
-                                 (/ (- (js/Math.pow base t) 1) (- base 1)))]
-                        (cond
-                          ;; Handle numeric values (like opacity)
-                          (and (number? v1) (number? v2))
-                          (+ v1 (* t' (- v2 v1)))
-
-                          ;; Handle color values
-                          (and (string? v1) (string? v2))
-                          (let [color1 (color v1)
-                                color2 (color v2)
-                                mixed (.mix color1 color2 t')]
-                            (.string mixed))
-
-                          ;; Fallback to the lower stop's value
-                          :else v1))
-                      (recur rest-stops)))))))))
-
-      ;; Handle step expressions
-      (and (object? color-value) (.-step color-value))
-      (let [input (.-input color-value)
-            stops (.-stops color-value)
-            default (.-default color-value)]
-        (let [value (or default (when stops (aget stops 1)))]
-          (if (number? value)
-            value
-            (js/parseFloat value))))
-
-      ;; Handle simple object values (like numbers wrapped in objects)
-      (and (object? color-value) (.-valueOf color-value))
-      (let [value (.valueOf color-value)]
-        (if (number? value)
-          value
-          (js/parseFloat value)))
-
-      ;; For other complex expressions, try to extract a reasonable value
+      ;; Handle simple object values
       (object? color-value)
-      (do
-        (js/console.warn "Complex expression detected, attempting to extract value:" (js/JSON.stringify color-value))
-        ;; Try various common properties
-        (let [value (cond
-                      (.-default color-value) (.-default color-value)
-                      (.-value color-value) (.-value color-value)
-                      :else 0.7)]
-          (if (number? value)
-            value
-            (js/parseFloat value))))
+      (try
+        (let [value (or (.-default color-value)
+                        (.-value color-value)
+                        (.-valueOf color-value))]
+          (parse-color-expression value current-zoom))
+        (catch js/Error e
+          nil))
 
       :else
       (do
-        (js/console.warn "Unexpected color value type:" (type color-value) "value:" color-value)
-        color-value))))
+        (js/console.warn "Unexpected color value type:" (type color-value))
+        nil))))
+
+(defn parse-numeric-expression [numeric-value current-zoom]
+  (when numeric-value
+    (js/console.log "DEBUG parse-numeric-expression:"
+                    "input:" numeric-value
+                    "zoom:" current-zoom
+                    "isExpression:" (isExpression numeric-value))
+
+    (cond
+      ;; Use the actual expression evaluator for expressions
+      (isExpression numeric-value)
+      (try
+        (let [result (evaluate numeric-value #js {:zoom current-zoom})]
+          (js/console.log "DEBUG expression evaluation result:"
+                          "zoom:" current-zoom
+                          "result:" result
+                          "result-type:" (type result))
+          (cond
+            (number? result) result
+            (string? result) (let [parsed (js/parseFloat result)]
+                               (if (js/isNaN parsed) nil parsed))
+            :else nil))
+        (catch js/Error e
+          (js/console.warn "Failed to evaluate numeric expression:" e numeric-value)
+          nil))
+
+      ;; Handle simple numeric values
+      (number? numeric-value)
+      numeric-value
+
+      ;; Handle string values
+      (string? numeric-value)
+      (try
+        (let [parsed (js/parseFloat numeric-value)]
+          (if (js/isNaN parsed) nil parsed))
+        (catch js/Error e
+          nil))
+
+      ;; Handle object values with default/value properties
+      (object? numeric-value)
+      (try
+        (let [value (or (.-default numeric-value)
+                        (.-value numeric-value)
+                        (.-valueOf numeric-value))]
+          (cond
+            (number? value) value
+            (string? value) (let [parsed (js/parseFloat value)]
+                              (if (js/isNaN parsed) nil parsed))
+            :else nil))
+        (catch js/Error e
+          nil))
+
+      :else nil)))
 
 (defn validate-style [style]
   (try
-    (let [complete-style (clj->js
-                          {:version 8
-                           :name "Building Style Validation"
-                           :sources {:dummy-source {:type "geojson"
-                                                    :data {:type "FeatureCollection"
-                                                           :features []}}}
-                           :layers [{:id "validation-layer"
-                                     :type "fill"
-                                     :source "dummy-source"
-                                     :paint style}]})
-          validation-result ((.-validateStyleMin style-spec) complete-style)]
-      (if (and (array? validation-result) (== (.-length validation-result) 0))
-        true
-        false))
+    ;; For building paint properties, we don't need full style validation
+    ;; Just check if the style map has the expected structure
+    (and (map? style)
+         (every? (fn [[k v]]
+                   (and (keyword? k)
+                        (or (string? v)
+                            (number? v))))
+                 style))
     (catch js/Error e
       false)))

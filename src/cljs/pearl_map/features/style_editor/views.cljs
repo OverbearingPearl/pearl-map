@@ -17,27 +17,88 @@
 
 (defn get-current-building-styles []
   (let [current-zoom (get-current-zoom)
-        layer-ids ["building" "building-top"]
+        ;; Prefer building-top layer for expressions, fall back to building layer
+        layer-ids ["building-top" "building"]
+        numeric-properties #{:fill-opacity}
+        color-properties #{:fill-color :fill-outline-color}
         style-keys [:fill-color :fill-opacity :fill-outline-color]]
-    (->> layer-ids
-         (mapcat (fn [layer-id]
-                   (->> style-keys
-                        (map (fn [style-key]
-                               (when-let [current-value (map-engine/get-paint-property layer-id (name style-key))]
-                                 [style-key (map-engine/parse-color-expression current-value current-zoom)])))
-                        (remove nil?))))
-         (into {}))))
+
+    (js/console.log "DEBUG get-current-building-styles:"
+                    "current-zoom:" current-zoom)
+
+    (let [all-styles (->> layer-ids
+                          (mapcat (fn [layer-id]
+                                    (->> style-keys
+                                         (map (fn [style-key]
+                                                (when-let [current-value (map-engine/get-paint-property layer-id (name style-key))]
+                                                  (js/console.log "DEBUG processing property:"
+                                                                  "layer:" layer-id
+                                                                  "key:" style-key
+                                                                  "value:" current-value
+                                                                  "isExpression:" (map-engine/isExpression current-value))
+                                                  (let [parsed-value (cond
+                                                                       ;; Numeric expressions
+                                                                       (and (numeric-properties style-key)
+                                                                            (map-engine/isExpression current-value))
+                                                                       (map-engine/parse-numeric-expression current-value current-zoom)
+
+                                                                       ;; Color expressions - handle gracefully
+                                                                       (and (color-properties style-key)
+                                                                            (map-engine/isExpression current-value))
+                                                                       (or (map-engine/parse-color-expression current-value current-zoom)
+                                                                           ;; Fallback for color expression failures
+                                                                           (do
+                                                                             (js/console.warn "Color expression evaluation failed, using default")
+                                                                             (case style-key
+                                                                               :fill-color "#f0f0f0"
+                                                                               :fill-outline-color "#cccccc"
+                                                                               nil)))
+
+                                                                       ;; Simple numeric values
+                                                                       (numeric-properties style-key)
+                                                                       (if (number? current-value)
+                                                                         current-value
+                                                                         (map-engine/parse-numeric-expression current-value current-zoom))
+
+                                                                       ;; Simple color values
+                                                                       (color-properties style-key)
+                                                                       (if (string? current-value)
+                                                                         current-value
+                                                                         (map-engine/parse-color-expression current-value current-zoom))
+
+                                                                       :else
+                                                                       current-value)]
+                                                    (when (some? parsed-value)
+                                                      [style-key parsed-value])))))
+                                         (remove nil?))))
+                          (into {}))]
+      ;; Use reasonable defaults only for missing properties
+      (merge {:fill-color "#f0f0f0"
+              :fill-opacity 0.7
+              :fill-outline-color "#cccccc"}
+             all-styles))))
 
 (defn apply-current-style [style]
   (try
     (let [validation-result (map-engine/validate-style style)
           current-zoom (get-current-zoom)]
       (if validation-result
+        ;; Only apply styles to layers that don't have expressions
+        ;; This preserves zoom-dependent behavior
         (doseq [layer-id ["building" "building-top"]]
           (try
             (doseq [[style-key style-value] style]
-              (let [final-value (map-engine/parse-color-expression style-value current-zoom)]
-                (map-engine/set-paint-property layer-id (name style-key) final-value)))
+              (let [current-raw-value (map-engine/get-paint-property layer-id (name style-key))
+                    ;; CRITICAL: Only apply styles to layers without expressions
+                    ;; This prevents breaking the zoom-dependent opacity system
+                    final-value (if (map-engine/isExpression current-raw-value)
+                                  ;; Layer has expression - preserve it, don't override
+                                  current-raw-value
+                                  ;; Layer has no expression - apply the new style
+                                  style-value)]
+                (when (and (some? final-value)
+                           (not= final-value current-raw-value))
+                  (map-engine/set-paint-property layer-id (name style-key) final-value))))
             (catch js/Error e
               (js/console.warn (str "Could not apply style to layer " layer-id ":") e))))
         (js/console.error "Style validation failed - not applying changes")))
@@ -46,12 +107,40 @@
       (throw e))))
 
 (defn update-building-style [style-key value]
-  (when (and value (not (str/blank? value)))
+  (when value
     (let [processed-value (cond
-                            (#{:fill-color :fill-outline-color} style-key) value
-                            (= style-key :fill-opacity) (js/parseFloat value)
+                            (#{:fill-color :fill-outline-color} style-key)
+                            (if (string? value) value (str value))
+
+                            (= style-key :fill-opacity)
+                            (if (string? value)
+                              (let [parsed (js/parseFloat value)]
+                                (if (js/isNaN parsed)
+                                  (do
+                                    (js/console.warn "Invalid opacity value:" value)
+                                    nil)
+                                  parsed))
+                              (if (number? value)
+                                value
+                                (do
+                                  (js/console.warn "Unexpected opacity value type:" value)
+                                  nil)))
+
                             :else value)]
-      (re-frame/dispatch [:style-editor/update-and-apply-style style-key processed-value]))))
+      (when (some? processed-value)
+        (re-frame/dispatch [:style-editor/update-and-apply-style style-key processed-value])))))
+
+(defn force-refresh-styles []
+  (let [current-zoom (get-current-zoom)]
+    (js/console.log "FORCE REFRESH - Current zoom:" current-zoom)
+
+    ;; Simply get the current styles without forcing zoom changes
+    ;; This preserves expression objects
+    (let [styles (get-current-building-styles)]
+      (js/console.log "DEBUG refreshed styles:" styles)
+      ;; Don't re-apply styles that would break expressions
+      ;; Just update the UI state
+      (re-frame/dispatch [:style-editor/set-editing-style styles]))))
 
 (defn setup-map-listener []
   (let [map-inst (.-pearlMapInstance js/window)]
@@ -90,10 +179,17 @@
           [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Opacity"]
           [:input {:type "range"
                    :min "0" :max "1" :step "0.1"
-                   :value (:fill-opacity editing-style)
+                   :value (let [opacity (:fill-opacity editing-style)]
+                            (if (and opacity (not (js/isNaN opacity)))
+                              opacity
+                              0.7))  ;; Only provide default for display, not processing
                    :on-change #(update-building-style :fill-opacity (-> % .-target .-value))
                    :style {:width "100%"}}]
-          [:span {:style {:font-size "12px"}} (str "Opacity: " (:fill-opacity editing-style))]]
+          [:span {:style {:font-size "12px"}}
+           (str "Opacity: " (let [opacity (:fill-opacity editing-style)]
+                              (if (and opacity (not (js/isNaN opacity)))
+                                opacity
+                                "Unknown")))]]
          [:div {:style {:margin-bottom "15px"}}
           [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Outline Color"]
           [:input {:type "color"
@@ -107,9 +203,12 @@
           [:button {:on-click #(re-frame/dispatch [:style-editor/set-and-apply-style (:dark default-building-styles)])
                     :style {:padding "8px 12px" :border "none" :border-radius "4px"
                             :background "#343a40" :color "white" :cursor "pointer"}} "Dark Theme"]
-          [:button {:on-click #(re-frame/dispatch [:style-editor/load-and-apply-current-styles])
+          [:button {:on-click force-refresh-styles
                     :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                            :background "#28a745" :color "white" :cursor "pointer"}} "Refresh Styles"]]
+                            :background "#28a745" :color "white" :cursor "pointer"}} "Refresh Styles"]
+          [:button {:on-click #(re-frame/dispatch [:style-editor/manually-apply-current-style])
+                    :style {:padding "8px 12px" :border "none" :border-radius "4px"
+                            :background "#dc3545" :color "white" :cursor "pointer"}} "Apply Changes"]]
          [:div {:style {:padding-top "15px" :border-top "1px solid #eee"}}
           [:p {:style {:color "#666" :font-size "12px" :margin "0 0 10px 0" :font-weight "bold"}}
            "Buildings Status:"]

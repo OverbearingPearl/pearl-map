@@ -18,12 +18,20 @@
  (fn [{:keys [db]} [_ style-key value]]
    (let [updated-style (assoc (:style-editor/editing-style db) style-key value)]
      {:db (assoc db :style-editor/editing-style updated-style)
-      :fx [[:dispatch-later {:ms 100 :dispatch [:style-editor/actually-apply-styles updated-style]}]]})))
+      ;; Remove auto-apply to prevent breaking expressions
+      ;; :fx [[:dispatch-later {:ms 100 :dispatch [:style-editor/actually-apply-styles updated-style]}]]
+      })))
 
 (re-frame/reg-event-fx
  :style-editor/actually-apply-styles
  (fn [{:keys [db]} [_ style]]
    {:fx [[:dispatch [:style-editor/apply-styles style]]]}))
+
+(re-frame/reg-event-fx
+ :style-editor/manually-apply-current-style
+ (fn [{:keys [db]} _]
+   (let [current-style (:style-editor/editing-style db)]
+     {:fx [[:dispatch [:style-editor/apply-styles current-style]]]})))
 
 (re-frame/reg-event-fx
  :style-editor/apply-styles
