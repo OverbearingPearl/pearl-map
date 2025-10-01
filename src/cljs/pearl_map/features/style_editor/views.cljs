@@ -84,11 +84,16 @@
       (when (some? processed-value)
         (re-frame/dispatch [:style-editor/update-and-apply-style style-key processed-value])))))
 
-(defn force-refresh-styles []
-  ;; Use a small delay to ensure the map has fully updated
-  (js/setTimeout
-   #(re-frame/dispatch [:style-editor/load-and-apply-current-styles])
-   100))
+(defn refresh-styles-on-idle []
+  (let [map-inst (.-pearlMapInstance js/window)]
+    (when map-inst
+      ;; Get current state from app-db directly instead of using subscriptions
+      (let [db @re-frame.db/app-db
+            target-layer (get db :style-editor/target-layer "building")
+            current-styles (get-layer-styles target-layer)]
+        (re-frame/dispatch [:style-editor/set-and-apply-style current-styles])
+        (.once map-inst "idle"
+               #(re-frame/dispatch [:style-editor/refresh-styles-after-idle]))))))
 
 (defn setup-map-listener []
   (let [map-inst (.-pearlMapInstance js/window)]
@@ -103,13 +108,14 @@
            (fn []
              (re-frame/dispatch [:style-editor/on-map-load])))
 
-      ;; Refresh styles when zoom changes to show current effective values
-      (.on map-inst "zoom"
+      ;; Refresh styles when map becomes idle (after any interaction)
+      (.on map-inst "idle"
            (fn []
-             (let [target-layer @(re-frame/subscribe [:style-editor/target-layer])]
+             ;; Use app-db directly instead of subscription
+             (let [db @re-frame.db/app-db
+                   target-layer (get db :style-editor/target-layer "building")]
                (when (= target-layer "building-top")
-                 ;; Use idle event to ensure map has finished rendering
-                 (.once map-inst "idle" force-refresh-styles))))))))
+                 (re-frame/dispatch [:style-editor/refresh-styles-after-idle]))))))))
 
 (defn building-style-editor []
   (reagent/create-class
@@ -141,7 +147,7 @@
                     :on-change #(let [new-layer (-> % .-target .-value)]
                                   (re-frame/dispatch [:style-editor/set-target-layer new-layer])
                                   ;; Refresh styles when switching layers
-                                  (re-frame/dispatch [:style-editor/load-and-apply-current-styles]))
+                                  (refresh-styles-on-idle))
                     :style {:width "100%" :padding "5px" :border "1px solid #ddd" :border-radius "4px"}}
            [:option {:value "building"} "Building"]
            [:option {:value "building-top"} "Building Top"]]]
@@ -189,7 +195,7 @@
           [:button {:on-click #(re-frame/dispatch [:style-editor/set-and-apply-style (:dark default-building-styles)])
                     :style {:padding "8px 12px" :border "none" :border-radius "4px"
                             :background "#343a40" :color "white" :cursor "pointer" :flex "1"}} "Dark"]
-          [:button {:on-click force-refresh-styles
+          [:button {:on-click refresh-styles-on-idle
                     :style {:padding "8px 12px" :border "none" :border-radius "4px"
                             :background "#28a745" :color "white" :cursor "pointer" :flex "1"}} "Refresh"]
           [:button {:on-click #(re-frame/dispatch [:style-editor/manually-apply-current-style])

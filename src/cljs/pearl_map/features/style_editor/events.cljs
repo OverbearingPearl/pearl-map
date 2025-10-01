@@ -66,12 +66,12 @@
   (style-editor-views/get-layer-styles layer-id))
 
 (re-frame/reg-event-fx
- :style-editor/load-and-apply-current-styles
+ :style-editor/refresh-styles-after-idle
  (fn [{:keys [db]} _]
    (let [target-layer (get db :style-editor/target-layer "building")
          current-styles (get-layer-styles target-layer)]
-     {:db (assoc db :style-editor/editing-style current-styles)
-      :fx [[:dispatch [:style-editor/apply-styles current-styles]]]})))
+     ;; Only update the editing style, don't re-apply it (to avoid loops)
+     {:db (assoc db :style-editor/editing-style current-styles)})))
 
 (re-frame/reg-event-fx
  :style-editor/on-map-load
