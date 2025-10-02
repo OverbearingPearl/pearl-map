@@ -54,13 +54,8 @@
       (if validation-result
         (doseq [[style-key style-value] style]
           (when (some? style-value)
-            ;; For building-top opacity, don't modify the expression - it should remain zoom-dependent
-            ;; Only apply literal values to other properties and layers
-            (if (and (= layer-id "building-top") (= style-key :fill-opacity))
-              ;; Do nothing - preserve the original zoom-dependent expression
-              nil
-              ;; For other properties, set as literal values
-              (map-engine/set-paint-property layer-id (name style-key) style-value))))
+            ;; Apply literal values to all properties and layers
+            (map-engine/set-paint-property layer-id (name style-key) style-value)))
         (js/console.error "Style validation failed - not applying changes")))
     (catch js/Error e
       (js/console.error (str "Failed to apply style to layer " layer-id ":") e)
@@ -174,8 +169,7 @@
                                     (when (and (= (:fill-color editing-style) "transparent") (> new-opacity 0))
                                       (update-building-style :fill-color "#f0f0f0"))
                                     (update-building-style :fill-opacity new-opacity)))
-                    :style {:width "100%"}
-                    :disabled (= target-layer "building-top")}]
+                    :style {:width "100%"}}]
            [:span {:style {:font-size "12px" :color "#666"}}
             (str "Current: " (let [opacity (:fill-opacity editing-style)
                                    color-transparent? (= (:fill-color editing-style) "transparent")]
@@ -183,9 +177,7 @@
                                  color-transparent? "0% (transparent)"
                                  (and opacity (not (js/isNaN opacity)))
                                  (-> opacity (* 100) js/Math.round (str "%"))
-                                 :else "Unknown")))
-            (when (= target-layer "building-top")
-              " (zoom-dependent)")]]]
+                                 :else "Unknown")))]]]
 
          [:div {:style {:margin-bottom "15px"}}
           [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Outline Color"]
