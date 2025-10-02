@@ -209,10 +209,7 @@
                             :background "#343a40" :color "white" :cursor "pointer" :flex "1"}} "Dark"]
           [:button {:on-click #(re-frame/dispatch [:style-editor/immediate-refresh-styles])
                     :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                            :background "#28a745" :color "white" :cursor "pointer" :flex "1"}} "Refresh"]
-          [:button {:on-click #(re-frame/dispatch [:style-editor/manually-apply-current-style])
-                    :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                            :background "#dc3545" :color "white" :cursor "pointer" :flex "1"}} "Apply"]]
+                            :background "#28a745" :color "white" :cursor "pointer" :flex "1"}} "Refresh"]]
 
          ;; Status information
          [:div {:style {:padding-top "15px" :border-top "1px solid #eee"}}
