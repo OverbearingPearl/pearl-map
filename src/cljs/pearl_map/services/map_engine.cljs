@@ -224,8 +224,25 @@
 
 (defn set-paint-property [layer-id property-name value]
   (when-let [^js map-obj (get-map-instance)]
-    (when (.getLayer map-obj layer-id)
-      (.setPaintProperty map-obj layer-id property-name value))))
+    (when (and map-obj (.getLayer map-obj layer-id))
+      (try
+        ;; Convert Clojure data structures to JavaScript objects for MapLibre
+        (let [processed-value (cond
+                                ;; Handle nested maps (like gradient expressions)
+                                (map? value)
+                                (clj->js value)
+
+                                ;; Handle vectors (arrays in JS)
+                                (vector? value)
+                                (clj->js value)
+
+                                ;; Pass through other values unchanged
+                                :else
+                                value)]
+          (.setPaintProperty map-obj layer-id property-name processed-value))
+        (catch js/Error e
+          (js/console.error (str "Failed to set paint property " property-name " for layer " layer-id ":") e)
+          (throw e))))))
 
 (defn get-current-zoom []
   (when-let [^js map-obj (get-map-instance)]

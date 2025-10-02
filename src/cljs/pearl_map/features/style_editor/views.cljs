@@ -17,32 +17,38 @@
 
 (defn get-layer-styles [layer-id]
   (let [current-zoom (get-current-zoom)
-        style-keys [:fill-color :fill-opacity :fill-outline-color]]
+        style-keys [:fill-color :fill-opacity :fill-outline-color]
+        ^js map-obj (map-engine/get-map-instance)]
 
-    (let [layer-styles (->> style-keys
-                            (map (fn [style-key]
-                                   (when-let [current-value (map-engine/get-paint-property layer-id (name style-key))]
-                                     (let [parsed-value (cond
-                                                          (= style-key :fill-opacity)
-                                                          (map-engine/parse-numeric-expression current-value current-zoom)
+    (if (and map-obj (.getLayer map-obj layer-id))
+      (let [layer-styles (->> style-keys
+                              (map (fn [style-key]
+                                     (when-let [current-value (map-engine/get-paint-property layer-id (name style-key))]
+                                       (let [parsed-value (cond
+                                                            (= style-key :fill-opacity)
+                                                            (map-engine/parse-numeric-expression current-value current-zoom)
 
-                                                          (#{:fill-color :fill-outline-color} style-key)
-                                                          (let [color-value (map-engine/parse-color-expression current-value current-zoom)]
-                                                            (if (= color-value "transparent")
-                                                              "transparent"
-                                                              color-value))
+                                                            (#{:fill-color :fill-outline-color} style-key)
+                                                            (let [color-value (map-engine/parse-color-expression current-value current-zoom)]
+                                                              (if (= color-value "transparent")
+                                                                "transparent"
+                                                                color-value))
 
-                                                          :else
-                                                          current-value)]
-                                       (when (some? parsed-value)
-                                         [style-key parsed-value])))))
-                            (remove nil?)
-                            (into {}))]
+                                                            :else
+                                                            current-value)]
+                                         (when (some? parsed-value)
+                                           [style-key parsed-value])))))
+                              (remove nil?)
+                              (into {}))]
 
-      (merge {:fill-color "#f0f0f0"
-              :fill-opacity 0.7
-              :fill-outline-color "#cccccc"}
-             layer-styles))))
+        (merge {:fill-color "#f0f0f0"
+                :fill-opacity 0.7
+                :fill-outline-color "#cccccc"}
+               layer-styles))
+      ;; Return default styles if layer doesn't exist
+      {:fill-color "#f0f0f0"
+       :fill-opacity 0.7
+       :fill-outline-color "#cccccc"})))
 
 (defn get-current-building-styles []
   (let [target-layer @(re-frame/subscribe [:style-editor/target-layer])]
@@ -50,13 +56,13 @@
 
 (defn apply-layer-style [layer-id style]
   (try
-    (let [validation-result (map-engine/validate-style style)]
-      (if validation-result
+    (when-let [^js map-obj (map-engine/get-map-instance)]
+      (when (.getLayer map-obj layer-id)
         (doseq [[style-key style-value] style]
-          (when (some? style-value)
-            ;; Apply literal values to all properties and layers
-            (map-engine/set-paint-property layer-id (name style-key) style-value)))
-        (js/console.error "Style validation failed - not applying changes")))
+          ;; Skip :gradient key as it's UI metadata, not a MapLibre paint property
+          (when (and (some? style-value) (not= style-key :gradient))
+            ;; Apply both literal values and expression objects
+            (map-engine/set-paint-property layer-id (name style-key) style-value)))))
     (catch js/Error e
       (js/console.error (str "Failed to apply style to layer " layer-id ":") e)
       (throw e))))
@@ -96,6 +102,85 @@
            (fn []
              (re-frame/dispatch [:style-editor/reset-styles-immediately]))))))
 
+(defn- gradient-controls [editing-style update-building-style]
+  (let [gradient-data (:gradient editing-style {:type "uniform"
+                                                :uniform-color "#f0f0f0"
+                                                :uniform-opacity 0.7
+                                                :stops [{:zoom 0 :color "#f0f0f0" :opacity 0.3}
+                                                        {:zoom 22 :color "#f0f0f0" :opacity 0.9}]})]
+    [:div
+     ;; Mode selector
+     [:div {:style {:margin-bottom "15px"}}
+      [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Style Mode"]
+      [:div {:style {:display "flex" :gap "10px"}}
+       [:label {:style {:display "flex" :align-items "center" :gap "5px"}}
+        [:input {:type "radio"
+                 :name "style-mode"
+                 :checked (= (:type gradient-data) "uniform")
+                 :on-change #(update-building-style :gradient
+                                                    (assoc gradient-data :type "uniform"))}]
+        "Uniform"]
+       [:label {:style {:display "flex" :align-items "center" :gap "5px"}}
+        [:input {:type "radio"
+                 :name "style-mode"
+                 :checked (= (:type gradient-data) "gradient")
+                 :on-change #(update-building-style :gradient
+                                                    (assoc gradient-data :type "gradient"))}]
+        "Gradient"]]]
+
+     (if (= (:type gradient-data) "uniform")
+       ;; Uniform style controls
+       [:div
+        [:div {:style {:margin-bottom "10px"}}
+         [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Fill Color"]
+         [:input {:type "color"
+                  :value (:uniform-color gradient-data "#f0f0f0")
+                  :on-change #(update-building-style :gradient
+                                                     (assoc gradient-data :uniform-color (-> % .-target .-value)))
+                  :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"}}]]
+        [:div {:style {:margin-bottom "15px"}}
+         [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Opacity"]
+         [:div
+          [:input {:type "range"
+                   :min "0" :max "1" :step "0.1"
+                   :value (:uniform-opacity gradient-data 0.7)
+                   :on-change #(update-building-style :gradient
+                                                      (assoc gradient-data :uniform-opacity (-> % .-target .-value js/parseFloat)))
+                   :style {:width "100%"}}]
+          [:span {:style {:font-size "12px" :color "#666"}}
+           (str "Current: " (-> (or (:uniform-opacity gradient-data) 0.7) (* 100) js/Math.round (str "%")))]]]]
+
+       ;; Gradient style controls
+       [:div
+        (for [i (range 2)]
+          (let [stop (get-in gradient-data [:stops i])]
+            [:div {:key i :style {:margin-bottom "15px" :padding "10px" :border "1px solid #eee" :border-radius "4px"}}
+             [:div {:style {:font-weight "bold" :margin-bottom "5px"}}
+              (if (= i 0) "Low Zoom (≤)" "High Zoom (≥)")]
+             [:div {:style {:margin-bottom "5px"}}
+              [:label {:style {:display "block" :margin-bottom "2px" :font-size "12px"}} "Zoom Level"]
+              [:input {:type "number"
+                       :min "0" :max "22" :step "1"
+                       :value (:zoom stop)
+                       :on-change #(update-building-style :gradient
+                                                          (assoc-in gradient-data [:stops i :zoom] (-> % .-target .-value js/parseFloat)))
+                       :style {:width "100%" :padding "3px" :border "1px solid #ddd" :border-radius "2px"}}]]
+             [:div {:style {:margin-bottom "5px"}}
+              [:label {:style {:display "block" :margin-bottom "2px" :font-size "12px"}} "Color"]
+              [:input {:type "color"
+                       :value (:color stop "#f0f0f0")
+                       :on-change #(update-building-style :gradient
+                                                          (assoc-in gradient-data [:stops i :color] (-> % .-target .-value)))
+                       :style {:width "100%" :height "25px" :border "1px solid #ddd" :border-radius "2px"}}]]
+             [:div
+              [:label {:style {:display "block" :margin-bottom "2px" :font-size "12px"}} "Opacity"]
+              [:input {:type "range"
+                       :min "0" :max "1" :step "0.1"
+                       :value (:opacity stop 0.7)
+                       :on-change #(update-building-style :gradient
+                                                          (assoc-in gradient-data [:stops i :opacity] (-> % .-target .-value js/parseFloat)))
+                       :style {:width "100%"}}]]]))])]))
+
 (defn building-style-editor []
   (reagent/create-class
    {:component-did-mount
@@ -115,7 +200,7 @@
                        :padding "15px"
                        :border-radius "8px"
                        :font-family "Arial, sans-serif"
-                       :width "320px"
+                       :width "350px"
                        :box-shadow "0 2px 10px rgba(0,0,0,0.1)"}}
          [:h3 {:style {:margin "0 0 15px 0" :color "#333"}} "Building Style Editor"]
 
@@ -130,55 +215,10 @@
            [:option {:value "building"} "Building"]
            [:option {:value "building-top"} "Building Top"]]]
 
-         ;; Style controls
-         [:div {:style {:margin-bottom "10px"}}
-          [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Fill Color"]
-          [:div {:style {:position "relative"}}
-           [:input {:type "color"
-                    :value (let [color-value (:fill-color editing-style)]
-                             (if (= color-value "transparent")
-                               "#f0f0f0" ; Use default color for the input, but show as transparent via CSS
-                               (or color-value "#f0f0f0")))
-                    :on-change #(update-building-style :fill-color (-> % .-target .-value))
-                    :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
-                            :opacity (if (= (:fill-color editing-style) "transparent") 0.3 1.0)
-                            :background (if (= (:fill-color editing-style) "transparent")
-                                          "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
-                                          "transparent")}}]
-           (when (= (:fill-color editing-style) "transparent")
-             [:div {:style {:position "absolute" :top "50%" :left "50%" :transform "translate(-50%, -50%)"
-                            :color "#666" :font-size "12px" :font-weight "bold" :pointer-events "none"}}
-              "TRANSPARENT"])]]
+         ;; Gradient controls
+         [gradient-controls editing-style update-building-style]
 
-         [:div {:style {:margin-bottom "10px"}}
-          [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Opacity"]
-          [:div
-           [:input {:type "range"
-                    :min "0" :max "1" :step "0.1"
-                    :value (let [opacity (:fill-opacity editing-style)
-                                 color-transparent? (= (:fill-color editing-style) "transparent")]
-                             (cond
-                               color-transparent? 0
-                               (and opacity (not (js/isNaN opacity)))
-                               opacity
-                               :else 0.7))
-                    :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
-                                  (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
-                                    ;; If we're increasing opacity from 0 and color is transparent,
-                                    ;; we need to set a default color first
-                                    (when (and (= (:fill-color editing-style) "transparent") (> new-opacity 0))
-                                      (update-building-style :fill-color "#f0f0f0"))
-                                    (update-building-style :fill-opacity new-opacity)))
-                    :style {:width "100%"}}]
-           [:span {:style {:font-size "12px" :color "#666"}}
-            (str "Current: " (let [opacity (:fill-opacity editing-style)
-                                   color-transparent? (= (:fill-color editing-style) "transparent")]
-                               (cond
-                                 color-transparent? "0% (transparent)"
-                                 (and opacity (not (js/isNaN opacity)))
-                                 (-> opacity (* 100) js/Math.round (str "%"))
-                                 :else "Unknown")))]]]
-
+         ;; Outline color (always uniform)
          [:div {:style {:margin-bottom "15px"}}
           [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Outline Color"]
           [:input {:type "color"
@@ -205,4 +245,4 @@
           [:p {:style {:color "#666" :font-size "11px" :margin "0" :font-style "italic"}}
            "Only works with Dark or Light vector styles"]
           [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
-           "Styles: " (pr-str (select-keys editing-style [:fill-color :fill-opacity :fill-outline-color]))]]]))}))
+           "Mode: " (get-in editing-style [:gradient :type] "uniform")]]]))}))
