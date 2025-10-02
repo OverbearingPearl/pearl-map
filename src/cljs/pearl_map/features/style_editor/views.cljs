@@ -87,10 +87,6 @@
       (when (some? processed-value)
         (re-frame/dispatch [:style-editor/update-and-apply-style style-key processed-value])))))
 
-(defn refresh-styles-on-idle []
-  ;; Immediately refresh styles using current map state
-  (re-frame/dispatch [:style-editor/refresh-styles-after-idle]))
-
 (defn setup-map-listener []
   (let [map-inst (.-pearlMapInstance js/window)]
     (when map-inst
@@ -103,7 +99,7 @@
 
       (.on map-inst "styledata"
            (fn []
-             (re-frame/dispatch [:style-editor/refresh-styles-after-idle]))))))
+             (re-frame/dispatch [:style-editor/reset-styles-immediately]))))))
 
 (defn building-style-editor []
   (reagent/create-class
@@ -134,8 +130,7 @@
           [:select {:value target-layer
                     :on-change #(let [new-layer (-> % .-target .-value)]
                                   (re-frame/dispatch [:style-editor/set-target-layer new-layer])
-                                  ;; Immediately refresh styles for the new layer
-                                  (re-frame/dispatch [:style-editor/refresh-styles-after-idle]))
+                                  (re-frame/dispatch [:style-editor/reset-styles-immediately]))
                     :style {:width "100%" :padding "5px" :border "1px solid #ddd" :border-radius "4px"}}
            [:option {:value "building"} "Building"]
            [:option {:value "building-top"} "Building Top"]]]
@@ -207,9 +202,9 @@
           [:button {:on-click #(re-frame/dispatch [:style-editor/set-and-apply-style (:dark default-building-styles)])
                     :style {:padding "8px 12px" :border "none" :border-radius "4px"
                             :background "#343a40" :color "white" :cursor "pointer" :flex "1"}} "Dark"]
-          [:button {:on-click #(re-frame/dispatch [:style-editor/immediate-refresh-styles])
+          [:button {:on-click #(re-frame/dispatch [:style-editor/reset-styles-immediately])
                     :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                            :background "#28a745" :color "white" :cursor "pointer" :flex "1"}} "Refresh"]]
+                            :background "#28a745" :color "white" :cursor "pointer" :flex "1"}} "Reset"]]
 
          ;; Status information
          [:div {:style {:padding-top "15px" :border-top "1px solid #eee"}}

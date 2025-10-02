@@ -62,14 +62,7 @@
   (style-editor-views/get-layer-styles layer-id))
 
 (re-frame/reg-event-fx
- :style-editor/immediate-refresh-styles
- (fn [{:keys [db]} _]
-   (let [target-layer (get db :style-editor/target-layer "building")
-         current-styles (get-layer-styles target-layer)]
-     {:db (assoc db :style-editor/editing-style current-styles)})))
-
-(re-frame/reg-event-fx
- :style-editor/refresh-styles-after-idle
+ :style-editor/reset-styles-immediately
  (fn [{:keys [db]} _]
    (let [target-layer (get db :style-editor/target-layer "building")
          current-styles (get-layer-styles target-layer)]
