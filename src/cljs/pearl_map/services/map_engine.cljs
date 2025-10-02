@@ -196,7 +196,8 @@
             (.once new-map-obj "load"
                    (fn []
                      (apply-map-state! current-state)
-                     (reapply-custom-layers! (:layers current-state)))))))))))
+                     (reapply-custom-layers! (:layers current-state))
+                     (re-frame/dispatch [:style-editor/refresh-styles-after-idle]))))))))))
 
 (defn- switch-to-vector-style [current-state style-url]
   (let [^js map-obj (get-map-instance)]
@@ -206,7 +207,8 @@
            (fn []
              (add-buildings-layer)
              (reapply-custom-layers! (:layers current-state))
-             (apply-map-state! current-state)))))
+             (apply-map-state! current-state)
+             (re-frame/dispatch [:style-editor/refresh-styles-after-idle])))))
 
 (defn change-map-style [style-url]
   (let [^js map-obj (get-map-instance)

@@ -94,23 +94,13 @@
 (defn setup-map-listener []
   (let [map-inst (.-pearlMapInstance js/window)]
     (when map-inst
-      ;; Remove existing listeners
       (.off map-inst "load")
-      (.off map-inst "zoom")
-      (.off map-inst "idle")
       (.off map-inst "styledata")
 
-      ;; Add new listeners
       (.on map-inst "load"
            (fn []
              (re-frame/dispatch [:style-editor/on-map-load])))
 
-      ;; Remove the idle listener that was causing conflicts
-      ;; (.on map-inst "idle"
-      ;;      (fn []
-      ;;        (re-frame/dispatch [:style-editor/refresh-styles-after-idle])))
-
-      ;; Refresh styles when map style changes
       (.on map-inst "styledata"
            (fn []
              (re-frame/dispatch [:style-editor/refresh-styles-after-idle]))))))
