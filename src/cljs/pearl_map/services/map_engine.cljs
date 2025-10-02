@@ -316,11 +316,15 @@
 (defn parse-color-expression [color-value current-zoom]
   (when color-value
     (cond
+      ;; Handle "transparent" string directly
+      (and (string? color-value) (= color-value "transparent"))
+      "transparent"
+
       ;; Handle expression objects
       (isExpression color-value)
       (try
         (let [result (evaluate color-value #js {:zoom current-zoom})]
-          (if (string? result)
+          (if (or (string? result) (= result "transparent"))
             result
             (do
               (js/console.warn "Expression evaluated to non-string color:" result)

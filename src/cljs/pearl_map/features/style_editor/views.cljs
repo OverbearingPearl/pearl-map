@@ -27,7 +27,10 @@
                                                           (map-engine/parse-numeric-expression current-value current-zoom)
 
                                                           (#{:fill-color :fill-outline-color} style-key)
-                                                          (map-engine/parse-color-expression current-value current-zoom)
+                                                          (let [color-value (map-engine/parse-color-expression current-value current-zoom)]
+                                                            (if (= color-value "transparent")
+                                                              "transparent"
+                                                              color-value))
 
                                                           :else
                                                           current-value)]
@@ -85,15 +88,8 @@
         (re-frame/dispatch [:style-editor/update-and-apply-style style-key processed-value])))))
 
 (defn refresh-styles-on-idle []
-  (let [map-inst (.-pearlMapInstance js/window)]
-    (when map-inst
-      ;; Get current state from app-db directly instead of using subscriptions
-      (let [db @re-frame.db/app-db
-            target-layer (get db :style-editor/target-layer "building")
-            current-styles (get-layer-styles target-layer)]
-        (re-frame/dispatch [:style-editor/set-and-apply-style current-styles])
-        (.once map-inst "idle"
-               #(re-frame/dispatch [:style-editor/refresh-styles-after-idle]))))))
+  ;; Immediately refresh styles using current map state
+  (re-frame/dispatch [:style-editor/refresh-styles-after-idle]))
 
 (defn setup-map-listener []
   (let [map-inst (.-pearlMapInstance js/window)]
@@ -102,20 +98,22 @@
       (.off map-inst "load")
       (.off map-inst "zoom")
       (.off map-inst "idle")
+      (.off map-inst "styledata")
 
       ;; Add new listeners
       (.on map-inst "load"
            (fn []
              (re-frame/dispatch [:style-editor/on-map-load])))
 
-      ;; Refresh styles when map becomes idle (after any interaction)
-      (.on map-inst "idle"
+      ;; Remove the idle listener that was causing conflicts
+      ;; (.on map-inst "idle"
+      ;;      (fn []
+      ;;        (re-frame/dispatch [:style-editor/refresh-styles-after-idle])))
+
+      ;; Refresh styles when map style changes
+      (.on map-inst "styledata"
            (fn []
-             ;; Use app-db directly instead of subscription
-             (let [db @re-frame.db/app-db
-                   target-layer (get db :style-editor/target-layer "building")]
-               (when (= target-layer "building-top")
-                 (re-frame/dispatch [:style-editor/refresh-styles-after-idle]))))))))
+             (re-frame/dispatch [:style-editor/refresh-styles-after-idle]))))))
 
 (defn building-style-editor []
   (reagent/create-class
@@ -146,8 +144,8 @@
           [:select {:value target-layer
                     :on-change #(let [new-layer (-> % .-target .-value)]
                                   (re-frame/dispatch [:style-editor/set-target-layer new-layer])
-                                  ;; Refresh styles when switching layers
-                                  (refresh-styles-on-idle))
+                                  ;; Immediately refresh styles for the new layer
+                                  (re-frame/dispatch [:style-editor/refresh-styles-after-idle]))
                     :style {:width "100%" :padding "5px" :border "1px solid #ddd" :border-radius "4px"}}
            [:option {:value "building"} "Building"]
            [:option {:value "building-top"} "Building Top"]]]
@@ -155,28 +153,52 @@
          ;; Style controls
          [:div {:style {:margin-bottom "10px"}}
           [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Fill Color"]
-          [:input {:type "color"
-                   :value (or (:fill-color editing-style) "#f0f0f0")
-                   :on-change #(update-building-style :fill-color (-> % .-target .-value))
-                   :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"}}]]
+          [:div {:style {:position "relative"}}
+           [:input {:type "color"
+                    :value (let [color-value (:fill-color editing-style)]
+                             (if (= color-value "transparent")
+                               "#f0f0f0" ; Use default color for the input, but show as transparent via CSS
+                               (or color-value "#f0f0f0")))
+                    :on-change #(update-building-style :fill-color (-> % .-target .-value))
+                    :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
+                            :opacity (if (= (:fill-color editing-style) "transparent") 0.3 1.0)
+                            :background (if (= (:fill-color editing-style) "transparent")
+                                          "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
+                                          "transparent")}}]
+           (when (= (:fill-color editing-style) "transparent")
+             [:div {:style {:position "absolute" :top "50%" :left "50%" :transform "translate(-50%, -50%)"
+                            :color "#666" :font-size "12px" :font-weight "bold" :pointer-events "none"}}
+              "TRANSPARENT"])]]
 
          [:div {:style {:margin-bottom "10px"}}
           [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Opacity"]
           [:div
            [:input {:type "range"
                     :min "0" :max "1" :step "0.1"
-                    :value (let [opacity (:fill-opacity editing-style)]
-                             (if (and opacity (not (js/isNaN opacity)))
+                    :value (let [opacity (:fill-opacity editing-style)
+                                 color-transparent? (= (:fill-color editing-style) "transparent")]
+                             (cond
+                               color-transparent? 0
+                               (and opacity (not (js/isNaN opacity)))
                                opacity
-                               0.7))
-                    :on-change #(update-building-style :fill-opacity (-> % .-target .-value))
+                               :else 0.7))
+                    :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
+                                  (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
+                                    ;; If we're increasing opacity from 0 and color is transparent,
+                                    ;; we need to set a default color first
+                                    (when (and (= (:fill-color editing-style) "transparent") (> new-opacity 0))
+                                      (update-building-style :fill-color "#f0f0f0"))
+                                    (update-building-style :fill-opacity new-opacity)))
                     :style {:width "100%"}
                     :disabled (= target-layer "building-top")}]
            [:span {:style {:font-size "12px" :color "#666"}}
-            (str "Current: " (let [opacity (:fill-opacity editing-style)]
-                               (if (and opacity (not (js/isNaN opacity)))
+            (str "Current: " (let [opacity (:fill-opacity editing-style)
+                                   color-transparent? (= (:fill-color editing-style) "transparent")]
+                               (cond
+                                 color-transparent? "0% (transparent)"
+                                 (and opacity (not (js/isNaN opacity)))
                                  (-> opacity (* 100) js/Math.round (str "%"))
-                                 "Unknown")))
+                                 :else "Unknown")))
             (when (= target-layer "building-top")
               " (zoom-dependent)")]]]
 
@@ -195,7 +217,7 @@
           [:button {:on-click #(re-frame/dispatch [:style-editor/set-and-apply-style (:dark default-building-styles)])
                     :style {:padding "8px 12px" :border "none" :border-radius "4px"
                             :background "#343a40" :color "white" :cursor "pointer" :flex "1"}} "Dark"]
-          [:button {:on-click refresh-styles-on-idle
+          [:button {:on-click #(re-frame/dispatch [:style-editor/immediate-refresh-styles])
                     :style {:padding "8px 12px" :border "none" :border-radius "4px"
                             :background "#28a745" :color "white" :cursor "pointer" :flex "1"}} "Refresh"]
           [:button {:on-click #(re-frame/dispatch [:style-editor/manually-apply-current-style])
