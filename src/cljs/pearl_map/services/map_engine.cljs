@@ -18,10 +18,12 @@
   (cond
     ;; Handle stops expressions with interpolation
     (and (.-stops expr) (.-zoom properties))
-    (let [stops (.-stops expr)
+    (let [stops-array (.-stops expr)
+          ;; Convert to Clojure vector for easier processing
+          stops (vec (js->clj stops-array))
           zoom (.-zoom properties)
           base (or (.-base expr) 1)
-          stop-count (alength stops)]
+          stop-count (count stops)]
 
       (if (zero? stop-count)
         nil
@@ -30,25 +32,26 @@
           (cond
             (>= i stop-count)
             ;; Beyond all stops - use last value
-            (aget (aget stops (dec stop-count)) 1)
+            (second (nth stops (dec stop-count)))
 
             :else
-            (let [current-stop (aget stops i)
-                  current-zoom (aget current-stop 0)
-                  current-value (aget current-stop 1)]
+            (let [[current-zoom current-value] (nth stops i)]
               (if (<= zoom current-zoom)
                 ;; Found the stop range
                 (if (zero? i)
                   ;; Before first stop - use first value
                   current-value
                   ;; Interpolate between previous and current stop
-                  (let [prev-stop (aget stops (dec i))
-                        prev-zoom (aget prev-stop 0)
-                        prev-value (aget prev-stop 1)
-                        t (/ (- zoom prev-zoom) (- current-zoom prev-zoom))]
+                  (let [[prev-zoom prev-value] (nth stops (dec i))
+                        t (/ (- zoom prev-zoom) (- current-zoom prev-zoom))
+                        ;; Apply exponential interpolation if base != 1
+                        interpolated-t (if (= base 1)
+                                         t
+                                         (/ (- (js/Math.pow base t) 1)
+                                            (- base 1)))]
                     (cond
                       (and (number? prev-value) (number? current-value))
-                      (+ prev-value (* (- current-value prev-value) t))
+                      (+ prev-value (* (- current-value prev-value) interpolated-t))
 
                       :else
                       current-value)))
@@ -376,43 +379,42 @@
         nil))))
 
 (defn parse-numeric-expression [numeric-value current-zoom]
-  (when numeric-value
-    (cond
-      (isExpression numeric-value)
-      (try
-        (let [result (evaluate numeric-value #js {:zoom current-zoom})]
-          (cond
-            (number? result) result
-            (string? result) (let [parsed (js/parseFloat result)]
-                               (if (js/isNaN parsed) nil parsed))
-            :else nil))
-        (catch js/Error e
-          nil))
+  (cond
+    (nil? numeric-value) nil
 
-      (number? numeric-value)
-      numeric-value
+    ;; Handle simple numeric values first
+    (number? numeric-value) numeric-value
 
-      (string? numeric-value)
-      (try
-        (let [parsed (js/parseFloat numeric-value)]
-          (if (js/isNaN parsed) nil parsed))
-        (catch js/Error e
-          nil))
+    ;; Handle all expression types through the evaluate function
+    (isExpression numeric-value)
+    (try
+      (let [result (evaluate numeric-value #js {:zoom current-zoom})]
+        (js/console.log "Evaluated numeric expression:" numeric-value "->" result)
+        (cond
+          (number? result) result
+          (string? result) (let [parsed (js/parseFloat result)]
+                             (if (js/isNaN parsed) nil parsed))
+          :else nil))
+      (catch js/Error e
+        (js/console.warn "Failed to evaluate numeric expression:" e)
+        nil))
 
-      (object? numeric-value)
-      (try
-        (let [value (or (.-default numeric-value)
-                        (.-value numeric-value)
-                        (.-valueOf numeric-value))]
-          (cond
-            (number? value) value
-            (string? value) (let [parsed (js/parseFloat value)]
+    ;; Handle string values
+    (string? numeric-value) (let [parsed (js/parseFloat numeric-value)]
                               (if (js/isNaN parsed) nil parsed))
-            :else nil))
-        (catch js/Error e
-          nil))
 
-      :else nil)))
+    ;; Handle object values - check for common expression properties
+    (object? numeric-value)
+    (let [value (or (.-default numeric-value)
+                    (.-value numeric-value)
+                    (.-valueOf numeric-value))]
+      (cond
+        (number? value) value
+        (string? value) (let [parsed (js/parseFloat value)]
+                          (if (js/isNaN parsed) nil parsed))
+        :else nil))
+
+    :else nil))
 
 (defn validate-style [style]
   (try

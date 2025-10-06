@@ -39,38 +39,69 @@
       [{:zoom current-zoom
         :color (map-engine/parse-color-expression color-value current-zoom)}])))
 
+;; Add helper function to parse opacity stops
+(defn parse-opacity-stops [opacity-value current-zoom]
+  (when opacity-value
+    (cond
+      ;; Handle stops expressions
+      (and (map-engine/isExpression opacity-value) (.-stops opacity-value))
+      (let [stops (.-stops opacity-value)]
+        (mapv (fn [[zoom opacity]]
+                {:zoom zoom
+                 :opacity (map-engine/parse-numeric-expression opacity current-zoom)})
+              stops))
+
+      ;; Handle single opacity values
+      :else
+      [{:zoom current-zoom
+        :opacity (map-engine/parse-numeric-expression opacity-value current-zoom)}])))
+
+;; Add helper function to update opacity stops
+(defn update-opacity-stop [stops zoom new-opacity]
+  (let [updated-stops (mapv (fn [[stop-zoom stop-opacity]]
+                              (if (= stop-zoom zoom)
+                                [stop-zoom new-opacity]
+                                [stop-zoom stop-opacity]))
+                            stops)]
+    {:stops updated-stops}))
+
 (defn get-layer-styles [layer-id]
   (let [current-zoom (get-current-zoom)
         style-keys [:fill-color :fill-opacity :fill-outline-color]]
+    (->> style-keys
+         (map (fn [style-key]
+                (let [current-value (map-engine/get-paint-property layer-id (name style-key))]
+                  ;; Add debugging
+                  (js/console.log "Style key:" (name style-key)
+                                  "Raw value:" current-value
+                                  "Type:" (type current-value)
+                                  "Zoom:" current-zoom)
+                  ;; Provide defaults when property is undefined
+                  (let [parsed-value (cond
+                                       (nil? current-value)
+                                       (case style-key
+                                         :fill-opacity 1.0  ; Default to fully opaque
+                                         :fill-outline-color "#cccccc"  ; Default outline color
+                                         nil)  ; No default for fill-color
 
-    (let [layer-styles (->> style-keys
-                            (map (fn [style-key]
-                                   (when-let [current-value (map-engine/get-paint-property layer-id (name style-key))]
-                                     (let [parsed-value (cond
-                                                          (= style-key :fill-opacity)
-                                                          (let [opacity (map-engine/parse-numeric-expression current-value current-zoom)]
-                                                            ;; Accept any valid number, including 0 and 1
-                                                            (when (and (number? opacity) (not (js/isNaN opacity)))
-                                                              opacity))
+                                       (= style-key :fill-opacity)
+                                       (do
+                                         (js/console.log "Parsing opacity:" current-value)
+                                         (map-engine/parse-numeric-expression current-value current-zoom))
 
-                                                          (#{:fill-color :fill-outline-color} style-key)
-                                                          (let [color-value (map-engine/parse-color-expression current-value current-zoom)]
-                                                            (if (= color-value "transparent")
-                                                              "transparent"
-                                                              color-value))
+                                       (#{:fill-color :fill-outline-color} style-key)
+                                       (do
+                                         (js/console.log "Parsing color:" current-value)
+                                         (map-engine/parse-color-expression current-value current-zoom))
 
-                                                          :else
-                                                          current-value)]
-                                       (when (some? parsed-value)
-                                         [style-key parsed-value])))))
-                            (remove nil?)
-                            (into {}))]
-
-      ;; Provide sensible defaults only when values are missing
-      (merge {:fill-color "#f0f0f0"
-              :fill-opacity 0.7
-              :fill-outline-color "#cccccc"}
-             layer-styles))))
+                                       :else
+                                       current-value)]
+                    ;; Add more debugging
+                    (js/console.log "Parsed value:" parsed-value "for key:" (name style-key))
+                    (when (some? parsed-value)
+                      [style-key parsed-value])))))
+         (remove nil?)
+         (into {}))))
 
 (defn get-current-building-styles []
   (let [target-layer @(re-frame/subscribe [:style-editor/target-layer])]
@@ -210,30 +241,54 @@
 
          [:div {:style {:margin-bottom "10px"}}
           [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Opacity"]
-          [:div
-           [:input {:type "range"
-                    :min "0" :max "1" :step "0.1"
-                    :value (let [opacity (:fill-opacity editing-style)
-                                 color-transparent? (= (:fill-color editing-style) "transparent")]
-                             (cond
-                               color-transparent? 0
-                               (number? opacity) opacity
-                               :else 0.7))  ;; Use default when opacity is nil
-                    :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
-                                  (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
-                                    ;; If we're increasing opacity from 0 and color is transparent,
-                                    ;; we need to set a default color first
-                                    (when (and (= (:fill-color editing-style) "transparent") (> new-opacity 0))
-                                      (update-building-style :fill-color "#f0f0f0"))
-                                    (update-building-style :fill-opacity new-opacity)))
-                    :style {:width "100%"}}]
-           [:span {:style {:font-size "12px" :color "#666"}}
-            (str "Current: " (let [opacity (:fill-opacity editing-style)
-                                   color-transparent? (= (:fill-color editing-style) "transparent")]
-                               (cond
-                                 color-transparent? "0% (transparent)"
-                                 (number? opacity) (-> opacity (* 100) js/Math.round (str "%"))
-                                 :else "70%")))]]]
+          (let [current-zoom (get-current-zoom)
+                raw-fill-opacity (map-engine/get-paint-property target-layer "fill-opacity")
+                opacity-stops (parse-opacity-stops raw-fill-opacity current-zoom)
+                has-stops? (> (count opacity-stops) 1)]
+            (if has-stops?
+              ;; Display multiple opacity sliders for stops
+              [:div
+               (for [{:keys [zoom opacity]} opacity-stops]
+                 [:div {:key zoom :style {:margin-bottom "10px"}}
+                  [:div {:style {:display "flex" :justify-content "space-between" :align-items "center" :margin-bottom "5px"}}
+                   [:span {:style {:font-size "11px" :color "#666"}} (str "z" zoom)]
+                   [:span {:style {:font-size "11px" :color "#666"}}
+                    (str (-> (or opacity 0) (* 100) js/Math.round) "%")]]
+                  [:input {:type "range"
+                           :min "0" :max "1" :step "0.1"
+                           :value (or opacity 0)
+                           :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
+                                         (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
+                                           ;; Update the specific stop in the expression
+                                           (let [updated-expression (update-opacity-stop (.-stops raw-fill-opacity) zoom new-opacity)]
+                                             (re-frame/dispatch [:style-editor/update-and-apply-style :fill-opacity updated-expression]))))
+                           :style {:width "100%"}}]])]
+              ;; Single opacity slider (existing behavior)
+              [:div
+               [:input {:type "range"
+                        :min "0" :max "1" :step "0.1"
+                        :value (let [opacity (:fill-opacity editing-style)
+                                     color-transparent? (= (:fill-color editing-style) "transparent")]
+                                 (cond
+                                   color-transparent? 0
+                                   (number? opacity) opacity
+                                   ;; Default to 1 if opacity is not set (common in vector styles)
+                                   :else 1))
+                        :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
+                                      (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
+                                        ;; If we're increasing opacity from 0 and color is transparent,
+                                        ;; we need to set a default color first
+                                        (when (and (= (:fill-color editing-style) "transparent") (> new-opacity 0))
+                                          (update-building-style :fill-color "#f0f0f0"))
+                                        (update-building-style :fill-opacity new-opacity)))
+                        :style {:width "100%"}}]
+               [:span {:style {:font-size "12px" :color "#666"}}
+                (str "Current: " (let [opacity (:fill-opacity editing-style)
+                                       color-transparent? (= (:fill-color editing-style) "transparent")]
+                                   (cond
+                                     color-transparent? "0% (transparent)"
+                                     (number? opacity) (-> opacity (* 100) js/Math.round (str "%"))
+                                     :else "100% (default)")))]]))]
 
          [:div {:style {:margin-bottom "15px"}}
           [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Outline Color"]

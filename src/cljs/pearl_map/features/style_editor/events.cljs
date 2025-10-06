@@ -65,21 +65,8 @@
  :style-editor/reset-styles-immediately
  (fn [{:keys [db]} _]
    (let [target-layer (get db :style-editor/target-layer "building")
-         current-zoom (map-engine/get-current-zoom)
-         ;; Get the raw paint properties
-         raw-fill-color (map-engine/get-paint-property target-layer "fill-color")
-         raw-fill-opacity (map-engine/get-paint-property target-layer "fill-opacity")
-         raw-fill-outline-color (map-engine/get-paint-property target-layer "fill-outline-color")
-         ;; Parse each property individually
-         parsed-fill-color (if (map-engine/isExpression raw-fill-color)
-                             raw-fill-color
-                             (map-engine/parse-color-expression raw-fill-color current-zoom))
-         parsed-fill-opacity (map-engine/parse-numeric-expression raw-fill-opacity current-zoom)
-         parsed-fill-outline-color (map-engine/parse-color-expression raw-fill-outline-color current-zoom)]
-     {:db (assoc db :style-editor/editing-style
-                 {:fill-color (or parsed-fill-color "#f0f0f0")
-                  :fill-opacity (or parsed-fill-opacity 0.7)
-                  :fill-outline-color (or parsed-fill-outline-color "#cccccc")})})))
+         current-styles (get-layer-styles target-layer)]
+     {:db (assoc db :style-editor/editing-style current-styles)})))
 
 (re-frame/reg-event-fx
  :style-editor/on-map-load
