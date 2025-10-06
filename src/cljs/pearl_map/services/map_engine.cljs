@@ -8,7 +8,7 @@
             ["@maplibre/maplibre-gl-style-spec" :as style-spec]))
 
 ;; Simplified expression handling - focus on basic value extraction
-(defn- isExpression [x]
+(defn isExpression [x]
   (and (object? x)
        (or (some? (.-stops x))
            (some? (.-property x))
@@ -225,7 +225,11 @@
 (defn set-paint-property [layer-id property-name value]
   (when-let [^js map-obj (get-map-instance)]
     (when (.getLayer map-obj layer-id)
-      (.setPaintProperty map-obj layer-id property-name value))))
+      ;; Convert Clojure maps to JavaScript objects for expressions
+      (let [js-value (if (map? value)
+                       (clj->js value)
+                       value)]
+        (.setPaintProperty map-obj layer-id property-name js-value)))))
 
 (defn get-current-zoom []
   (when-let [^js map-obj (get-map-instance)]
@@ -412,13 +416,23 @@
 
 (defn validate-style [style]
   (try
-    ;; For building paint properties, we don't need full style validation
-    ;; Just check if the style map has the expected structure
+    ;; Accept expression objects, strings, numbers, and nil values
     (and (map? style)
          (every? (fn [[k v]]
                    (and (keyword? k)
                         (or (string? v)
-                            (number? v))))
+                            (number? v)
+                            (nil? v)
+                            ;; Allow expression objects
+                            (and (object? v)
+                                 (or (some? (.-stops v))
+                                     (some? (.-property v))
+                                     (some? (.-type v))))
+                            ;; Allow Clojure maps that represent expressions
+                            (and (map? v)
+                                 (or (:stops v)
+                                     (:property v)
+                                     (:type v))))))
                  style))
     (catch js/Error e
       false)))

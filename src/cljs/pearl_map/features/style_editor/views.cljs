@@ -15,6 +15,30 @@
 (defn get-current-zoom []
   (map-engine/get-current-zoom))
 
+(defn update-color-stop [stops zoom new-color]
+  (let [updated-stops (mapv (fn [[stop-zoom stop-color]]
+                              (if (= stop-zoom zoom)
+                                [stop-zoom new-color]
+                                [stop-zoom stop-color]))
+                            stops)]
+    {:stops updated-stops}))
+
+(defn parse-color-stops [color-value current-zoom]
+  (when color-value
+    (cond
+      ;; Handle stops expressions
+      (and (map-engine/isExpression color-value) (.-stops color-value))
+      (let [stops (.-stops color-value)]
+        (mapv (fn [[zoom color]]
+                {:zoom zoom
+                 :color (map-engine/parse-color-expression color current-zoom)})
+              stops))
+
+      ;; Handle single color values
+      :else
+      [{:zoom current-zoom
+        :color (map-engine/parse-color-expression color-value current-zoom)}])))
+
 (defn get-layer-styles [layer-id]
   (let [current-zoom (get-current-zoom)
         style-keys [:fill-color :fill-opacity :fill-outline-color]]
@@ -24,7 +48,10 @@
                                    (when-let [current-value (map-engine/get-paint-property layer-id (name style-key))]
                                      (let [parsed-value (cond
                                                           (= style-key :fill-opacity)
-                                                          (map-engine/parse-numeric-expression current-value current-zoom)
+                                                          (let [opacity (map-engine/parse-numeric-expression current-value current-zoom)]
+                                                            ;; Accept any valid number, including 0 and 1
+                                                            (when (and (number? opacity) (not (js/isNaN opacity)))
+                                                              opacity))
 
                                                           (#{:fill-color :fill-outline-color} style-key)
                                                           (let [color-value (map-engine/parse-color-expression current-value current-zoom)]
@@ -39,6 +66,7 @@
                             (remove nil?)
                             (into {}))]
 
+      ;; Provide sensible defaults only when values are missing
       (merge {:fill-color "#f0f0f0"
               :fill-opacity 0.7
               :fill-outline-color "#cccccc"}
@@ -53,10 +81,10 @@
     (let [validation-result (map-engine/validate-style style)]
       (if validation-result
         (doseq [[style-key style-value] style]
-          (when (some? style-value)
-            ;; Apply literal values to all properties and layers
-            (map-engine/set-paint-property layer-id (name style-key) style-value)))
-        (js/console.error "Style validation failed - not applying changes")))
+          ;; Allow nil values to be set (they might clear the property)
+          ;; Apply values directly - map-engine/set-paint-property handles conversion
+          (map-engine/set-paint-property layer-id (name style-key) style-value))
+        (js/console.error "Style validation failed - not applying changes" style)))
     (catch js/Error e
       (js/console.error (str "Failed to apply style to layer " layer-id ":") e)
       (throw e))))
@@ -133,22 +161,52 @@
          ;; Style controls
          [:div {:style {:margin-bottom "10px"}}
           [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Fill Color"]
-          [:div {:style {:position "relative"}}
-           [:input {:type "color"
-                    :value (let [color-value (:fill-color editing-style)]
-                             (if (= color-value "transparent")
-                               "#f0f0f0" ; Use default color for the input, but show as transparent via CSS
-                               (or color-value "#f0f0f0")))
-                    :on-change #(update-building-style :fill-color (-> % .-target .-value))
-                    :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
-                            :opacity (if (= (:fill-color editing-style) "transparent") 0.3 1.0)
-                            :background (if (= (:fill-color editing-style) "transparent")
-                                          "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
-                                          "transparent")}}]
-           (when (= (:fill-color editing-style) "transparent")
-             [:div {:style {:position "absolute" :top "50%" :left "50%" :transform "translate(-50%, -50%)"
-                            :color "#666" :font-size "12px" :font-weight "bold" :pointer-events "none"}}
-              "TRANSPARENT"])]]
+          (let [current-zoom (get-current-zoom)
+                raw-fill-color (map-engine/get-paint-property target-layer "fill-color")
+                color-stops (parse-color-stops raw-fill-color current-zoom)
+                has-stops? (> (count color-stops) 1)]
+            (if has-stops?
+              ;; Display multiple color blocks for stops
+              [:div {:style {:display "flex" :gap "5px" :flex-wrap "wrap"}}
+               (for [{:keys [zoom color]} color-stops]
+                 [:div {:key zoom :style {:position "relative" :flex "1" :min-width "60px"}}
+                  [:input {:type "color"
+                           :value (if (= color "transparent") "#f0f0f0" (or color "#f0f0f0"))
+                           :on-change #(let [new-color (-> % .-target .-value)]
+                                         (when new-color
+                                           ;; Update the specific stop in the expression
+                                           (let [updated-expression (update-color-stop (.-stops raw-fill-color) zoom new-color)]
+                                             (re-frame/dispatch [:style-editor/update-and-apply-style :fill-color updated-expression]))))
+                           :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
+                                   :opacity (if (= color "transparent") 0.3 1.0)
+                                   :background "transparent"}}]
+                  [:div {:style {:font-size "10px" :text-align "center" :margin-top "2px" :color "#666"}}
+                   (str "z" zoom)]
+                  (when (= color "transparent")
+                    [:div {:style {:position "absolute" :top "0" :left "0" :right "0" :height "30px"
+                                   :display "flex" :align-items "center" :justify-content "center"
+                                   :background "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
+                                   :border-radius "4px" :color "#666" :font-weight "bold" :pointer-events "none"
+                                   :font-size "8px" :line-height "1"}}
+                     "TRANSPARENT"])])]
+              ;; Single color display (existing behavior)
+              [:div {:style {:position "relative"}}
+               [:input {:type "color"
+                        :value (let [color-value (:fill-color editing-style)]
+                                 (if (= color-value "transparent")
+                                   "#f0f0f0"
+                                   (or color-value "#f0f0f0")))
+                        :on-change #(update-building-style :fill-color (-> % .-target .-value))
+                        :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
+                                :opacity (if (= (:fill-color editing-style) "transparent") 0.3 1.0)
+                                :background "transparent"}}]
+               (when (= (:fill-color editing-style) "transparent")
+                 [:div {:style {:position "absolute" :top "0" :left "0" :right "0" :height "30px"
+                                :display "flex" :align-items "center" :justify-content "center"
+                                :background "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
+                                :border-radius "4px" :color "#666" :font-weight "bold" :pointer-events "none"
+                                :font-size "10px" :line-height "1"}}
+                  "TRANSPARENT"])]))]
 
          [:div {:style {:margin-bottom "10px"}}
           [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Opacity"]
@@ -159,9 +217,8 @@
                                  color-transparent? (= (:fill-color editing-style) "transparent")]
                              (cond
                                color-transparent? 0
-                               (and opacity (not (js/isNaN opacity)))
-                               opacity
-                               :else 0.7))
+                               (number? opacity) opacity
+                               :else 0.7))  ;; Use default when opacity is nil
                     :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
                                   (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
                                     ;; If we're increasing opacity from 0 and color is transparent,
@@ -175,9 +232,8 @@
                                    color-transparent? (= (:fill-color editing-style) "transparent")]
                                (cond
                                  color-transparent? "0% (transparent)"
-                                 (and opacity (not (js/isNaN opacity)))
-                                 (-> opacity (* 100) js/Math.round (str "%"))
-                                 :else "Unknown")))]]]
+                                 (number? opacity) (-> opacity (* 100) js/Math.round (str "%"))
+                                 :else "70%")))]]]
 
          [:div {:style {:margin-bottom "15px"}}
           [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Outline Color"]
