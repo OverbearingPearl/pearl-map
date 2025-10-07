@@ -22,7 +22,8 @@
 (re-frame/reg-event-fx
  :style-editor/switch-target-layer
  (fn [{:keys [db]} [_ layer-id]]
-   (let [current-styles (style-editor-views/get-layer-styles layer-id)]
+   (let [current-style (:current-style db)
+         current-styles (style-editor-views/get-layer-styles layer-id current-style)]
      {:db (-> db
               (assoc :style-editor/target-layer layer-id)
               (assoc :style-editor/editing-style current-styles))})))
@@ -58,18 +59,21 @@
     :fx [[:dispatch [:style-editor/apply-styles style]]]}))
 
 ;; Add helper function to access get-layer-styles
-(defn get-layer-styles [layer-id]
-  (style-editor-views/get-layer-styles layer-id))
+(defn get-layer-styles [layer-id current-style]
+  (style-editor-views/get-layer-styles layer-id current-style))
 
 (re-frame/reg-event-fx
  :style-editor/reset-styles-immediately
  (fn [{:keys [db]} _]
    (let [target-layer (get db :style-editor/target-layer "building")
-         current-styles (get-layer-styles target-layer)]
+         current-style (:current-style db)
+         current-styles (get-layer-styles target-layer current-style)]
      {:db (assoc db :style-editor/editing-style current-styles)})))
 
 (re-frame/reg-event-fx
  :style-editor/on-map-load
  (fn [{:keys [db]} _]
-   (let [current-styles (style-editor-views/get-current-building-styles)]
+   (let [target-layer (get db :style-editor/target-layer "building")
+         current-style (:current-style db)
+         current-styles (style-editor-views/get-current-building-styles target-layer current-style)]
      {:db (assoc db :style-editor/editing-style current-styles)})))
