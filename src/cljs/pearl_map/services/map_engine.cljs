@@ -225,6 +225,10 @@
     (when (.getLayer map-obj layer-id)
       (.getPaintProperty map-obj layer-id property-name))))
 
+(defn layer-exists? [layer-id]
+  (when-let [^js map-obj (get-map-instance)]
+    (.getLayer map-obj layer-id)))
+
 (defn set-paint-property [layer-id property-name value]
   (when-let [^js map-obj (get-map-instance)]
     (when (.getLayer map-obj layer-id)
@@ -232,7 +236,11 @@
       (let [js-value (if (map? value)
                        (clj->js value)
                        value)]
-        (.setPaintProperty map-obj layer-id property-name js-value)))))
+        (try
+          (.setPaintProperty map-obj layer-id property-name js-value)
+          (catch js/Error e
+            (js/console.error (str "Failed to set property " property-name " on layer " layer-id ":") e)
+            (throw e)))))))
 
 (defn get-current-zoom []
   (when-let [^js map-obj (get-map-instance)]
@@ -415,6 +423,60 @@
         :else nil))
 
     :else nil))
+
+(defn get-zoom-value-pairs [layer-id property-name current-zoom]
+  (let [value (get-paint-property layer-id property-name)]
+    (when value
+      (cond
+        ;; Handle stops expressions
+        (and (isExpression value) (.-stops value))
+        (let [stops (.-stops value)]
+          (mapv (fn [[zoom prop-value]]
+                  {:zoom zoom
+                   :value (if (#{"fill-color" "fill-outline-color"} property-name)
+                            (parse-color-expression prop-value current-zoom)
+                            (parse-numeric-expression prop-value current-zoom))})
+                stops))
+
+        ;; Handle single values
+        :else
+        [{:zoom current-zoom
+          :value (if (#{"fill-color" "fill-outline-color"} property-name)
+                   (parse-color-expression value current-zoom)
+                   (parse-numeric-expression value current-zoom))}]))))
+
+(defn update-single-value [layer-id property-name new-value]
+  "Update a property to a single value (not a stops expression)"
+  new-value)
+
+(defn update-zoom-value-pair [layer-id property-name zoom new-value]
+  (let [current-value (get-paint-property layer-id property-name)
+        current-zoom (get-current-zoom)]
+    (cond
+      ;; If we're updating the current zoom level and it's a single value, keep it as single value
+      (and (= zoom current-zoom)
+           (not (isExpression current-value)))
+      new-value
+
+      ;; If we're updating a different zoom level and it's currently a single value,
+      ;; convert to stops expression with original value at current zoom and new value at target zoom
+      (and (not= zoom current-zoom)
+           (not (isExpression current-value)))
+      {:stops [[current-zoom current-value] [zoom new-value]]}
+
+      ;; If it's already a stops expression, update the specific stop
+      (and (isExpression current-value) (.-stops current-value))
+      (let [stops (.-stops current-value)
+            updated-stops (mapv (fn [[stop-zoom stop-value]]
+                                  (if (= stop-zoom zoom)
+                                    [stop-zoom new-value]
+                                    [stop-zoom stop-value]))
+                                stops)]
+        {:stops updated-stops})
+
+      ;; For any other case (like other expression types), just use the new value
+      :else
+      new-value)))
 
 (defn validate-style [style]
   (try
