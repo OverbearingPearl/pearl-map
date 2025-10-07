@@ -10,7 +10,7 @@
  :style-editor/editing-style
  (fn [db]
    (get db :style-editor/editing-style {:fill-color "#f0f0f0"
-                                        :fill-opacity 0.7
+                                        :fill-opacity 1.0
                                         :fill-outline-color "#cccccc"})))
 
 (re-frame/reg-sub

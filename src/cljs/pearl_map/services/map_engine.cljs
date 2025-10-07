@@ -137,7 +137,7 @@
                               :source-layer "building"
                               :filter ["==" "extrude" "true"]
                               :paint {:fill-color "#f0f0f0"
-                                      :fill-opacity 0.7
+                                      :fill-opacity 1.0
                                       :fill-outline-color "#cccccc"}}))))))))
 
 (defn register-custom-layer [layer-id layer-impl]

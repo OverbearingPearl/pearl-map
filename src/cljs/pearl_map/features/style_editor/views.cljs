@@ -6,10 +6,10 @@
 
 (def default-building-styles
   {:light {:fill-color "#f0f0f0"
-           :fill-opacity 0.7
+           :fill-opacity 1.0
            :fill-outline-color "#cccccc"}
    :dark {:fill-color "#2d3748"
-          :fill-opacity 0.8
+          :fill-opacity 1.0
           :fill-outline-color "#4a5568"}})
 
 (defn get-current-zoom []
