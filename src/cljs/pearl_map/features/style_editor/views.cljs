@@ -67,40 +67,28 @@
 
 (defn get-layer-styles [layer-id]
   (let [current-zoom (get-current-zoom)
-        style-keys [:fill-color :fill-opacity :fill-outline-color]]
+        style-keys [:fill-color :fill-opacity :fill-outline-color]
+        map-instance (map-engine/get-map-instance)]
     (->> style-keys
          (map (fn [style-key]
-                (let [current-value (map-engine/get-paint-property layer-id (name style-key))]
-                  ;; Add debugging
-                  (js/console.log "Style key:" (name style-key)
-                                  "Raw value:" current-value
-                                  "Type:" (type current-value)
-                                  "Zoom:" current-zoom)
-                  ;; Provide defaults when property is undefined
-                  (let [parsed-value (cond
-                                       (nil? current-value)
-                                       (case style-key
-                                         :fill-opacity 1.0  ; Default to fully opaque
-                                         :fill-outline-color "#cccccc"  ; Default outline color
-                                         nil)  ; No default for fill-color
+                (if (and map-instance (.getLayer ^js map-instance layer-id))
+                  (let [current-value (map-engine/get-paint-property layer-id (name style-key))]
+                    (if (some? current-value)
+                      ;; Property exists - parse normally
+                      (let [parsed-value (cond
+                                           (= style-key :fill-opacity)
+                                           (map-engine/parse-numeric-expression current-value current-zoom)
 
-                                       (= style-key :fill-opacity)
-                                       (do
-                                         (js/console.log "Parsing opacity:" current-value)
-                                         (map-engine/parse-numeric-expression current-value current-zoom))
+                                           (#{:fill-color :fill-outline-color} style-key)
+                                           (map-engine/parse-color-expression current-value current-zoom)
 
-                                       (#{:fill-color :fill-outline-color} style-key)
-                                       (do
-                                         (js/console.log "Parsing color:" current-value)
-                                         (map-engine/parse-color-expression current-value current-zoom))
-
-                                       :else
-                                       current-value)]
-                    ;; Add more debugging
-                    (js/console.log "Parsed value:" parsed-value "for key:" (name style-key))
-                    (when (some? parsed-value)
-                      [style-key parsed-value])))))
-         (remove nil?)
+                                           :else
+                                           current-value)]
+                        [style-key parsed-value])
+                      ;; Property is nil - return nil to indicate "NOT SET"
+                      [style-key nil]))
+                  ;; Layer doesn't exist - return nil to indicate "NOT SET"
+                  [style-key nil])))
          (into {}))))
 
 (defn get-current-building-styles []
@@ -161,7 +149,9 @@
     (fn []
       (setup-map-listener)
       ;; Initialize target layer
-      (re-frame/dispatch [:style-editor/set-target-layer "building"]))
+      (re-frame/dispatch [:style-editor/set-target-layer "building"])
+      ;; Reset styles immediately to handle initial state
+      (re-frame/dispatch [:style-editor/reset-styles-immediately]))
     :reagent-render
     (fn []
       (let [editing-style @(re-frame/subscribe [:style-editor/editing-style])
@@ -292,10 +282,23 @@
 
          [:div {:style {:margin-bottom "15px"}}
           [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Outline Color"]
-          [:input {:type "color"
-                   :value (or (:fill-outline-color editing-style) "#cccccc")
-                   :on-change #(update-building-style :fill-outline-color (-> % .-target .-value))
-                   :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"}}]]
+          (let [outline-color (:fill-outline-color editing-style)]
+            [:div {:style {:position "relative"}}
+             [:input {:type "color"
+                      :value (if (some? outline-color)
+                               (if (= outline-color "transparent") "#f0f0f0" outline-color)
+                               "#f0f0f0")
+                      :on-change #(update-building-style :fill-outline-color (-> % .-target .-value))
+                      :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
+                              :opacity (if (or (= outline-color "transparent") (nil? outline-color)) 0.3 1.0)
+                              :background "transparent"}}]
+             (when (or (= outline-color "transparent") (nil? outline-color))
+               [:div {:style {:position "absolute" :top "0" :left "0" :right "0" :height "30px"
+                              :display "flex" :align-items "center" :justify-content "center"
+                              :background "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
+                              :border-radius "4px" :color "#666" :font-weight "bold" :pointer-events "none"
+                              :font-size "10px" :line-height "1"}}
+                (if (nil? outline-color) "NOT SET" "TRANSPARENT")])])]
 
          ;; Action buttons
          [:div {:style {:display "flex" :gap "10px" :margin-bottom "15px" :flex-wrap "wrap"}}
@@ -316,4 +319,8 @@
           [:p {:style {:color "#666" :font-size "11px" :margin "0" :font-style "italic"}}
            "Only works with Dark or Light vector styles"]
           [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
-           "Styles: " (pr-str (select-keys editing-style [:fill-color :fill-opacity :fill-outline-color]))]]]))}))
+           "Styles: " (pr-str (-> editing-style
+                                  (select-keys [:fill-color :fill-opacity :fill-outline-color])
+                                  (update :fill-color #(if (nil? %) "NOT SET" %))
+                                  (update :fill-opacity #(if (nil? %) "NOT SET" %))
+                                  (update :fill-outline-color #(if (nil? %) "NOT SET" %))))]]]))}))
