@@ -33,13 +33,25 @@
  (fn [{:keys [db]} [_ style-key value]]
    (let [updated-style (assoc (:style-editor/editing-style db) style-key value)]
      {:db (assoc db :style-editor/editing-style updated-style)
-      :fx [[:dispatch [:style-editor/apply-styles updated-style]]]})))
+      :fx [[:dispatch [:style-editor/apply-single-style style-key value]]]})))
 
 (re-frame/reg-event-fx
  :style-editor/actually-apply-styles
  (fn [{:keys [db]} [_ style]]
    {:fx [[:dispatch [:style-editor/apply-styles style]]]}))
 
+
+(re-frame/reg-event-fx
+ :style-editor/apply-single-style
+ (fn [{:keys [db]} [_ style-key value]]
+   (try
+     (let [target-layer (get db :style-editor/target-layer "building")]
+       ;; Apply only the single style property, not the entire style map
+       (map-engine/set-paint-property target-layer (name style-key) value))
+     {:db db}
+     (catch js/Error e
+       (js/console.error "Failed to apply single style:" e)
+       {:db db}))))
 
 (re-frame/reg-event-fx
  :style-editor/apply-styles
@@ -68,6 +80,7 @@
    (let [target-layer (get db :style-editor/target-layer "building")
          current-style (:current-style db)
          current-styles (get-layer-styles target-layer current-style)]
+     ;; Update the editing style without triggering re-application
      {:db (assoc db :style-editor/editing-style current-styles)})))
 
 (re-frame/reg-event-fx

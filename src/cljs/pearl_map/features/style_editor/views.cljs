@@ -121,19 +121,51 @@
 
 (defn update-building-style [style-key value]
   (when value
-    (let [processed-value (cond
+    (let [target-layer (get @re-frame.db/app-db :style-editor/target-layer "building")
+          current-zoom (get-current-zoom)
+          current-value (map-engine/get-paint-property target-layer (name style-key))
+          ;; Check if the current value is an expression with stops
+          has-stops? (and (map-engine/isExpression current-value)
+                          (.-stops current-value))
+
+          processed-value (cond
                             (#{:fill-color :fill-outline-color} style-key)
-                            (if (string? value) value (str value))
+                            (if has-stops?
+                              ;; For stops expressions, update the specific stop
+                              (let [stops (.-stops current-value)
+                                    updated-stops (mapv (fn [[stop-zoom stop-color]]
+                                                          (if (= stop-zoom current-zoom)
+                                                            [stop-zoom value]
+                                                            [stop-zoom stop-color]))
+                                                        stops)]
+                                {:stops updated-stops})
+                              ;; Single value - just use the color string
+                              (if (string? value) value (str value)))
 
                             (= style-key :fill-opacity)
-                            (let [num-value (if (string? value)
-                                              (let [parsed (js/parseFloat value)]
-                                                (if (js/isNaN parsed) nil parsed))
-                                              (if (number? value) value nil))]
-                              num-value)
+                            (if has-stops?
+                              ;; For stops expressions, update the specific stop
+                              (let [stops (.-stops current-value)
+                                    num-value (if (string? value)
+                                                (let [parsed (js/parseFloat value)]
+                                                  (if (js/isNaN parsed) nil parsed))
+                                                (if (number? value) value nil))
+                                    updated-stops (mapv (fn [[stop-zoom stop-opacity]]
+                                                          (if (= stop-zoom current-zoom)
+                                                            [stop-zoom num-value]
+                                                            [stop-zoom stop-opacity]))
+                                                        stops)]
+                                {:stops updated-stops})
+                              ;; Single value - parse the number
+                              (let [num-value (if (string? value)
+                                                (let [parsed (js/parseFloat value)]
+                                                  (if (js/isNaN parsed) nil parsed))
+                                                (if (number? value) value nil))]
+                                num-value))
 
                             :else value)]
       (when (some? processed-value)
+        ;; Only update the specific style key without triggering a full reset
         (re-frame/dispatch [:style-editor/update-and-apply-style style-key processed-value])))))
 
 (defn setup-map-listener []
@@ -240,7 +272,9 @@
                                     (if (= color-value "transparent")
                                       "#f0f0f0"
                                       (or color-value "#f0f0f0")))
-                           :on-change #(update-building-style :fill-color (-> % .-target .-value))
+                           :on-change #(do
+                                         ;; Only update the color, don't touch anything else
+                                         (update-building-style :fill-color (-> % .-target .-value)))
                            :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
                                    :opacity (if (= (:fill-color editing-style) "transparent") 0.3 1.0)
                                    :background "transparent"}}]
@@ -289,10 +323,7 @@
                                       :else 1))
                            :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
                                          (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
-                                           ;; If we're increasing opacity from 0 and color is transparent,
-                                           ;; we need to set a default color first
-                                           (when (and (= (:fill-color editing-style) "transparent") (> new-opacity 0))
-                                             (update-building-style :fill-color "#f0f0f0"))
+                                           ;; Only update opacity, don't touch color
                                            (update-building-style :fill-opacity new-opacity)))
                            :style {:width "100%"}}]
                   [:span {:style {:font-size "12px" :color "#666"}}
