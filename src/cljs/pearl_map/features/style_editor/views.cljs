@@ -71,36 +71,30 @@
   (let [target-layer (get @re-frame.db/app-db :style-editor/target-layer "building")]
     (apply-layer-style target-layer style)))
 
-(defn update-building-style [style-key value]
-  (when value
-    (let [target-layer (get @re-frame.db/app-db :style-editor/target-layer "building")
-          current-zoom (get-current-zoom)
-          ;; Check if the current property is using stops
-          current-value (map-engine/get-paint-property target-layer (name style-key))
-          is-stops? (and (map-engine/isExpression current-value)
-                         (.-stops current-value))
-          processed-value (cond
-                            (#{:fill-color :fill-outline-color} style-key)
-                            ;; For colors, just pass the value directly
-                            (if (string? value) value (str value))
+(defn update-building-style
+  ([style-key value]
+   (update-building-style style-key value nil))
+  ([style-key value zoom]
+   (when value
+     (let [target-layer (get @re-frame.db/app-db :style-editor/target-layer "building")
+           current-zoom (or zoom (get-current-zoom))
+           processed-value (cond
+                             (#{:fill-color :fill-outline-color} style-key)
+                             ;; For colors, just pass the value directly
+                             (if (string? value) value (str value))
 
-                            (= style-key :fill-opacity)
-                            ;; For opacity, parse to number
-                            (let [num-value (if (string? value)
-                                              (let [parsed (js/parseFloat value)]
-                                                (if (js/isNaN parsed) nil parsed))
-                                              (if (number? value) value nil))]
-                              num-value)
+                             (= style-key :fill-opacity)
+                             ;; For opacity, parse to number
+                             (let [num-value (if (string? value)
+                                               (let [parsed (js/parseFloat value)]
+                                                 (if (js/isNaN parsed) nil parsed))
+                                               (if (number? value) value nil))]
+                               num-value)
 
-                            :else value)]
-      (when (some? processed-value)
-        ;; If the current property uses stops, update using zoom-value pair
-        ;; Otherwise, use single value directly
-        (if is-stops?
-          (let [updated-value (map-engine/update-zoom-value-pair target-layer (name style-key) current-zoom processed-value)]
-            (re-frame/dispatch [:style-editor/update-and-apply-style style-key updated-value]))
-          ;; For single values, apply directly
-          (re-frame/dispatch [:style-editor/update-and-apply-style style-key processed-value]))))))
+                             :else value)]
+       (when (some? processed-value)
+         (let [updated-value (map-engine/update-zoom-value-pair target-layer (name style-key) current-zoom processed-value)]
+           (re-frame/dispatch [:style-editor/update-and-apply-style style-key updated-value])))))))
 
 (defn setup-map-listener []
   (let [map-inst (.-pearlMapInstance js/window)]
@@ -188,19 +182,17 @@
                  [:div {:style {:margin-bottom "10px"}}
                   [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Fill Color"]
                   (let [current-zoom (get-current-zoom)
-                        zoom-value-pairs (map-engine/get-zoom-value-pairs target-layer "fill-color" current-zoom)
-                        has-multiple-pairs? (> (count zoom-value-pairs) 1)]
-                    (if has-multiple-pairs?
-                      ;; Display multiple color blocks for zoom levels
+                        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-color" current-zoom)]
+                    (if (> (count zoom-pairs) 1)
+                      ;; Multiple zoom levels
                       [:div {:style {:display "flex" :gap "5px" :flex-wrap "wrap"}}
-                       (for [[index {:keys [zoom value]}] (map-indexed vector zoom-value-pairs)]
+                       (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
                          [:div {:key (str zoom "-" index) :style {:position "relative" :flex "1" :min-width "60px"}}
                           [:input {:type "color"
                                    :value (if (= value "transparent") "#f0f0f0" (or value "#f0f0f0"))
                                    :on-change #(let [new-color (-> % .-target .-value)]
                                                  (when new-color
-                                                   (let [updated-value (map-engine/update-zoom-value-pair target-layer "fill-color" zoom new-color)]
-                                                     (re-frame/dispatch [:style-editor/update-and-apply-style :fill-color updated-value]))))
+                                                   (update-building-style :fill-color new-color zoom)))
                                    :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
                                            :opacity (if (= value "transparent") 0.3 1.0)
                                            :background "transparent"}}]
@@ -213,7 +205,7 @@
                                            :border-radius "4px" :color "#666" :font-weight "bold" :pointer-events "none"
                                            :font-size "8px" :line-height "1"}}
                              "TRANSPARENT"])])]
-                      ;; Single color display
+                      ;; Single zoom level
                       [:div {:style {:position "relative"}}
                        [:input {:type "color"
                                 :value (let [color-value (:fill-color editing-style)]
@@ -235,12 +227,11 @@
                  [:div {:style {:margin-bottom "10px"}}
                   [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Opacity"]
                   (let [current-zoom (get-current-zoom)
-                        zoom-value-pairs (map-engine/get-zoom-value-pairs target-layer "fill-opacity" current-zoom)
-                        has-multiple-pairs? (> (count zoom-value-pairs) 1)]
-                    (if has-multiple-pairs?
-                      ;; Display multiple opacity sliders for zoom levels
+                        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-opacity" current-zoom)]
+                    (if (> (count zoom-pairs) 1)
+                      ;; Multiple zoom levels
                       [:div
-                       (for [[index {:keys [zoom value]}] (map-indexed vector zoom-value-pairs)]
+                       (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
                          [:div {:key (str zoom "-" index) :style {:margin-bottom "10px"}}
                           [:div {:style {:display "flex" :justify-content "space-between" :align-items "center" :margin-bottom "5px"}}
                            [:span {:style {:font-size "11px" :color "#666"}} (str "z" zoom)]
@@ -251,10 +242,9 @@
                                    :value (or value 0)
                                    :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
                                                  (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
-                                                   (let [updated-value (map-engine/update-zoom-value-pair target-layer "fill-opacity" zoom new-opacity)]
-                                                     (re-frame/dispatch [:style-editor/update-and-apply-style :fill-opacity updated-value]))))
+                                                   (update-building-style :fill-opacity new-opacity zoom)))
                                    :style {:width "100%"}}]])]
-                      ;; Single opacity slider
+                      ;; Single zoom level
                       [:div
                        [:input {:type "range"
                                 :min "0" :max "1" :step "0.1"
