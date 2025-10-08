@@ -115,25 +115,19 @@
    {:component-did-mount
     (fn []
       (setup-map-listener)
-      ;; Initialize target layer
       (re-frame/dispatch [:style-editor/set-target-layer "building"])
-      ;; Reset styles immediately to handle initial state
       (re-frame/dispatch [:style-editor/reset-styles-immediately]))
     :reagent-render
     (fn []
       (let [editing-style @(re-frame/subscribe [:style-editor/editing-style])
             target-layer @(re-frame/subscribe [:style-editor/target-layer])
             current-style @(re-frame/subscribe [:current-style])]
-        [:div {:style {:position "absolute"
-                       :top "100px"
-                       :right "20px"
-                       :z-index 1000
-                       :background "rgba(255,255,255,0.95)"
-                       :padding "15px"
-                       :border-radius "8px"
+        [:div {:style {:background "rgba(255,255,255,0.98)"
+                       :padding "18px"
+                       :border-radius "10px"
                        :font-family "Arial, sans-serif"
-                       :width "320px"
-                       :box-shadow "0 2px 10px rgba(0,0,0,0.1)"}}
+                       :width "280px"
+                       :box-shadow "0 4px 15px rgba(0,0,0,0.15)"}}
          [:h3 {:style {:margin "0 0 15px 0" :color "#333"}} "Building Style Editor"]
 
          ;; Show unsupported message for raster style
@@ -185,9 +179,9 @@
                         zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-color" current-zoom)]
                     (if (> (count zoom-pairs) 1)
                       ;; Multiple zoom levels
-                      [:div {:style {:display "flex" :gap "5px" :flex-wrap "wrap"}}
+                      [:div {:key "multiple-zoom-colors" :style {:display "flex" :gap "5px" :flex-wrap "wrap"}}
                        (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
-                         [:div {:key (str zoom "-" index) :style {:position "relative" :flex "1" :min-width "60px"}}
+                         [:div {:key (str "color-" zoom "-" index) :style {:position "relative" :flex "1" :min-width "60px"}}
                           [:input {:type "color"
                                    :value (if (= value "transparent") "#f0f0f0" (or value "#f0f0f0"))
                                    :on-change #(let [new-color (-> % .-target .-value)]
@@ -196,14 +190,14 @@
                                    :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
                                            :opacity (if (= value "transparent") 0.3 1.0)
                                            :background "transparent"}}]
-                          [:div {:style {:font-size "10px" :text-align "center" :margin-top "2px" :color "#666"}}
+                          [:div {:key (str "label-" zoom) :style {:font-size "10px" :text-align "center" :margin-top "2px" :color "#666"}}
                            (str "z" zoom)]
                           (when (= value "transparent")
-                            [:div {:style {:position "absolute" :top "0" :left "0" :right "0" :height "30px"
-                                           :display "flex" :align-items "center" :justify-content "center"
-                                           :background "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
-                                           :border-radius "4px" :color "#666" :font-weight "bold" :pointer-events "none"
-                                           :font-size "8px" :line-height "1"}}
+                            [:div {:key (str "transparent-" zoom) :style {:position "absolute" :top "0" :left "0" :right "0" :height "30px"
+                                                                          :display "flex" :align-items "center" :justify-content "center"
+                                                                          :background "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
+                                                                          :border-radius "4px" :color "#666" :font-weight "bold" :pointer-events "none"
+                                                                          :font-size "8px" :line-height "1"}}
                              "TRANSPARENT"])])]
                       ;; Single zoom level
                       [:div {:style {:position "relative"}}
@@ -230,14 +224,15 @@
                         zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-opacity" current-zoom)]
                     (if (> (count zoom-pairs) 1)
                       ;; Multiple zoom levels
-                      [:div
+                      [:div {:key "multiple-zoom-opacities"}
                        (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
-                         [:div {:key (str zoom "-" index) :style {:margin-bottom "10px"}}
-                          [:div {:style {:display "flex" :justify-content "space-between" :align-items "center" :margin-bottom "5px"}}
-                           [:span {:style {:font-size "11px" :color "#666"}} (str "z" zoom)]
-                           [:span {:style {:font-size "11px" :color "#666"}}
+                         [:div {:key (str "opacity-" zoom "-" index) :style {:margin-bottom "10px"}}
+                          [:div {:key (str "header-" zoom) :style {:display "flex" :justify-content "space-between" :align-items "center" :margin-bottom "5px"}}
+                           [:span {:key (str "zoom-label-" zoom) :style {:font-size "11px" :color "#666"}} (str "z" zoom)]
+                           [:span {:key (str "value-label-" zoom) :style {:font-size "11px" :color "#666"}}
                             (str (-> (or value 0) (* 100) js/Math.round) "%")]]
-                          [:input {:type "range"
+                          [:input {:key (str "slider-" zoom)
+                                   :type "range"
                                    :min "0" :max "1" :step "0.1"
                                    :value (or value 0)
                                    :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]

@@ -1,24 +1,19 @@
 (ns pearl-map.features.models-3d.views
-  (:require [re-frame.core :as re-frame]))
+  (:require [re-frame.core :as re-frame]
+            [pearl-map.components.ui.controls :as ui-controls]
+            [pearl-map.components.ui.buttons :as ui-buttons]))
 
 (defn model-controls []
   (let [model-loaded @(re-frame/subscribe [:models-3d/model-loaded])
         model-error @(re-frame/subscribe [:models-3d/model-load-error])]
-    [:div {:style {:position "absolute"
-                   :top "120px"
-                   :right "20px"
-                   :z-index 1000
-                   :background "rgba(255,255,255,0.9)"
-                   :padding "10px"
-                   :border-radius "5px"
-                   :font-family "Arial, sans-serif"}}
-     [:h3 {:style {:margin "0 0 10px 0"}} "3D Models"]
-     [:button {:on-click #(re-frame/dispatch [:models-3d/load-eiffel-tower])
-               :style {:margin "5px" :padding "8px 12px" :border "none"
-                       :border-radius "3px" :background "#007bff" :color "white"
-                       :cursor "pointer"}} "Load Eiffel Tower"]
-     [:div {:style {:margin-top "10px" :font-size "12px" :color "#666"}}
-      "Status: " (if model-loaded "Loaded" "Not Loaded")]
+    [ui-controls/control-panel
+     {:width "220px"}
+     [:h3 {:key "title" :style {:margin "0 0 12px 0" :font-size "1.1em" :color "#333"}} "3D Models"]
+     [ui-buttons/primary-button {:key "load-button" :on-click #(re-frame/dispatch [:models-3d/load-eiffel-tower])}
+      "Load Eiffel Tower"]
+     [:div {:key "status" :style {:margin-top "10px" :font-size "12px" :color "#666"}}
+      "Status: " [:span {:style {:color (if model-loaded "#28a745" "#dc3545") :font-weight "bold"}}
+                  (if model-loaded "Loaded" "Not Loaded")]]
      (when model-error
-       [:div {:style {:color "red" :margin-top "10px" :font-size "12px"}}
+       [:div {:key "error" :style {:color "#dc3545" :margin-top "8px" :font-size "11px" :background "#f8d7da" :padding "6px" :border-radius "3px"}}
         "Error: " model-error])]))

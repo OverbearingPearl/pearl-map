@@ -1,6 +1,8 @@
 (ns pearl-map.components.map.controls
   (:require [re-frame.core :as re-frame]
-            [pearl-map.services.map-engine :as map-engine]))
+            [pearl-map.services.map-engine :as map-engine]
+            [pearl-map.components.ui.buttons :as ui-buttons]
+            [pearl-map.components.ui.layout :as ui-layout]))
 
 (def style-urls map-engine/style-urls)
 
@@ -14,30 +16,14 @@
 
 (defn style-controls []
   (let [current-style @(re-frame/subscribe [:current-style])]
-    [:div {:style {:position "absolute"
-                   :top "20px"
-                   :right "20px"
-                   :z-index 1000
-                   :background "rgba(255,255,255,0.9)"
-                   :padding "10px"
-                   :border-radius "5px"
-                   :font-family "Arial, sans-serif"}}
-     [:h3 {:style {:margin "0 0 10px 0"}} "Map Style"]
-     [:button {:on-click #(change-map-style (:basic style-urls))
-               :style {:margin "5px" :padding "8px 12px" :border "none"
-                       :border-radius "3px" :background "#007bff" :color "white"
-                       :cursor "pointer"}} "Basic Style"]
-     [:button {:on-click #(change-map-style (:dark style-urls))
-               :style {:margin "5px" :padding "8px 12px" :border "none"
-                       :border-radius "3px" :background "#343a40" :color "white"
-                       :cursor "pointer"}} "Dark Style"]
-     [:button {:on-click #(change-map-style (:light style-urls))
-               :style {:margin "5px" :padding "8px 12px" :border "none"
-                       :border-radius "3px" :background "#f8f9fa" :color "black"
-                       :cursor "pointer"}} "Light Style"]
-     [:button {:on-click #(add-example-custom-layer)
-               :style {:margin "5px" :padding "8px 12px" :border "none"
-                       :border-radius "3px" :background "#28a745" :color "white"
-                       :cursor "pointer"}} "Add Custom Layer"]
-     [:div {:style {:margin-top "10px" :font-size "12px" :color "#666"}}
-      "Current: " (str current-style)]]))
+    [ui-layout/card
+     {:width "250px"}
+     [:h3 {:key "title" :style {:margin "0 0 10px 0"}} "Map Style"]
+     [ui-layout/flex-container {:key "button-row" :gap "5px" :wrap "wrap"}
+      [ui-buttons/primary-button {:key "basic-style" :on-click #(change-map-style (:basic style-urls))} "Basic"]
+      [ui-buttons/dark-button {:key "dark-style" :on-click #(change-map-style (:dark style-urls))} "Dark"]
+      [ui-buttons/light-button {:key "light-style" :on-click #(change-map-style (:light style-urls))} "Light"]
+      [ui-buttons/success-button {:key "custom-layer" :on-click #(add-example-custom-layer)} "Custom"]]
+     [ui-layout/flex-container {:key "current-style" :align "flex-start" :style {:margin-top "10px"}}
+      [:span {:key "current-style-text" :style {:font-size "12px" :color "#666"}}
+       "Current: " (str current-style)]]]))
