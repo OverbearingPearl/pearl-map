@@ -62,9 +62,10 @@ pearl-map/
 │       └── pearl_map/                       # 前端主命名空间
 │           ├── core.cljs                    # 应用入口点和配置 [已存在]
 │           ├── app/                         # 应用核心 (re-frame 架构)
-│           │   ├── db.cljs                  # 数据库模式和初始状态 [待建]
-│           │   ├── events.cljs              # 全局事件处理器 [待建]
-│           │   └── subs.cljs                # 全局订阅 [待建]
+│           │   ├── db.cljs                  # 数据库模式和初始状态 [已实现]
+│           │   ├── events.cljs              # 全局事件处理器 [已实现]
+│           │   ├── subs.cljs                # 全局订阅 [已实现]
+│           │   └── views.cljs               # 应用视图和布局 [已实现]
 │           ├── features/                    # 功能模块 (re-frame 标准组织方式)
 │           │   ├── map_view/                # 地图视图功能模块
 │           │   │   ├── events.cljs          # 地图特定事件处理器 [待建]
@@ -220,49 +221,6 @@ pearl-map/
 - 地图覆盖系统，包含标题、样式控件、3D 控件和调试信息 - 已实现
 - 建筑样式编辑器，包含图层选择和实时预览 - 已实现
 - 3D 模型加载控件，包含状态指示器 - 已实现
-
-**文件结构状态：**
-```
-src/
-├── cljs/pearl_map/
-│   ├── core.cljs                    # 应用入口点和配置 [已实现]
-│   ├── app/                         # 应用核心 (re-frame 架构) [已实现]
-│   │   ├── db.cljs                  # 数据库模式和初始状态 [已实现]
-│   │   ├── events.cljs              # 全局事件处理器 [已实现]
-│   │   ├── subs.cljs                # 全局订阅 [已实现]
-│   │   └── views.cljs               # 应用视图和布局 [已实现]
-│   ├── features/                    # 功能模块 (re-frame 标准组织方式) [已实现]
-│   │   ├── map_view/                # 地图视图功能模块 [已实现]
-│   │   │   ├── events.cljs          # 地图特定事件处理器 [已实现]
-│   │   │   ├── subs.cljs            # 地图特定订阅 [已实现]
-│   │   │   └── views.cljs           # 地图视图组件 [已实现]
-│   │   ├── style_editor/            # 样式编辑功能模块 [已实现]
-│   │   │   ├── events.cljs          # 样式编辑器事件处理器 [已实现]
-│   │   │   ├── subs.cljs            # 样式编辑器订阅 [已实现]
-│   │   │   └── views.cljs           # 样式编辑器组件 [已实现]
-│   │   └── models_3d/               # 3D 模型功能模块 [已实现]
-│   │       ├── events.cljs          # 3D 模型事件处理器 [已实现]
-│   │       ├── subs.cljs            # 3D 模型订阅 [已实现]
-│   │       └── views.cljs           # 3D 模型组件 [已实现]
-│   ├── components/                  # 可复用 UI 组件 [已实现]
-│   │   ├── ui/                      # 基础 UI 组件 [已实现]
-│   │   │   ├── buttons.cljs         # 按钮组件 [已实现]
-│   │   │   ├── controls.cljs        # 控件组件 [已实现]
-│   │   │   └── layout.cljs          # 布局组件 [已实现]
-│   │   └── map/                     # 地图特定 UI 组件 [已实现]
-│   │       ├── container.cljs       # 地图容器组件 [已实现]
-│   │       ├── controls.cljs        # 地图控制组件 [已实现]
-│   │       └── debug.cljs           # 调试信息组件 [已实现]
-│   ├── services/                    # 外部服务集成 [已实现]
-│   │   ├── map_engine.cljs          # 地图引擎服务 [已实现]
-│   │   ├── model_loader.cljs        # 模型加载服务 [已实现]
-│   │   └── api.cljs                 # API 客户端 [待建]
-│   └── utils/                       # 工具函数 [已实现]
-│       ├── colors.cljs              # 颜色工具 [已实现]
-│       └── geometry.cljs            # 几何工具 [已实现]
-└── pearl_map/
-    └── build.clj                    # 构建任务和工具 [已实现]
-```
 
 **后续步骤：**
 - 下一步：添加 API 客户端服务
