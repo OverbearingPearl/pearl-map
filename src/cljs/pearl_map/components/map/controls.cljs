@@ -22,8 +22,7 @@
      [ui-layout/flex-container {:key "button-row" :gap "5px" :wrap "wrap"}
       [ui-buttons/primary-button {:key "basic-style" :on-click #(change-map-style (:basic style-urls))} "Basic"]
       [ui-buttons/dark-button {:key "dark-style" :on-click #(change-map-style (:dark style-urls))} "Dark"]
-      [ui-buttons/light-button {:key "light-style" :on-click #(change-map-style (:light style-urls))} "Light"]
-      [ui-buttons/success-button {:key "custom-layer" :on-click #(add-example-custom-layer)} "Custom"]]
+      [ui-buttons/light-button {:key "light-style" :on-click #(change-map-style (:light style-urls))} "Light"]]
      [ui-layout/flex-container {:key "current-style" :align "flex-start" :style {:margin-top "10px"}}
       [:span {:key "current-style-text" :style {:font-size "12px" :color "#666"}}
        "Current: " (str current-style)]]]))
