@@ -2,7 +2,8 @@
   (:require [reagent.core :as reagent]
             [re-frame.core :as re-frame]
             [clojure.string :as str]
-            [pearl-map.services.map-engine :as map-engine]))
+            [pearl-map.services.map-engine :as map-engine]
+            [pearl-map.components.ui.buttons :as ui-buttons]))
 
 (def default-building-styles
   {:light {:fill-color "#f0f0f0"
@@ -283,15 +284,12 @@
 
                  ;; Action buttons
                  [:div {:style {:display "flex" :gap "10px" :margin-bottom "15px" :flex-wrap "wrap"}}
-                  [:button {:on-click #(re-frame/dispatch [:style-editor/set-and-apply-style (:light default-building-styles)])
-                            :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                                    :background "#007bff" :color "white" :cursor "pointer" :flex "1"}} "Light"]
-                  [:button {:on-click #(re-frame/dispatch [:style-editor/set-and-apply-style (:dark default-building-styles)])
-                            :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                                    :background "#343a40" :color "white" :cursor "pointer" :flex "1"}} "Dark"]
-                  [:button {:on-click #(re-frame/dispatch [:style-editor/reset-styles-immediately])
-                            :style {:padding "8px 12px" :border "none" :border-radius "4px"
-                                    :background "#28a745" :color "white" :cursor "pointer" :flex "1"}} "Reset"]]
+                  [ui-buttons/primary-button {:on-click #(re-frame/dispatch [:style-editor/set-and-apply-style (:light default-building-styles)])
+                                              :style {:flex "1"}} "Light"]
+                  [ui-buttons/dark-button {:on-click #(re-frame/dispatch [:style-editor/set-and-apply-style (:dark default-building-styles)])
+                                           :style {:flex "1"}} "Dark"]
+                  [ui-buttons/success-button {:on-click #(re-frame/dispatch [:style-editor/reset-styles-immediately])
+                                              :style {:flex "1"}} "Reset"]]
                  ])
 
               ;; Status information

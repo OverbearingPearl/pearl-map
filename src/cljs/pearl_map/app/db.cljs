@@ -9,4 +9,5 @@
                                 :fill-outline-color "#cccccc"}
    :models-3d/model-loaded false
    :models-3d/loaded-model nil
-   :models-3d/model-load-error nil})
+   :models-3d/model-load-error nil
+   :show-other-components? true})  ;; Added new state

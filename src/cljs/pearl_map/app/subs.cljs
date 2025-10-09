@@ -15,3 +15,8 @@
  :custom-layers
  (fn [db]
    (:custom-layers db)))
+
+(re-frame/reg-sub
+ :show-other-components?
+ (fn [db]
+   (:show-other-components? db)))

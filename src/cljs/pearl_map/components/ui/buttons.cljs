@@ -4,39 +4,39 @@
 (defn button
   "Base button component with consistent styling"
   [props & children]
-  (let [{:keys [on-click style class disabled?] :as attrs} (if (map? props) props {})]
+  (let [{:keys [on-click style class disabled?] :as attrs} (if (map? props) props {})
+        base-style {:margin "5px"
+                    :padding "8px 12px"
+                    :border "none"
+                    :border-radius "3px"
+                    :background "#007bff"
+                    :color "white"
+                    :cursor "pointer"
+                    :font-family "Arial, sans-serif"}]
     [:button
      (merge
       {:on-click on-click
        :disabled disabled?
-       :style (merge {:margin "5px"
-                      :padding "8px 12px"
-                      :border "none"
-                      :border-radius "3px"
-                      :background "#007bff"
-                      :color "white"
-                      :cursor "pointer"
-                      :font-family "Arial, sans-serif"}
-                     style)
+       :style (merge base-style (when (map? props) (:style props)) style)
        :class class}
       (when (map? props)
         (dissoc props :style :class :disabled?)))
      children]))
 
 (defn primary-button [props & children]
-  [button (merge {:style {:background "#007bff"}} props) children])
+  [button (update props :style merge {:background "#007bff"}) children])
 
 (defn secondary-button [props & children]
-  [button (merge {:style {:background "#6c757d"}} props) children])
+  [button (update props :style merge {:background "#6c757d"}) children])
 
 (defn success-button [props & children]
-  [button (merge {:style {:background "#28a745"}} props) children])
+  [button (update props :style merge {:background "#28a745"}) children])
 
 (defn danger-button [props & children]
-  [button (merge {:style {:background "#dc3545"}} props) children])
+  [button (update props :style merge {:background "#dc3545"}) children])
 
 (defn dark-button [props & children]
-  [button (merge {:style {:background "#343a40"}} props) children])
+  [button (update props :style merge {:background "#343a40"}) children])
 
 (defn light-button [props & children]
-  [button (merge {:style {:background "#f8f9fa" :color "black"}} props) children])
+  [button (update props :style merge {:background "#f8f9fa" :color "black"}) children])

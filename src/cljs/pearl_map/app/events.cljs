@@ -31,3 +31,8 @@
  :clear-custom-layers
  (fn [db _]
    (assoc db :custom-layers {})))
+
+(re-frame/reg-event-db
+ :toggle-other-components
+ (fn [db _]
+   (update db :show-other-components? not)))
