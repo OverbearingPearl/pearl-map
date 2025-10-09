@@ -6,8 +6,9 @@
   (let [map-instance @(re-frame/subscribe [:map-instance])
         model-loaded @(re-frame/subscribe [:models-3d/model-loaded])]
     [:div {:style {:position "absolute"
-                   :bottom "60px"  ;; Move up to avoid overlapping with scale control
-                   :left "20px"
+                   :bottom "20px"
+                   :left "50%"
+                   :transform "translateX(-50%)"
                    :z-index 1000
                    :background "rgba(255,255,255,0.95)"
                    :padding "15px"
