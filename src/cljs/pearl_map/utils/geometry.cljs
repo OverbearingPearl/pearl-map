@@ -87,4 +87,3 @@
   "Calculate scale factor to make model match real-world dimensions"
   (let [scale-factor (/ target-height-meters model-height-meters)]
     scale-factor))
-

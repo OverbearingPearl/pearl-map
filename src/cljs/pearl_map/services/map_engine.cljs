@@ -425,11 +425,12 @@
                       normalized-x (- (* 2 (/ eiffel-x canvas-width)) 1)
                       normalized-y (- (* -2 (/ eiffel-y canvas-height)) 1)
 
-                      ;; DYNAMIC SCALING: Simple visual scaling based on zoom
-                      ;; Base scale at zoom 15, adjust 1.5x per zoom level
-                      base-scale 1.0
-                      zoom-factor (js/Math.pow 1.5 (- zoom 15))
-                      scale-factor (* base-scale zoom-factor)]
+                      ;; PRECISE MERCATOR SCALING: Calculate scale based on actual coordinate system
+                      ;; In MapLibre, each zoom level doubles the scale (2^zoom)
+                      ;; We want the model to grow when zooming in, shrink when zooming out
+                      reference-zoom 15  ;; Model looks good at this zoom level
+                      zoom-delta (- zoom reference-zoom)
+                      scale-factor (js/Math.pow 2 zoom-delta)]  ;; Direct relationship
 
                   ;; Position and scale the model - update on every render
                   (let [model-scene (.-scene (.-model layer-state))]
@@ -438,7 +439,7 @@
                           (* normalized-x 25)  ;; Reduced scale to make model visible
                           (* normalized-y 25)  ;; Reduced scale to make model visible
                           0)
-                    ;; Update scale based on simple visual scaling
+                    ;; Update scale based on precise mercator scaling
                     (.set (.-scale model-scene) scale-factor scale-factor scale-factor)
                     (js/console.log "Model scale:" scale-factor "at zoom:" zoom))
 
