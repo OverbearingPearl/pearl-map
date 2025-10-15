@@ -3,9 +3,11 @@
             [re-frame.db :as db]
             [reagent.core :as reagent]
             [pearl-map.utils.geometry :as geom]
+            [pearl-map.services.model-loader :as model-loader]
             ["maplibre-gl" :as maplibre]
             ["color" :as color]
-            ["@maplibre/maplibre-gl-style-spec" :as style-spec]))
+            ["@maplibre/maplibre-gl-style-spec" :as style-spec]
+            ["three" :as three]))
 
 ;; Simplified expression handling - focus on basic value extraction
 (defn isExpression [x]
@@ -308,6 +310,146 @@
                 (.enableVertexAttribArray context position-attribute)
                 (.vertexAttribPointer context position-attribute 3 (.-FLOAT context) false 0 0)
                 (.drawArrays context (.-TRIANGLES context) 0 3)))))))
+
+(defn create-3d-model-layer []
+  (let [layer-impl (js-obj)]
+    (set! (.-id layer-impl) "3d-model-layer")
+    (set! (.-type layer-impl) "custom")
+    (set! (.-renderingMode layer-impl) "3d")
+    (set! (.-onAdd layer-impl)
+          (fn [map gl]
+            (let [^js layer-state #js {}
+                  ^js context gl
+                  ^js scene (three/Scene.)
+                  ^js camera (three/PerspectiveCamera. 75 1 0.1 1000)
+                  ;; Create a separate canvas for Three.js
+                  ^js canvas (js/document.createElement "canvas")
+                  ^js renderer (three/WebGLRenderer. #js {:canvas canvas
+                                                          :antialias true
+                                                          :alpha true})
+                  ^js map-obj map]
+
+              ;; Set up canvas and add to map container
+              (let [^js container (.getContainer map-obj)
+                    width (.-clientWidth container)
+                    height (.-clientHeight container)]
+                (set! (.-width canvas) width)
+                (set! (.-height canvas) height)
+                (set! (.-style canvas) (str "position: absolute; top: 0; left: 0; width: " width "px; height: " height "px; pointer-events: none;"))
+                (.appendChild container canvas))
+
+              ;; Set up perspective camera
+              (let [^js container (.getContainer map-obj)
+                    width (.-clientWidth container)
+                    height (.-clientHeight container)]
+                (set! (.-aspect camera) (/ width height))
+                (.updateProjectionMatrix camera)
+                ;; Position camera above the scene
+                (.set (.-position camera) 0 0 50)
+                (.lookAt camera 0 0 0))
+
+              ;; Set up renderer
+              (let [^js container (.getContainer map-obj)
+                    width (.-clientWidth container)
+                    height (.-clientHeight container)]
+                (.setSize renderer width height)
+                (.setPixelRatio renderer (.-devicePixelRatio js/window))
+                ;; Configure for transparent overlay
+                (.setClearColor renderer 0x000000 0)
+                (set! (.-autoClear renderer) false))
+
+              ;; Handle map resize
+              (.on map-obj "resize"
+                   (fn []
+                     (let [^js container (.getContainer map-obj)
+                           width (.-clientWidth container)
+                           height (.-clientHeight container)]
+                       (set! (.-width canvas) width)
+                       (set! (.-height canvas) height)
+                       (.setSize renderer width height)
+                       (set! (.-aspect camera) (/ width height))
+                       (.updateProjectionMatrix camera))))
+
+              ;; Load Eiffel Tower model using model-loader
+              (model-loader/load-gltf-model
+               "/models/eiffel_tower/scene.gltf"
+               (fn [gltf-model]
+                 ;; Position the model at Eiffel Tower coordinates
+                 (let [model-scene (.-scene gltf-model)]
+                   ;; Get model's bounding box for reference (but don't use for scaling)
+                   (let [bbox (three/Box3.)
+                         center (three/Vector3.)
+                         size (three/Vector3.)]
+                     (.setFromObject bbox model-scene)
+                     (.getCenter bbox center)
+                     (.getSize bbox size)
+                     (js/console.log "Model original dimensions:" (.-x size) "x" (.-y size) "x" (.-z size)))
+
+                   (.add scene model-scene)
+                   (set! (.-model layer-state) gltf-model)))
+               (fn [error]
+                 (js/console.error "Failed to load 3D model in custom layer:" error)))
+
+              (set! (.-scene layer-state) scene)
+              (set! (.-camera layer-state) camera)
+              (set! (.-renderer layer-state) renderer)
+              (set! (.-canvas layer-state) canvas)
+              (set! (.-context layer-state) context)
+              (set! (.-map layer-state) map-obj)
+              (set! (.-layer-state layer-impl) layer-state))))
+    (set! (.-render layer-impl)
+          (fn [^js gl ^js matrix]
+            (let [^js layer-state (.-layer-state layer-impl)
+                  ^js scene (.-scene layer-state)
+                  ^js camera (.-camera layer-state)
+                  ^js renderer (.-renderer layer-state)
+                  ^js map-obj (.-map layer-state)]
+
+              (when (and scene camera renderer (.-model layer-state))
+                ;; Get current map view state
+                (let [^js center (.getCenter map-obj)
+                      ^js zoom (.getZoom map-obj)
+                      ^js pitch (.getPitch map-obj)
+                      ^js bearing (.getBearing map-obj)
+
+                      ;; Convert Eiffel Tower coordinates to screen position
+                      eiffel-point (.project map-obj (clj->js [2.2945 48.8584]))
+                      eiffel-x (.-x eiffel-point)
+                      eiffel-y (.-y eiffel-point)
+
+                      ;; Get canvas dimensions
+                      canvas-width (.-clientWidth (.getContainer map-obj))
+                      canvas-height (.-clientHeight (.getContainer map-obj))
+
+                      ;; Convert screen coordinates to normalized device coordinates (-1 to 1)
+                      normalized-x (- (* 2 (/ eiffel-x canvas-width)) 1)
+                      normalized-y (- (* -2 (/ eiffel-y canvas-height)) 1)
+
+                      ;; DYNAMIC SCALING: Simple visual scaling based on zoom
+                      ;; Base scale at zoom 15, adjust 1.5x per zoom level
+                      base-scale 1.0
+                      zoom-factor (js/Math.pow 1.5 (- zoom 15))
+                      scale-factor (* base-scale zoom-factor)]
+
+                  ;; Position and scale the model - update on every render
+                  (let [model-scene (.-scene (.-model layer-state))]
+                    ;; Update position
+                    (.set (.-position model-scene)
+                          (* normalized-x 25)  ;; Reduced scale to make model visible
+                          (* normalized-y 25)  ;; Reduced scale to make model visible
+                          0)
+                    ;; Update scale based on simple visual scaling
+                    (.set (.-scale model-scene) scale-factor scale-factor scale-factor)
+                    (js/console.log "Model scale:" scale-factor "at zoom:" zoom))
+
+                  ;; Update camera to look at the scene center
+                  (.set (.-position camera) 0 0 50)
+                  (.lookAt camera 0 0 0)
+                  (.updateProjectionMatrix camera)
+
+                  ;; Render the scene
+                  (.render renderer scene camera))))))
+    layer-impl))
 
 (defn create-example-custom-layer []
   (let [layer-impl (js-obj)]
