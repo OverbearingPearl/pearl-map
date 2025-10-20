@@ -53,49 +53,10 @@
         (println "⚠️  GLTF source directory not found:" (.getAbsolutePath source-dir))
         (println "Expected path:" (.getAbsolutePath source-dir))))))
 
-;; Add Three.js file copying function with overwrite behavior
-(defn copy-threejs-files
-  "Build hook to copy Three.js files from node_modules to target directory"
-  []
-  (println "Copying Three.js files from node_modules...")
-
-  (let [source-dir (io/file "node_modules/three")
-        target-dir (io/file "target/public/js/three")
-        source-gltf (io/file "node_modules/three/examples/jsm/loaders")
-        target-gltf (io/file "target/public/js/three/loaders")]
-
-    ;; Create target directories if they don't exist
-    (.mkdirs target-dir)
-    (.mkdirs target-gltf)
-
-    ;; Copy Three.js main library (always overwrite)
-    (if (.exists source-dir)
-      (do
-        (println "Three.js source directory exists:" (.getAbsolutePath source-dir))
-        ;; Copy the main three.js file
-        (let [source-file (io/file source-dir "build/three.min.js")
-              target-file (io/file target-dir "three.min.js")]
-          (when (.exists source-file)
-            (io/copy source-file target-file)
-            (println "✓ Copied/overwritten three.min.js to:" (.getAbsolutePath target-file)))))
-      (println "⚠️  Three.js not found in node_modules, please run 'npm install'"))
-
-    ;; Copy GLTFLoader (always overwrite)
-    (if (.exists source-gltf)
-      (do
-        (println "GLTFLoader source directory exists:" (.getAbsolutePath source-gltf))
-        ;; Copy the GLTFLoader file
-        (let [source-file (io/file source-gltf "GLTFLoader.js")
-              target-file (io/file target-gltf "GLTFLoader.js")]
-          (when (.exists source-file)
-            (io/copy source-file target-file)
-            (println "✓ Copied/overwritten GLTFLoader.js to:" (.getAbsolutePath target-file)))))
-      (println "⚠️  GLTFLoader not found in node_modules, please run 'npm install'"))))
 
 (defn ^:export build-hook []
   (copy-maplibre-css)
-  (copy-gltf-files)
-  (copy-threejs-files))
+  (copy-gltf-files))
 
 ;; Add the missing -main function
 (defn -main [& args]
