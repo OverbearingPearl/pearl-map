@@ -7,7 +7,6 @@
     (when map-obj
       (map-engine/on-map-load
        (fn [map-instance]
-         ;; Map loaded callback - 3D model loading should be handled separately
          (js/console.log "Map loaded successfully")))
       (map-engine/on-map-error
        (fn [e]
