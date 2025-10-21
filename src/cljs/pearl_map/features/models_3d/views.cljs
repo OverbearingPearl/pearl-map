@@ -2,15 +2,7 @@
   (:require [re-frame.core :as re-frame]
             [pearl-map.components.ui.controls :as ui-controls]
             [pearl-map.components.ui.buttons :as ui-buttons]
-            [pearl-map.features.map-view.events :as map-events]
             [pearl-map.services.map-engine :as map-engine]))
-
-(defn add-example-custom-layer []
-  (map-events/add-example-custom-layer))
-
-(defn add-3d-model-layer []
-  (let [custom-layer (map-engine/create-3d-model-layer)]
-    (map-engine/add-custom-layer "3d-model-layer" custom-layer nil)))
 
 (defn model-controls []
   (let [model-loaded @(re-frame/subscribe [:models-3d/model-loaded])
@@ -19,14 +11,10 @@
      {:width "240px"}
      [:h3 {:key "title" :style {:margin "0 0 12px 0" :font-size "1.1em" :color "#333"}} "3D Models"]
      [ui-buttons/primary-button {:key "load-button" :on-click #(re-frame/dispatch [:models-3d/load-eiffel-tower])}
-      "Load Eiffel Tower"]
-     [ui-buttons/success-button {:key "3d-layer" :on-click #(add-3d-model-layer) :style {:margin-top "8px"}}
-      "Add 3D Model Layer"]
-     [ui-buttons/secondary-button {:key "custom-layer" :on-click #(add-example-custom-layer) :style {:margin-top "8px"}}
-      "Add Example Layer"]
+      "Load & Display Eiffel Tower"]
      [:div {:key "status" :style {:margin-top "10px" :font-size "12px" :color "#666"}}
       "Status: " [:span {:style {:color (if model-loaded "#28a745" "#dc3545") :font-weight "bold"}}
-                  (if model-loaded "Loaded" "Not Loaded")]]
+                  (if model-loaded "Loaded & Displayed" "Not Loaded")]]
      (when model-error
        [:div {:key "error" :style {:color "#dc3545" :margin-top "8px" :font-size "11px" :background "#f8d7da" :padding "6px" :border-radius "3px"}}
         "Error: " model-error])]))

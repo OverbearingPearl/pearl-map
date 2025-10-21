@@ -10,10 +10,6 @@
   (re-frame/dispatch [:set-current-style style-url])
   (map-engine/change-map-style style-url))
 
-(defn add-example-custom-layer []
-  (let [custom-layer (map-engine/create-example-custom-layer)]
-    (map-engine/add-custom-layer "example-custom-layer" custom-layer nil)))
-
 (defn style-controls []
   (let [current-style @(re-frame/subscribe [:current-style])
         show-other-components? @(re-frame/subscribe [:show-other-components?])]

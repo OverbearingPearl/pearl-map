@@ -452,27 +452,6 @@
                   (.render renderer scene camera))))))
     layer-impl))
 
-(defn create-example-custom-layer []
-  (let [layer-impl (js-obj)]
-    (set! (.-id layer-impl) "example-custom-layer")
-    (set! (.-type layer-impl) "custom")
-    (set! (.-renderingMode layer-impl) "3d")
-    (set! (.-onAdd layer-impl)
-          (fn [map gl]
-            (let [^js layer-state #js {}
-                  ^js context gl
-                  vertex-source "uniform mat4 u_matrix; attribute vec3 a_pos; void main() { gl_Position = u_matrix * vec4(a_pos, 1.0); }"
-                  fragment-source "precision mediump float; void main() { gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5); }"
-                  program (create-shader-program context vertex-source fragment-source)
-                  position-buffer (create-example-geometry context)]
-              (set! (.-position-buffer layer-state) position-buffer)
-              (set! (.-program layer-state) program)
-              (set! (.-context layer-state) context)
-              (set! (.-map layer-state) map)
-              (set! (.-layer-state layer-impl) layer-state))))
-    (setup-layer-rendering layer-impl)
-    layer-impl))
-
 (defn parse-color-expression [color-value current-zoom]
   (when color-value
     (cond
