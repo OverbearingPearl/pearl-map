@@ -128,18 +128,23 @@
   (when-let [^js map-obj (get-map-instance)]
     (.once map-obj "idle"
            (fn []
-             (when (get (js->clj (.getSources map-obj)) "composite")
-               (when-not (.getLayer map-obj "buildings")
-                 (.addLayer map-obj
-                            (clj->js
-                             {:id "buildings"
-                              :type "fill"
-                              :source "composite"
-                              :source-layer "building"
-                              :filter ["==" "extrude" "true"]
-                              :paint {:fill-color "#f0f0f0"
-                                      :fill-opacity 1.0
-                                      :fill-outline-color "#cccccc"}}))))))))
+             ;; Use the current API - check if composite source exists by trying to get it
+             (try
+               (when (.getSource map-obj "composite")
+                 (when-not (.getLayer map-obj "buildings")
+                   (.addLayer map-obj
+                              (clj->js
+                               {:id "buildings"
+                                :type "fill"
+                                :source "composite"
+                                :source-layer "building"
+                                :filter ["==" "extrude" "true"]
+                                :paint {:fill-color "#f0f0f0"
+                                        :fill-opacity 1.0
+                                        :fill-outline-color "#cccccc"}}))))
+               (catch js/Error e
+                 ;; Composite source doesn't exist, skip adding buildings layer
+                 nil))))))
 
 (defn register-custom-layer [layer-id layer-impl]
   (re-frame/dispatch [:register-custom-layer layer-id layer-impl]))
@@ -154,11 +159,12 @@
 
 (defn- get-current-map-state []
   (let [^js map-obj (get-map-instance)]
-    {:center (.getCenter map-obj)
-     :zoom (.getZoom map-obj)
-     :pitch (.getPitch map-obj)
-     :bearing (.getBearing map-obj)
-     :layers (get-custom-layers)}))
+    (when map-obj
+      {:center (.getCenter map-obj)
+       :zoom (.getZoom map-obj)
+       :pitch (.getPitch map-obj)
+       :bearing (.getBearing map-obj)
+       :layers (get-custom-layers)})))
 
 (defn- apply-map-state! [state]
   (let [^js map-obj (get-map-instance)]
