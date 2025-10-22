@@ -4,7 +4,7 @@
 
 (defn debug-info []
   (let [map-instance @(re-frame/subscribe [:map-instance])
-        model-loaded @(re-frame/subscribe [:models-3d/model-loaded])]
+        eiffel-loaded? @(re-frame/subscribe [:models-3d/eiffel-loaded?])]
     [:div {:style {:position "absolute"
                    :bottom "20px"
                    :left "50%"
@@ -23,4 +23,4 @@
      [:div {:style {:margin-bottom "6px"}}
       "Container: " [:span {:style {:color "#28a745"}} "✓"]]
      [:div
-      "3D Model: " [:span {:style {:color (if model-loaded "#28a745" "#dc3545")}} (if model-loaded "✓" "✗")]]]))
+      "3D Model: " [:span {:style {:color (if eiffel-loaded? "#28a745" "#dc3545")}} (if eiffel-loaded? "✓" "✗")]]]))

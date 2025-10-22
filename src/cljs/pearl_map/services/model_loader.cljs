@@ -1,2 +1,12 @@
-(ns pearl-map.services.model-loader)
-;; File kept as placeholder - all GLTF loading functionality removed
+(ns pearl-map.services.model-loader
+  (:require ["three" :as three]
+            ["three/examples/jsm/loaders/GLTFLoader.js" :as GLTFLoaderModule]))
+
+(defn create-gltf-loader []
+  (GLTFLoaderModule/GLTFLoader.))
+
+(defn load-model [loader url on-load on-error]
+  (.load loader url
+         (fn [gltf] (on-load gltf))
+         nil  ; progress callback (optional)
+         (fn [error] (on-error error))))

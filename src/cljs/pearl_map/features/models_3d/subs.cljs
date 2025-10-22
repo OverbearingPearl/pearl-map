@@ -2,16 +2,6 @@
   (:require [re-frame.core :as re-frame]))
 
 (re-frame/reg-sub
- :models-3d/model-loaded
+ :models-3d/eiffel-loaded?
  (fn [db _]
-   (:models-3d/model-loaded db)))
-
-(re-frame/reg-sub
- :models-3d/loaded-model
- (fn [db _]
-   (:models-3d/loaded-model db)))
-
-(re-frame/reg-sub
- :models-3d/model-load-error
- (fn [db _]
-   (:models-3d/model-load-error db)))
+   (get db :models-3d/eiffel-loaded? false)))
