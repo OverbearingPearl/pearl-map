@@ -6,7 +6,7 @@
 
 (def eiffel-tower-coords [2.2945 48.8584])
 (def model-altitude 0)
-(def model-rotate [(/ js/Math.PI 2) 0 0])
+(def model-rotate [0 0 0])
 
 (defn create-custom-layer []
   (let [model-mercator (.fromLngLat maplibre/MercatorCoordinate
@@ -64,20 +64,12 @@
                          (let [^js model (.-scene gltf)]
                            ;; Position model at origin with proper rotation and scale
                            (-> model .-position (.set 0 0 0))
-                           ;; Rotate model to face the camera properly
-                           (-> model .-rotation (.set (- (/ js/Math.PI 2)) 0 0))
+                           ;; Rotate model to stand upright (90 degrees around X-axis)
+                           (-> model .-rotation (.set (/ js/Math.PI 2) 0 0))
                            ;; Use a reasonable scale
                            (-> model .-scale (.set 1 1 1))
 
-                           (.add scene model)
-
-                           ;; Add a test cube for debugging, positioned to the side
-                           (let [^js geometry (three/BoxGeometry. 10 10 10)
-                                 ^js material (three/MeshBasicMaterial. #js {:color 0xff0000})
-                                 ^js cube (three/Mesh. geometry material)]
-                             (-> cube .-position (.set 20 0 0))
-                             (.add scene cube)
-                             (js/console.log "Test cube added for debugging"))))
+                           (.add scene model)))
                        (fn [error]
                          (js/console.error "Failed to load Eiffel Tower model:" error)))
 
@@ -125,8 +117,8 @@
                              (set! (.-projectionMatrix camera) view-proj-matrix)
                              (set! (.-matrixWorldInverse camera) (.clone view-proj-matrix))
 
-                             ;; Position camera at an angle to see the model from the side
-                             (-> camera .-position (.set 50 50 50))
+                             ;; Position camera above and in front of the model
+                             (-> camera .-position (.set 0 -100 50))
                              ;; Set Z-axis as up to match MapLibre's coordinate system
                              (-> camera .-up (.set 0 0 1))
                              (.lookAt camera (three/Vector3. 0 0 0))
