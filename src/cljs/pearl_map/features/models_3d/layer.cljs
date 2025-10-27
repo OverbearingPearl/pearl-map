@@ -6,21 +6,20 @@
 
 (def eiffel-tower-coords [2.2945 48.8584])
 (def model-altitude 0)
-(def model-rotate [0 0 0])
+(def model-rotate [(/ js/Math.PI 2) 0 0])
 
 (defn create-custom-layer []
   (let [model-mercator (.fromLngLat maplibre/MercatorCoordinate
                                     (clj->js eiffel-tower-coords)
                                     model-altitude)
-        ;; Use appropriate scale - this is the transform applied to the entire model
-        fixed-scale 1.0  ;; Use 1.0 for proper scaling
+        model-scale (.meterInMercatorCoordinateUnits model-mercator)
         model-transform #js {:translateX (.-x model-mercator)
                              :translateY (.-y model-mercator)
                              :translateZ (.-z model-mercator)
                              :rotateX (nth model-rotate 0)
                              :rotateY (nth model-rotate 1)
                              :rotateZ (nth model-rotate 2)
-                             :scale fixed-scale}]
+                             :scale model-scale}]
 
     (let [state (atom nil)]
       #js {:id "3d-model-eiffel"
@@ -31,45 +30,27 @@
                     (let [^js map-obj map
                           ^js canvas (.getCanvas map-obj)
                           ^js scene (three/Scene.)
-                          ;; Use wider field of view for better perspective
-                          ^js camera (three/PerspectiveCamera. 60 1 1 1000)
+                          ^js camera (three/Camera.)
                           ^js loader (model-loader/create-gltf-loader)
-
-                          ;; Create directional lights with higher intensity
-                          ^js directional-light-1 (three/DirectionalLight. 0xffffff 2)
-                          ^js directional-light-2 (three/DirectionalLight. 0xffffff 2)
-
-                          ;; Fix: Use correct canvas and WebGL context
+                          ^js directional-light-1 (three/DirectionalLight. 0xffffff)
+                          ^js directional-light-2 (three/DirectionalLight. 0xffffff)
                           ^js renderer (three/WebGLRenderer.
                                         #js {:canvas canvas
                                              :context gl
                                              :antialias true})]
 
-                      ;; Configure lights - position them properly
-                      (-> directional-light-1 .-position (.set 1 -1 1))
+                      (-> directional-light-1 .-position (.set 0 -70 100) (.normalize))
                       (.add scene directional-light-1)
 
-                      (-> directional-light-2 .-position (.set -1 1 1))
+                      (-> directional-light-2 .-position (.set 0 70 100) (.normalize))
                       (.add scene directional-light-2)
-
-                      ;; Add ambient light with higher intensity for better visibility
-                      (let [^js ambient-light (three/AmbientLight. 0x404040 1.0)]
-                        (.add scene ambient-light))
 
                       ;; Load the Eiffel Tower model
                       (model-loader/load-model
                        loader
                        "/models/eiffel_tower/scene.gltf"
                        (fn [gltf]
-                         (let [^js model (.-scene gltf)]
-                           ;; Position model at origin with proper rotation and scale
-                           (-> model .-position (.set 0 0 0))
-                           ;; Rotate model to stand upright (90 degrees around X-axis)
-                           (-> model .-rotation (.set (/ js/Math.PI 2) 0 0))
-                           ;; Use a reasonable scale
-                           (-> model .-scale (.set 1 1 1))
-
-                           (.add scene model)))
+                         (.add scene (.-scene gltf)))
                        (fn [error]
                          (js/console.error "Failed to load Eiffel Tower model:" error)))
 
@@ -83,53 +64,30 @@
                                          :modelTransform model-transform})))
 
            :render (fn [gl matrix-data]
-                     (js/console.log "=== render called ===")
-
                      (when-let [^js state @state]
-                       (js/console.log "State available:", state)
-
-                       (let [^js scene (.-scene state)
-                             ^js camera (.-camera state)
-                             ^js renderer (.-renderer state)
-                             ^js map-instance (.-map state)
-                             ^js model-transform (.-modelTransform state)
-
-                             ;; Fix: Use the correct projection matrix from matrix-data
-                             ^js projection-matrix (let [matrix-array (.-projectionMatrix matrix-data)]
-                                                     (when matrix-array
-                                                       (.fromArray (three/Matrix4.) matrix-array)))]
-
-                         (when projection-matrix
-                           (js/console.log "Projection matrix created")
-
-                           ;; Create view-projection matrix with mercator transform applied
-                           (let [^js view-proj-matrix (.clone projection-matrix)
-                                 ;; Create model matrix for mercator positioning
-                                 ^js model-matrix (.makeTranslation
-                                                   (three/Matrix4.)
-                                                   (.-translateX model-transform)
-                                                   (.-translateY model-transform)
-                                                   (.-translateZ model-transform))]
-                             ;; Apply the model transform to position everything in mercator space
-                             (.multiply view-proj-matrix model-matrix)
-
-                             ;; Set camera properties
-                             (set! (.-projectionMatrix camera) view-proj-matrix)
-                             (set! (.-matrixWorldInverse camera) (.clone view-proj-matrix))
-
-                             ;; Position camera above and in front of the model
-                             (-> camera .-position (.set 0 -100 50))
-                             ;; Set Z-axis as up to match MapLibre's coordinate system
-                             (-> camera .-up (.set 0 0 1))
-                             (.lookAt camera (three/Vector3. 0 0 0))
-
-                             ;; Render the scene
-                             (.resetState renderer)
-                             (.render renderer scene camera)
-                             (.triggerRepaint map-instance)
-                             (js/console.log "Render completed")))))
-
-                     (js/console.log "=== render finished ==="))})))
+                       (let [scene (.-scene state)
+                             camera (.-camera state)
+                             renderer (.-renderer state)
+                             map-instance (.-map state)
+                             model-transform (.-modelTransform state)
+                             rotation-x (.makeRotationAxis (three/Matrix4.) (three/Vector3. 1 0 0) (.-rotateX model-transform))
+                             rotation-y (.makeRotationAxis (three/Matrix4.) (three/Vector3. 0 1 0) (.-rotateY model-transform))
+                             rotation-z (.makeRotationAxis (three/Matrix4.) (three/Vector3. 0 0 1) (.-rotateZ model-transform))
+                             m (.fromArray (three/Matrix4.) (-> matrix-data .-defaultProjectionData .-mainMatrix))
+                             l (-> (three/Matrix4.)
+                                   (.makeTranslation (.-translateX model-transform)
+                                                     (.-translateY model-transform)
+                                                     (.-translateZ model-transform))
+                                   (.scale (three/Vector3. (.-scale model-transform)
+                                                           (- (.-scale model-transform))
+                                                           (.-scale model-transform)))
+                                   (.multiply rotation-x)
+                                   (.multiply rotation-y)
+                                   (.multiply rotation-z))]
+                         (set! (.-projectionMatrix camera) (.multiply m l))
+                         (.resetState renderer)
+                         (.render renderer scene camera)
+                         (.triggerRepaint map-instance))))})))
 
 ;; Test function remains unchanged
 (defn test-threejs-rendering []
