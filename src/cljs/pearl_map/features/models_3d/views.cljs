@@ -18,6 +18,12 @@
                              :step 0.1
                              :value eiffel-scale
                              :on-change #(re-frame/dispatch [:models-3d/set-eiffel-scale (js/parseFloat (-> % .-target .-value))])}]
+        [:div {:key "scale-value"
+               :style {:text-align "right"
+                       :font-size "0.9em"
+                       :color "#666"
+                       :margin-top "4px"}}
+         (str "x " (-> eiffel-scale js/Number (.toFixed 1)))]
         [ui-buttons/secondary-button
          {:key "remove-button"
           :style {:margin-top "12px"}

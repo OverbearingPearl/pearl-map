@@ -7,6 +7,7 @@
 (def eiffel-tower-coords [2.2945 48.8584])
 (def model-altitude 0)
 (def model-rotate [(/ js/Math.PI 2) 0 0])
+(def eiffel-tower-real-height 330) ;; Real height of Eiffel Tower in meters
 
 (defonce layer-state (atom nil))
 
@@ -57,7 +58,18 @@
                      loader
                      "/models/eiffel_tower/scene.gltf"
                      (fn [gltf]
-                       (.add scene (.-scene gltf)))
+                       (let [model-scene (.-scene gltf)
+                             box (three/Box3.)
+                             size (three/Vector3.)]
+                         (.setFromObject box model-scene)
+                         (.getSize box size)
+                         (let [model-unit-height (.-y size)
+                               model-scale-factor (if (pos? model-unit-height)
+                                                    (/ eiffel-tower-real-height model-unit-height)
+                                                    1)]
+                           (.add scene model-scene)
+                           (when-let [^js st @layer-state]
+                             (set! (.-modelScaleFactor st) model-scale-factor)))))
                      (fn [error]
                        (js/console.error "Failed to load Eiffel Tower model:" error)))
 
@@ -69,7 +81,8 @@
                                              :renderer renderer
                                              :map map-obj
                                              :modelTransform model-transform
-                                             :userScale initial-scale})))
+                                             :userScale initial-scale
+                                             :modelScaleFactor 1})))
 
          :render (fn [gl matrix-data]
                    (when-let [^js state @layer-state]
@@ -79,7 +92,8 @@
                            renderer (.-renderer state)
                            map-instance (.-map state)
                            model-transform (.-modelTransform state)
-                           final-scale (* (.-scale model-transform) user-scale)
+                           model-scale-factor (or (.-modelScaleFactor state) 1)
+                           final-scale (* (.-scale model-transform) model-scale-factor user-scale)
                            rotation-x (.makeRotationAxis (three/Matrix4.) (three/Vector3. 1 0 0) (.-rotateX model-transform))
                            rotation-y (.makeRotationAxis (three/Matrix4.) (three/Vector3. 0 1 0) (.-rotateY model-transform))
                            rotation-z (.makeRotationAxis (three/Matrix4.) (three/Vector3. 0 0 1) (.-rotateZ model-transform))
