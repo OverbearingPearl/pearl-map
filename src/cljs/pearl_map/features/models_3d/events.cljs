@@ -15,10 +15,17 @@
    {:db (assoc db :models-3d/eiffel-scale scale)}))
 
 (re-frame/reg-event-fx
+ :models-3d/set-eiffel-rotation-z
+ (fn [{:keys [db]} [_ degrees]]
+   (model-layer/set-rotation-z degrees)
+   {:db (assoc db :models-3d/eiffel-rotation-z degrees)}))
+
+(re-frame/reg-event-fx
  :models-3d/add-eiffel-tower
  (fn [{:keys [db]} _]
    (let [initial-scale (:models-3d/eiffel-scale db)
-         custom-layer (model-layer/create-custom-layer initial-scale)]
+         initial-rotation-z (:models-3d/eiffel-rotation-z db)
+         custom-layer (model-layer/create-custom-layer initial-scale initial-rotation-z)]
      (map-engine/add-custom-layer
       "3d-model-eiffel"
       (clj->js custom-layer)

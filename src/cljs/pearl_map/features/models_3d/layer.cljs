@@ -15,10 +15,14 @@
   (when-let [^js st @layer-state]
     (set! (.-userScale st) scale)))
 
+(defn set-rotation-z [degrees]
+  (when-let [^js st @layer-state]
+    (set! (.-userRotationZ st) (* degrees (/ js/Math.PI 180)))))
+
 (defn cleanup-state []
   (reset! layer-state nil))
 
-(defn create-custom-layer [initial-scale]
+(defn create-custom-layer [initial-scale initial-rotation-z]
   (let [model-mercator (.fromLngLat maplibre/MercatorCoordinate
                                     (clj->js eiffel-tower-coords)
                                     model-altitude)
@@ -82,6 +86,7 @@
                                              :map map-obj
                                              :modelTransform model-transform
                                              :userScale initial-scale
+                                             :userRotationZ (* initial-rotation-z (/ js/Math.PI 180))
                                              :modelScaleFactor 1})))
 
          :render (fn [gl matrix-data]
@@ -94,9 +99,10 @@
                            model-transform (.-modelTransform state)
                            model-scale-factor (or (.-modelScaleFactor state) 1)
                            final-scale (* (.-scale model-transform) model-scale-factor user-scale)
+                           user-rotation-z (or (.-userRotationZ state) 0)
                            rotation-x (.makeRotationAxis (three/Matrix4.) (three/Vector3. 1 0 0) (.-rotateX model-transform))
                            rotation-y (.makeRotationAxis (three/Matrix4.) (three/Vector3. 0 1 0) (.-rotateY model-transform))
-                           rotation-z (.makeRotationAxis (three/Matrix4.) (three/Vector3. 0 0 1) (.-rotateZ model-transform))
+                           rotation-z (.makeRotationAxis (three/Matrix4.) (three/Vector3. 0 0 1) (+ (.-rotateZ model-transform) user-rotation-z))
                            m (.fromArray (three/Matrix4.) (-> matrix-data .-defaultProjectionData .-mainMatrix))
                            l (-> (three/Matrix4.)
                                  (.makeTranslation (.-translateX model-transform)
@@ -105,9 +111,9 @@
                                  (.scale (three/Vector3. final-scale
                                                          (- final-scale)
                                                          final-scale))
-                                 (.multiply rotation-x)
+                                 (.multiply rotation-z)
                                  (.multiply rotation-y)
-                                 (.multiply rotation-z))]
+                                 (.multiply rotation-x))]
                        (set! (.-projectionMatrix camera) (.multiply m l))
                        (.resetState renderer)
                        (.render renderer scene camera)

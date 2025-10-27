@@ -10,3 +10,8 @@
  :models-3d/eiffel-scale
  (fn [db _]
    (get db :models-3d/eiffel-scale 1.0)))
+
+(re-frame/reg-sub
+ :models-3d/eiffel-rotation-z
+ (fn [db _]
+   (get db :models-3d/eiffel-rotation-z 0.0)))

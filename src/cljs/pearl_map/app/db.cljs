@@ -9,4 +9,5 @@
                                 :fill-outline-color "#cccccc"}
    :models-3d/eiffel-loaded? false
    :models-3d/eiffel-scale 1.0
+   :models-3d/eiffel-rotation-z 0.0
    :show-other-components? true})  ;; Added new state
