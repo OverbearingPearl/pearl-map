@@ -1,6 +1,8 @@
 (ns pearl-map.features.models-3d.layer
   (:require ["three" :as three]
             ["maplibre-gl" :as maplibre]
+            [re-frame.core :as rf]
+            [pearl-map.app.db :as app-db]
             [pearl-map.services.model-loader :as model-loader]
             [pearl-map.utils.geometry :as geom]))
 
@@ -79,15 +81,21 @@
 
                     (set! (.-autoClear renderer) false)
 
-                    ;; Store state in the atom
-                    (reset! layer-state #js {:scene scene
-                                             :camera camera
-                                             :renderer renderer
-                                             :map map-obj
-                                             :modelTransform model-transform
-                                             :userScale initial-scale
-                                             :userRotationZ (* initial-rotation-z (/ js/Math.PI 180))
-                                             :modelScaleFactor 1})))
+                    ;; Dispatch events to reset sliders to default values.
+                    ;; NOTE: Event names are guessed as I don't have the events.cljs file.
+                    (rf/dispatch [:models-3d/set-eiffel-scale (:models-3d/eiffel-scale app-db/default-db)])
+                    (rf/dispatch [:models-3d/set-eiffel-rotation-z (:models-3d/eiffel-rotation-z app-db/default-db)])
+
+                    ;; Store state in the atom, using default values
+                    (reset! layer-state
+                            #js {:scene scene
+                                 :camera camera
+                                 :renderer renderer
+                                 :map map-obj
+                                 :modelTransform model-transform
+                                 :userScale (:models-3d/eiffel-scale app-db/default-db)
+                                 :userRotationZ (* (:models-3d/eiffel-rotation-z app-db/default-db) (/ js/Math.PI 180))
+                                 :modelScaleFactor 1})))
 
          :render (fn [gl matrix-data]
                    (when-let [^js state @layer-state]
