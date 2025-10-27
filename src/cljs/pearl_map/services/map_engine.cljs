@@ -56,6 +56,25 @@
 
 (def eiffel-tower-coords [2.2945 48.8584])
 
+(def eiffel-tower-osm-ids
+  "OSM IDs for buildings in the Eiffel Tower complex to be excluded from the map."
+  [5013364   ;; Eiffel Tower main structure
+   308687745 ;; Another building part, identified via click debugging
+   308687744 ;; Another building part, identified via click debugging
+   308689164 ;; Another building part, identified via click debugging
+   4114842   ;; Another building part, identified via click debugging
+   4114839   ;; Another building part, identified via click debugging
+   308687746 ;; Another building part, identified via click debugging
+   308145239 ;; Another building part, identified via click debugging
+   69034127  ;; Another building part, identified via click debugging
+   278644    ;; Another building part, identified via click debugging
+   279659    ;; Another building part, identified via click debugging
+   540568    ;; Another building part, identified via click debugging
+   335101043 ;; Another building part, identified via click debugging
+   540590    ;; Another building part, identified via click debugging
+   4114841   ;; Another building part, identified via click debugging
+   ])
+
 (def style-urls
   {:basic "raster-style"
    :dark "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
@@ -124,10 +143,15 @@
                        :type "fill-extrusion"
                        :source "carto"
                        :source-layer "building"
+                       :filter (into ["!in" "$id"] eiffel-tower-osm-ids)
                        :paint {:fill-extrusion-color "#f0f0f0"
                                :fill-extrusion-height ["coalesce" ["get" "height"] ["get" "render_height"] 0]
                                :fill-extrusion-base ["coalesce" ["get" "min_height"] ["get" "render_min_height"] 0]
-                               :fill-extrusion-opacity 1.0}}))))
+                               :fill-extrusion-opacity 1.0}}))
+          (.on map-obj "click" "buildings"
+               (fn [e]
+                 (when-let [feature (first (.-features e))]
+                   (js/console.log "Clicked Feature --- ID:" (.-id feature) "--- Properties:" (js->clj (.-properties feature) :keywordize-keys true)))))))
       (catch js/Error e
         (js/console.error "Failed to add buildings layer:" e)))))
 
