@@ -9,9 +9,16 @@
    (assoc db :models-3d/eiffel-loaded? loaded?)))
 
 (re-frame/reg-event-fx
+ :models-3d/set-eiffel-scale
+ (fn [{:keys [db]} [_ scale]]
+   (model-layer/set-scale scale)
+   {:db (assoc db :models-3d/eiffel-scale scale)}))
+
+(re-frame/reg-event-fx
  :models-3d/add-eiffel-tower
  (fn [{:keys [db]} _]
-   (let [custom-layer (model-layer/create-custom-layer)]
+   (let [initial-scale (:models-3d/eiffel-scale db)
+         custom-layer (model-layer/create-custom-layer initial-scale)]
      (map-engine/add-custom-layer
       "3d-model-eiffel"
       (clj->js custom-layer)
@@ -22,4 +29,5 @@
  :models-3d/remove-eiffel-tower
  (fn [{:keys [db]} _]
    (map-engine/remove-custom-layer "3d-model-eiffel")
+   (model-layer/cleanup-state)
    {:db (assoc db :models-3d/eiffel-loaded? false)}))

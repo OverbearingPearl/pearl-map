@@ -5,3 +5,8 @@
  :models-3d/eiffel-loaded?
  (fn [db _]
    (get db :models-3d/eiffel-loaded? false)))
+
+(re-frame/reg-sub
+ :models-3d/eiffel-scale
+ (fn [db _]
+   (get db :models-3d/eiffel-scale 1.0)))
