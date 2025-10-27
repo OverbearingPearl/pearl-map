@@ -2,6 +2,12 @@
   (:require [re-frame.core :as re-frame]
             [pearl-map.services.map-engine :as map-engine]))
 
+(re-frame/reg-fx
+ :set-map-light
+ (fn [light-props]
+   (when-let [^js map-instance (map-engine/get-map-instance)]
+     (.setLight map-instance (clj->js light-props)))))
+
 (defn init-map []
   (let [map-obj (map-engine/init-map)]
     (when map-obj

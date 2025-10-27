@@ -2,9 +2,23 @@
   (:require ["three" :as three]
             ["maplibre-gl" :as maplibre]
             [re-frame.core :as rf]
+            [re-frame.db :as rf-db]
             [pearl-map.app.db :as app-db]
             [pearl-map.services.model-loader :as model-loader]
             [pearl-map.utils.geometry :as geom]))
+
+(defn- maplibre-light-pos->three-direction
+  "Converts MapLibre light position [r, a, p] to a Three.js direction Vector3.
+  It assumes the map is on the XZ plane and Y is up.
+  - MapLibre's azimuth 'a' is clockwise from North (-Z direction).
+  - MapLibre's polar 'p' is from zenith (+Y direction)."
+  [[r a p]]
+  (let [a-rad (* a (/ js/Math.PI 180))
+        p-rad (* p (/ js/Math.PI 180))
+        x (* r (js/Math.sin p-rad) (js/Math.sin a-rad))
+        y (* r (js/Math.cos p-rad))
+        z (* r (- (js/Math.sin p-rad)) (js/Math.cos a-rad))]
+    (three/Vector3. x y z)))
 
 (def eiffel-tower-coords [2.2945 48.8584])
 (def model-altitude 0)
@@ -46,18 +60,15 @@
                         ^js scene (three/Scene.)
                         ^js camera (three/Camera.)
                         ^js loader (model-loader/create-gltf-loader)
-                        ^js directional-light-1 (three/DirectionalLight. 0xffffff)
-                        ^js directional-light-2 (three/DirectionalLight. 0xffffff)
+                        ^js directional-light (three/DirectionalLight. 0xffffff)
+                        ^js ambient-light (three/AmbientLight. 0xffffff 0.4)
                         ^js renderer (three/WebGLRenderer.
                                       #js {:canvas canvas
                                            :context gl
                                            :antialias true})]
 
-                    (-> directional-light-1 .-position (.set 0 -70 100) (.normalize))
-                    (.add scene directional-light-1)
-
-                    (-> directional-light-2 .-position (.set 0 70 100) (.normalize))
-                    (.add scene directional-light-2)
+                    (.add scene directional-light)
+                    (.add scene ambient-light)
 
                     ;; Load the Eiffel Tower model
                     (model-loader/load-model
@@ -91,6 +102,7 @@
                             #js {:scene scene
                                  :camera camera
                                  :renderer renderer
+                                 :light directional-light
                                  :map map-obj
                                  :modelTransform model-transform
                                  :userScale (:models-3d/eiffel-scale app-db/default-db)
@@ -99,7 +111,14 @@
 
          :render (fn [gl matrix-data]
                    (when-let [^js state @layer-state]
-                     (let [user-scale (.-userScale state)
+                     (let [light-props (:map/light-properties @rf-db/app-db)
+                           light (.-light state)
+                           _ (when (and light-props light)
+                               (doto light
+                                 (-> .-color (.set (three/Color. (:color light-props))))
+                                 (-> .-position (.copy (maplibre-light-pos->three-direction (:position light-props))))
+                                 (aset "intensity" (:intensity light-props))))
+                           user-scale (.-userScale state)
                            scene (.-scene state)
                            camera (.-camera state)
                            renderer (.-renderer state)

@@ -20,3 +20,8 @@
  :show-other-components?
  (fn [db]
    (:show-other-components? db)))
+
+(re-frame/reg-sub
+ :map/light-properties
+ (fn [db]
+   (:map/light-properties db)))
