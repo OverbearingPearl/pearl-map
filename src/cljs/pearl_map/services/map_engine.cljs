@@ -115,23 +115,21 @@
 
 (defn add-buildings-layer []
   (when-let [^js map-obj (get-map-instance)]
-    (.once map-obj "idle"
-           (fn []
-             (try
-               (when (.getSource map-obj "composite")
-                 (when-not (.getLayer map-obj "buildings")
-                   (.addLayer map-obj
-                              (clj->js
-                               {:id "buildings"
-                                :type "fill"
-                                :source "composite"
-                                :source-layer "building"
-                                :filter ["==" "extrude" "true"]
-                                :paint {:fill-color "#f0f0f0"
-                                        :fill-opacity 1.0
-                                        :fill-outline-color "#cccccc"}}))))
-               (catch js/Error e
-                 nil))))))
+    (try
+      (when (.getSource map-obj "carto")
+        (when-not (.getLayer map-obj "buildings")
+          (.addLayer map-obj
+                     (clj->js
+                      {:id "buildings"
+                       :type "fill-extrusion"
+                       :source "carto"
+                       :source-layer "building"
+                       :paint {:fill-extrusion-color "#f0f0f0"
+                               :fill-extrusion-height ["coalesce" ["get" "height"] ["get" "render_height"] 0]
+                               :fill-extrusion-base ["coalesce" ["get" "min_height"] ["get" "render_min_height"] 0]
+                               :fill-extrusion-opacity 1.0}}))))
+      (catch js/Error e
+        (js/console.error "Failed to add buildings layer:" e)))))
 
 (defn register-custom-layer [layer-id layer-impl]
   (re-frame/dispatch [:register-custom-layer layer-id layer-impl]))
@@ -350,14 +348,14 @@
         (let [stops (.-stops value)]
           (mapv (fn [[zoom prop-value]]
                   {:zoom zoom
-                   :value (if (#{"fill-color" "fill-outline-color"} property-name)
+                   :value (if (#{"fill-color" "fill-outline-color" "fill-extrusion-color"} property-name)
                             (parse-color-expression prop-value current-zoom)
                             (parse-numeric-expression prop-value current-zoom))})
                 stops))
 
         :else
         [{:zoom current-zoom
-          :value (if (#{"fill-color" "fill-outline-color"} property-name)
+          :value (if (#{"fill-color" "fill-outline-color" "fill-extrusion-color"} property-name)
                    (parse-color-expression value current-zoom)
                    (parse-numeric-expression value current-zoom))}]))))
 
