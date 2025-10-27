@@ -58,7 +58,6 @@
   (copy-maplibre-css)
   (copy-gltf-files))
 
-;; Add the missing -main function
 (defn -main [& args]
   (println "Running Pearl-Map build tasks...")
   (build-hook)

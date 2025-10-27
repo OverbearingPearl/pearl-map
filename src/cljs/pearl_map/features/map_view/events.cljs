@@ -11,9 +11,7 @@
 (defn init-map []
   (let [map-obj (map-engine/init-map)]
     (when map-obj
-      (map-engine/on-map-load
-       (fn [map-instance]
-         (js/console.log "Map loaded successfully")))
+      (map-engine/on-map-load (fn [_]))
       (map-engine/on-map-error
        (fn [e]
          (js/console.error "Map loading error:" e))))))

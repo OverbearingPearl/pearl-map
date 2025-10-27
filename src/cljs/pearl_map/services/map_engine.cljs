@@ -8,7 +8,6 @@
             ["@maplibre/maplibre-gl-style-spec" :as style-spec]
             ["three" :as three]))
 
-;; Simplified expression handling - focus on basic value extraction
 (defn isExpression [x]
   (and (object? x)
        (or (some? (.-stops x))
@@ -17,10 +16,8 @@
 
 (defn- evaluate [expr properties]
   (cond
-    ;; Handle stops expressions with interpolation
     (and (.-stops expr) (.-zoom properties))
     (let [stops-array (.-stops expr)
-          ;; Convert to Clojure vector for easier processing
           stops (vec (js->clj stops-array))
           zoom (.-zoom properties)
           base (or (.-base expr) 1)
@@ -28,24 +25,18 @@
 
       (if (zero? stop-count)
         nil
-        ;; Find the appropriate stop range
         (loop [i 0]
           (cond
             (>= i stop-count)
-            ;; Beyond all stops - use last value
             (second (nth stops (dec stop-count)))
 
             :else
             (let [[current-zoom current-value] (nth stops i)]
               (if (<= zoom current-zoom)
-                ;; Found the stop range
                 (if (zero? i)
-                  ;; Before first stop - use first value
                   current-value
-                  ;; Interpolate between previous and current stop
                   (let [[prev-zoom prev-value] (nth stops (dec i))
                         t (/ (- zoom prev-zoom) (- current-zoom prev-zoom))
-                        ;; Apply exponential interpolation if base != 1
                         interpolated-t (if (= base 1)
                                          t
                                          (/ (- (js/Math.pow base t) 1)
@@ -58,11 +49,9 @@
                       current-value)))
                 (recur (inc i))))))))
 
-    ;; Handle literal values
     (.-value expr) (.-value expr)
     (.-default expr) (.-default expr)
 
-    ;; Handle direct values
     :else expr))
 
 (def eiffel-tower-coords [2.2945 48.8584])
@@ -128,7 +117,6 @@
   (when-let [^js map-obj (get-map-instance)]
     (.once map-obj "idle"
            (fn []
-             ;; Use the current API - check if composite source exists by trying to get it
              (try
                (when (.getSource map-obj "composite")
                  (when-not (.getLayer map-obj "buildings")
@@ -143,7 +131,6 @@
                                         :fill-opacity 1.0
                                         :fill-outline-color "#cccccc"}}))))
                (catch js/Error e
-                 ;; Composite source doesn't exist, skip adding buildings layer
                  nil))))))
 
 (defn register-custom-layer [layer-id layer-impl]
@@ -274,11 +261,9 @@
 (defn parse-color-expression [color-value current-zoom]
   (when color-value
     (cond
-      ;; Handle "transparent" string directly
       (and (string? color-value) (= color-value "transparent"))
       "transparent"
 
-      ;; Handle expression objects
       (isExpression color-value)
       (try
         (let [result (evaluate color-value #js {:zoom current-zoom})]
@@ -291,7 +276,6 @@
           (js/console.warn "Failed to evaluate color expression:" e)
           nil))
 
-      ;; Handle simple color strings
       (string? color-value)
       (if (.startsWith color-value "#")
         color-value
@@ -304,7 +288,6 @@
             (js/console.warn "Failed to parse color string:" color-value)
             nil)))
 
-      ;; Handle numeric values (convert to hex)
       (number? color-value)
       (try
         (str "#" (.toString (js/Math.floor color-value) 16))
@@ -312,7 +295,6 @@
           (js/console.warn "Failed to convert numeric to color:" color-value)
           nil))
 
-      ;; Handle simple object values
       (object? color-value)
       (try
         (let [value (or (.-default color-value)
@@ -331,14 +313,11 @@
   (cond
     (nil? numeric-value) nil
 
-    ;; Handle simple numeric values first
     (number? numeric-value) numeric-value
 
-    ;; Handle all expression types through the evaluate function
     (isExpression numeric-value)
     (try
       (let [result (evaluate numeric-value #js {:zoom current-zoom})]
-        (js/console.log "Evaluated numeric expression:" numeric-value "->" result)
         (cond
           (number? result) result
           (string? result) (let [parsed (js/parseFloat result)]
@@ -348,11 +327,9 @@
         (js/console.warn "Failed to evaluate numeric expression:" e)
         nil))
 
-    ;; Handle string values
     (string? numeric-value) (let [parsed (js/parseFloat numeric-value)]
                               (if (js/isNaN parsed) nil parsed))
 
-    ;; Handle object values - check for common expression properties
     (object? numeric-value)
     (let [value (or (.-default numeric-value)
                     (.-value numeric-value)
@@ -369,7 +346,6 @@
   (let [value (get-paint-property layer-id property-name)]
     (when value
       (cond
-        ;; Handle stops expressions
         (and (isExpression value) (.-stops value))
         (let [stops (.-stops value)]
           (mapv (fn [[zoom prop-value]]
@@ -379,7 +355,6 @@
                             (parse-numeric-expression prop-value current-zoom))})
                 stops))
 
-        ;; Handle single values
         :else
         [{:zoom current-zoom
           :value (if (#{"fill-color" "fill-outline-color"} property-name)
@@ -394,18 +369,14 @@
   (let [current-value (get-paint-property layer-id property-name)
         current-zoom (get-current-zoom)]
     (cond
-      ;; If we're updating the current zoom level and it's a single value, keep it as single value
       (and (= zoom current-zoom)
            (not (isExpression current-value)))
       new-value
 
-      ;; If we're updating a different zoom level and it's currently a single value,
-      ;; convert to stops expression with original value at current zoom and new value at target zoom
       (and (not= zoom current-zoom)
            (not (isExpression current-value)))
       {:stops [[current-zoom current-value] [zoom new-value]]}
 
-      ;; If it's already a stops expression, update the specific stop
       (and (isExpression current-value) (.-stops current-value))
       (let [stops (.-stops current-value)
             updated-stops (mapv (fn [[stop-zoom stop-value]]
@@ -415,25 +386,21 @@
                                 stops)]
         {:stops updated-stops})
 
-      ;; For any other case (like other expression types), just use the new value
       :else
       new-value)))
 
 (defn validate-style [style]
   (try
-    ;; Accept expression objects, strings, numbers, and nil values
     (and (map? style)
          (every? (fn [[k v]]
                    (and (keyword? k)
                         (or (string? v)
                             (number? v)
                             (nil? v)
-                            ;; Allow expression objects
                             (and (object? v)
                                  (or (some? (.-stops v))
                                      (some? (.-property v))
                                      (some? (.-type v))))
-                            ;; Allow Clojure maps that represent expressions
                             (and (map? v)
                                  (or (:stops v)
                                      (:property v)

@@ -46,7 +46,6 @@
  (fn [{:keys [db]} [_ style-key value]]
    (try
      (let [target-layer (get db :style-editor/target-layer "building")]
-       ;; Apply only the single style property, not the entire style map
        (map-engine/set-paint-property target-layer (name style-key) value))
      {:db db}
      (catch js/Error e
@@ -57,7 +56,6 @@
  :style-editor/apply-styles
  (fn [{:keys [db]} [_ style]]
    (try
-     (js/console.log "Applying styles:" (clj->js style))
      (style-editor-views/apply-current-style style)
      {:db db}
      (catch js/Error e
@@ -70,7 +68,6 @@
    {:db (assoc db :style-editor/editing-style style)
     :fx [[:dispatch [:style-editor/apply-styles style]]]}))
 
-;; Add helper function to access get-layer-styles
 (defn get-layer-styles [layer-id current-style]
   (style-editor-views/get-layer-styles layer-id current-style))
 
@@ -80,7 +77,6 @@
    (let [target-layer (get db :style-editor/target-layer "building")
          current-style (:current-style db)
          current-styles (get-layer-styles target-layer current-style)]
-     ;; Update the editing style without triggering re-application
      {:db (assoc db :style-editor/editing-style current-styles)})))
 
 (re-frame/reg-event-fx

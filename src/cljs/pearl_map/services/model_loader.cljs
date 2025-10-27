@@ -8,5 +8,5 @@
 (defn load-model [loader url on-load on-error]
   (.load loader url
          (fn [gltf] (on-load gltf))
-         nil  ; progress callback (optional)
+         nil
          (fn [error] (on-error error))))

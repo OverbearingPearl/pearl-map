@@ -93,7 +93,6 @@
                     (set! (.-autoClear renderer) false)
 
                     ;; Dispatch events to reset sliders to default values.
-                    ;; NOTE: Event names are guessed as I don't have the events.cljs file.
                     (rf/dispatch [:models-3d/set-eiffel-scale (:models-3d/eiffel-scale app-db/default-db)])
                     (rf/dispatch [:models-3d/set-eiffel-rotation-z (:models-3d/eiffel-rotation-z app-db/default-db)])
 
@@ -156,16 +155,12 @@
     (.setSize renderer 200 200)
     (-> js/document .-body (.appendChild (.-domElement renderer)))
 
-    ;; Add a simple cube for testing
     (let [^js geometry (three/BoxGeometry. 1 1 1)
           ^js material (three/MeshBasicMaterial. #js {:color 0x00ff00})
           ^js cube (three/Mesh. geometry material)]
       (.add scene cube)
       (.set (.-position camera) 0 0 5)
 
-      (js/console.log "Test cube added to scene")
-
-      ;; Animate the cube - fix recursive call
       (let [animate (fn animate-fn []
                       (js/requestAnimationFrame animate-fn)
                       (set! (.-rotation-x cube) (+ (.-rotation-x cube) 0.01))

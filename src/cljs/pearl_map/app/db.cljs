@@ -13,5 +13,5 @@
                           :position [1.15 210 30]}
    :models-3d/eiffel-loaded? false
    :models-3d/eiffel-scale 1.0
-   :models-3d/eiffel-rotation-z 45.0 ;; Set initial orientation to match real world
-   :show-other-components? true})  ;; Added new state
+   :models-3d/eiffel-rotation-z 45.0
+   :show-other-components? true})
