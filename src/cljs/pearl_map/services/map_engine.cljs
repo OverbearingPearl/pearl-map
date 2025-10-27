@@ -60,7 +60,12 @@
   "OSM IDs for buildings in the Eiffel Tower complex to be excluded from the map."
   [;; Main structure:
    5013364
-   ;; Surrounding structures (IDs identified via click debugging):
+   ;; Other structures that have little impact (IDs identified via click debugging):
+   ;; 278644
+   ;; 279659
+   ;; 540568
+   ;; 540590]
+   ;; Surrounding structures:
    308687745
    308687744
    308689164
@@ -69,11 +74,7 @@
    308687746
    308145239
    69034127 
-   278644
-   279659
-   540568
    335101043
-   540590
    4114841])
 
 (def style-urls
