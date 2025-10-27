@@ -58,22 +58,23 @@
 
 (def eiffel-tower-osm-ids
   "OSM IDs for buildings in the Eiffel Tower complex to be excluded from the map."
-  [5013364   ;; Eiffel Tower main structure
-   308687745 ;; Another building part, identified via click debugging
-   308687744 ;; Another building part, identified via click debugging
-   308689164 ;; Another building part, identified via click debugging
-   4114842   ;; Another building part, identified via click debugging
-   4114839   ;; Another building part, identified via click debugging
-   308687746 ;; Another building part, identified via click debugging
-   308145239 ;; Another building part, identified via click debugging
-   69034127  ;; Another building part, identified via click debugging
-   278644    ;; Another building part, identified via click debugging
-   279659    ;; Another building part, identified via click debugging
-   540568    ;; Another building part, identified via click debugging
-   335101043 ;; Another building part, identified via click debugging
-   540590    ;; Another building part, identified via click debugging
-   4114841   ;; Another building part, identified via click debugging
-   ])
+  [;; Main structure:
+   5013364
+   ;; Surrounding structures (IDs identified via click debugging):
+   308687745
+   308687744
+   308689164
+   4114842
+   4114839
+   308687746
+   308145239
+   69034127 
+   278644
+   279659
+   540568
+   335101043
+   540590
+   4114841])
 
 (def style-urls
   {:basic "raster-style"
