@@ -8,7 +8,7 @@
             ["@maplibre/maplibre-gl-style-spec" :as style-spec]
             ["three" :as three]))
 
-(defn isExpression [x]
+(defn expression? [x]
   (cond
     (array? x) (and (string? (first x)) (> (count x) 1))
     (object? x) (or (some? (.-stops x))
@@ -119,14 +119,13 @@
       (clj->js (assoc base-config :style style-url)))))
 
 (defn init-map []
-  (let [map-element (.getElementById js/document "map-container")]
-    (when map-element
-      (let [map-config (create-config "raster-style")
-            map-obj (maplibre/Map. map-config)]
-        (set-map-instance! map-obj)
-        (.addControl map-obj (maplibre/NavigationControl.))
-        (.addControl map-obj (maplibre/ScaleControl.))
-        map-obj))))
+  (when (.getElementById js/document "map-container")
+    (let [map-config (create-config "raster-style")
+          map-obj (maplibre/Map. map-config)]
+      (set-map-instance! map-obj)
+      (doto map-obj
+        (.addControl (maplibre/NavigationControl.))
+        (.addControl (maplibre/ScaleControl.))))))
 
 (defn on-map-load [callback]
   (when-let [^js map-obj (get-map-instance)]
@@ -137,43 +136,36 @@
     (.on map-obj "error" #(callback %))))
 
 (defn- create-extruded-layer-spec [layer-id initial-color]
-  (clj->js
-   {:id layer-id
-    :type "fill-extrusion"
-    :source "carto"
-    :source-layer "building"
-    :filter (into ["!in" "$id"] eiffel-tower-osm-ids)
-    :paint {:fill-extrusion-color initial-color
-            :fill-extrusion-height ["coalesce" ["get" "height"] ["get" "render_height"] 10]
-            :fill-extrusion-base (if (= layer-id "extruded-building-top")
-                                   ["coalesce" ["get" "height"] ["get" "render_height"] 10]
-                                   ["coalesce" ["get" "min_height"] ["get" "render_min_height"] 0])
-            :fill-extrusion-opacity 1.0
-            :fill-extrusion-vertical-gradient (if (= layer-id "extruded-building-top") false true)
-            :fill-extrusion-translate [0, 0]
-            :fill-extrusion-translate-anchor "map"}}))
+  (let [is-top-layer? (= layer-id "extruded-building-top")
+        height-expr ["coalesce" ["get" "height"] ["get" "render_height"] 10]
+        base-expr (if is-top-layer?
+                    height-expr
+                    ["coalesce" ["get" "min_height"] ["get" "render_min_height"] 0])]
+    (clj->js
+     {:id layer-id
+      :type "fill-extrusion"
+      :source "carto"
+      :source-layer "building"
+      :filter (into ["!in" "$id"] eiffel-tower-osm-ids)
+      :paint {:fill-extrusion-color initial-color
+              :fill-extrusion-height height-expr
+              :fill-extrusion-base base-expr
+              :fill-extrusion-opacity 1.0
+              :fill-extrusion-vertical-gradient (not is-top-layer?)
+              :fill-extrusion-translate [0, 0]
+              :fill-extrusion-translate-anchor "map"}})))
 
 (defn add-extruded-buildings-layer []
   (when-let [^js map-obj (get-map-instance)]
-    (try
-      (when (.getSource map-obj "carto")
-        (let [current-style (:current-style @db/app-db)
-              initial-color (if (= current-style (:dark style-urls))
-                              "#2d3748"
-                              "#f0f0f0")]
-
-          (doseq [layer-id ["extruded-building" "extruded-building-top"]]
-            (when-not (.getLayer map-obj layer-id)
-              (let [spec (create-extruded-layer-spec layer-id initial-color)]
-                (js/console.log "Adding layer with spec:" spec "type:" (.-type spec))
-                (.addLayer map-obj spec))))
-
-          (.on map-obj "click" "extruded-building"
-               (fn [e]
-                 (when-let [feature (first (.-features e))]
-                   (js/console.log "Clicked Feature --- ID:" (.-id feature) "--- Properties:" (js->clj (.-properties feature) :keywordize-keys true)))))))
-      (catch js/Error e
-        (js/console.error "Failed to add extruded buildings layer:" e)))))
+    (when (.getSource map-obj "carto")
+      (let [current-style (:current-style @db/app-db)
+            initial-color (if (= current-style (:dark style-urls))
+                            "#2d3748"
+                            "#f0f0f0")]
+        (doseq [layer-id ["extruded-building" "extruded-building-top"]]
+          (when-not (.getLayer map-obj layer-id)
+            (let [spec (create-extruded-layer-spec layer-id initial-color)]
+              (.addLayer map-obj spec))))))))
 
 (defn register-custom-layer [layer-id layer-impl]
   (re-frame/dispatch [:register-custom-layer layer-id layer-impl]))
@@ -196,11 +188,12 @@
        :layers (get-custom-layers)})))
 
 (defn- apply-map-state! [state]
-  (let [^js map-obj (get-map-instance)]
-    (.setCenter map-obj (:center state))
-    (.setZoom map-obj (:zoom state))
-    (.setPitch map-obj (:pitch state))
-    (.setBearing map-obj (:bearing state))))
+  (when-let [^js map-obj (get-map-instance)]
+    (doto map-obj
+      (.setCenter (:center state))
+      (.setZoom (:zoom state))
+      (.setPitch (:pitch state))
+      (.setBearing (:bearing state)))))
 
 (defn- clear-custom-layers []
   (let [^js map-obj (get-map-instance)
@@ -272,30 +265,23 @@
 
 (defn set-paint-property [layer-id property-name value]
   (when-let [^js map-obj (get-map-instance)]
-    (when (.getLayer map-obj layer-id)
-      (when (some? value)
-        (let [js-value (cond
-                         (map? value) (clj->js value)
-                         (#{"fill-extrusion-color" "fill-color" "fill-outline-color"} property-name)
-                         (cond
-                           (= value "transparent") "transparent"
-                           (string? value) (if (or (.startsWith value "#")
-                                                   (.startsWith value "rgb")
-                                                   (.startsWith value "hsl"))
-                                             value
-                                             (str "#" value))
-                           :else (str "#" (.toString (js/parseInt (str value)) 16)))
-                         :else value)
-              layer-type (.-type (.getLayer map-obj layer-id))]
-          (try
-            (js/console.log "Setting paint property:" layer-id property-name js-value "on layer type:" layer-type)
-            (when (or (not= "fill-extrusion-color" property-name)
-                      (= "fill-extrusion" layer-type))
-              (.setPaintProperty map-obj layer-id property-name js-value))
-            (catch js/Error e
-              (js/console.error (str "Failed to set property " property-name
-                                     " on layer " layer-id " (type: " layer-type "):") e)
-              (throw e))))))))
+    (when (and (.getLayer map-obj layer-id) (some? value))
+      (let [js-value (cond
+                       (map? value) (clj->js value)
+                       (#{"fill-extrusion-color" "fill-color" "fill-outline-color"} property-name)
+                       (cond
+                         (= value "transparent") "transparent"
+                         (string? value) (if (or (.startsWith value "#")
+                                                 (.startsWith value "rgb")
+                                                 (.startsWith value "hsl"))
+                                           value
+                                           (str "#" value))
+                         :else (str "#" (.toString (js/parseInt (str value)) 16)))
+                       :else value)
+            layer-type (.-type (.getLayer map-obj layer-id))]
+        (when (or (not= "fill-extrusion-color" property-name)
+                  (= "fill-extrusion" layer-type))
+          (.setPaintProperty map-obj layer-id property-name js-value))))))
 
 (defn get-current-zoom []
   (when-let [^js map-obj (get-map-instance)]
@@ -326,68 +312,45 @@
       (cond
         (= color-value "transparent") "transparent"
         (.startsWith color-value "#") color-value
-        :else (try
-                (-> (color color-value)
-                    (.hex)
-                    (.toString)
-                    (.toLowerCase))
-                (catch js/Error e
-                  (js/console.warn "Failed to parse color string:" color-value)
-                  nil)))
+        :else (-> (color color-value)
+                  (.hex)
+                  (.toString)
+                  (.toLowerCase)))
 
-      (isExpression color-value)
-      (try
-        (let [result (evaluate color-value #js {:zoom current-zoom})]
-          (if (or (string? result) (= result "transparent"))
-            result
-            (do
-              (js/console.warn "Expression evaluated to non-string color:" result)
-              nil)))
-        (catch js/Error e
-          (js/console.warn "Failed to evaluate color expression:" e)
-          nil))
+      (expression? color-value)
+      (let [result (evaluate color-value #js {:zoom current-zoom})]
+        (if (or (string? result) (= result "transparent"))
+          result
+          (throw (js/Error. (str "Expression evaluated to non-string color: " result)))))
 
       (number? color-value)
-      (try
-        (str "#" (.toString (js/Math.floor color-value) 16))
-        (catch js/Error e
-          (js/console.warn "Failed to convert numeric to color:" color-value)
-          nil))
+      (str "#" (.toString (js/Math.floor color-value) 16))
 
       (object? color-value)
-      (try
-        (let [value (or (.-default color-value)
-                        (.-value color-value)
-                        (.-valueOf color-value))]
-          (parse-color-expression value current-zoom))
-        (catch js/Error e
-          nil))
+      (let [value (or (.-default color-value)
+                      (.-value color-value)
+                      (.-valueOf color-value))]
+        (parse-color-expression value current-zoom))
 
       :else
-      (do
-        (js/console.warn "Unexpected color value type:" (type color-value))
-        nil))))
+      (throw (js/Error. (str "Unexpected color value type: " (type color-value)))))))
 
 (defn parse-numeric-expression [numeric-value current-zoom]
   (cond
     (nil? numeric-value) nil
-
     (number? numeric-value) numeric-value
 
-    (isExpression numeric-value)
-    (try
-      (let [result (evaluate numeric-value #js {:zoom current-zoom})]
-        (cond
-          (number? result) result
-          (string? result) (let [parsed (js/parseFloat result)]
-                             (if (js/isNaN parsed) nil parsed))
-          :else nil))
-      (catch js/Error e
-        (js/console.warn "Failed to evaluate numeric expression:" e)
-        nil))
+    (expression? numeric-value)
+    (let [result (evaluate numeric-value #js {:zoom current-zoom})]
+      (cond
+        (number? result) result
+        (string? result) (let [parsed (js/parseFloat result)]
+                           (when-not (js/isNaN parsed) parsed))
+        :else (throw (js/Error. (str "Expression evaluated to non-numeric value: " result)))))
 
-    (string? numeric-value) (let [parsed (js/parseFloat numeric-value)]
-                              (if (js/isNaN parsed) nil parsed))
+    (string? numeric-value)
+    (let [parsed (js/parseFloat numeric-value)]
+      (when-not (js/isNaN parsed) parsed))
 
     (object? numeric-value)
     (let [value (or (.-default numeric-value)
@@ -396,7 +359,7 @@
       (cond
         (number? value) value
         (string? value) (let [parsed (js/parseFloat value)]
-                          (if (js/isNaN parsed) nil parsed))
+                          (when-not (js/isNaN parsed) parsed))
         :else nil))
 
     :else nil))
@@ -441,7 +404,7 @@
         clj-value (if (some? current-value) (js->clj current-value :keywordize-keys true) nil)]
     (cond
       ;; Not an expression, create one if needed
-      (not (isExpression current-value))
+      (not (expression? current-value))
       (if (and (not= zoom current-zoom) (some? current-value))
         ["interpolate" ["linear"] ["zoom"] current-zoom current-value zoom new-value]
         new-value)
@@ -483,18 +446,15 @@
       new-value)))
 
 (defn validate-style [style]
-  (try
-    (and (map? style)
-         (every? (fn [[k v]]
-                   (and (keyword? k)
-                        (or (string? v)
-                            (number? v)
-                            (nil? v)
-                            (isExpression v)
-                            (and (map? v)
-                                 (or (:stops v)
-                                     (:property v)
-                                     (:type v))))))
-                 style))
-    (catch js/Error e
-      false)))
+  (and (map? style)
+       (every? (fn [[k v]]
+                 (and (keyword? k)
+                      (or (string? v)
+                          (number? v)
+                          (nil? v)
+                          (expression? v)
+                          (and (map? v)
+                               (or (:stops v)
+                                   (:property v)
+                                   (:type v))))))
+               style)))
