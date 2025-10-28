@@ -5,22 +5,8 @@
             [pearl-map.services.map-engine :as map-engine]
             [pearl-map.components.ui.buttons :as ui-buttons]))
 
-(def default-building-styles
-  {:light {:fill-color "#f0f0f0"
-           :fill-opacity 1.0
-           :fill-outline-color "#cccccc"
-           :fill-extrusion-color "#f0f0f0"
-           :fill-extrusion-opacity 1.0}
-   :dark {:fill-color "#2d3748"
-          :fill-opacity 1.0
-          :fill-outline-color "#4a5568"
-          :fill-extrusion-color "#2d3748"
-          :fill-extrusion-opacity 1.0}})
-
 (defn get-current-zoom []
   (map-engine/get-current-zoom))
-
-
 
 (defn get-layer-styles [layer-id current-style]
   (let [current-zoom (get-current-zoom)
@@ -60,26 +46,6 @@
                     ;; Layer doesn't exist - return nil to indicate "NOT SET"
                     [style-key nil])))
            (into {})))))
-
-(defn get-current-building-styles [target-layer current-style]
-  (get-layer-styles target-layer current-style))
-
-(defn apply-layer-style [layer-id style]
-  (try
-    (let [validation-result (map-engine/validate-style style)]
-      (if validation-result
-        (doseq [[style-key style-value] style]
-          ;; Allow nil values to be set (they might clear the property)
-          ;; Apply values directly - map-engine/set-paint-property handles conversion
-          (map-engine/set-paint-property layer-id (name style-key) style-value))
-        (js/console.error "Style validation failed - not applying changes" style)))
-    (catch js/Error e
-      (js/console.error (str "Failed to apply style to layer " layer-id ":") e)
-      (throw e))))
-
-(defn apply-current-style [style]
-  (let [target-layer (get @re-frame.db/app-db :style-editor/target-layer)]
-    (apply-layer-style target-layer style)))
 
 (defn update-building-style
   ([style-key value]
@@ -188,7 +154,7 @@
                                        (re-frame/dispatch [:style-editor/reset-styles-immediately]))
                          :style {:width "100%" :padding "5px" :border "1px solid #ddd" :border-radius "4px"}}
                 [:option {:value "building"} "Building"]
-                [:option {:value "building-top"} "Building Top"] ;; Added building-top
+                [:option {:value "building-top"} "Building Top"]
                 [:option {:value "extruded-building"} "Building 3D (Extruded)"]
                 [:option {:value "extruded-building-top"} "Building 3D Top"]]]
 
@@ -357,27 +323,17 @@
                        [:span {:style {:font-size "12px" :color "#666"}}
                         (str "Current: " (-> (or (:fill-extrusion-opacity editing-style) 1) (* 100) js/Math.round (str "%")))]]))]
 
-                 ;; Action buttons
-                 [:div {:style {:display "flex" :gap "10px" :margin-bottom "15px" :flex-wrap "wrap"}}
-                  [ui-buttons/primary-button {:on-click #(re-frame/dispatch [:style-editor/set-and-apply-style (:light default-building-styles)])
-                                              :style {:flex "1"}} "Light"]
-                  [ui-buttons/dark-button {:on-click #(re-frame/dispatch [:style-editor/set-and-apply-style (:dark default-building-styles)])
-                                           :style {:flex "1"}} "Dark"]
-                  [ui-buttons/success-button {:on-click #(re-frame/dispatch [:style-editor/reset-styles-immediately])
-                                              :style {:flex "1"}} "Reset"]]
-                 ])
-
-              ;; Status information
-              [:div {:style {:padding-top "15px" :border-top "1px solid #eee"}}
-               [:p {:style {:color "#666" :font-size "12px" :margin "0 0 10px 0" :font-weight "bold"}}
-                (str "Current Layer: " target-layer)]
-               [:p {:style {:color "#666" :font-size "11px" :margin "0" :font-style "italic"}}
-                "Only works with Dark or Light vector styles"]
-               [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
-                "Styles: " (pr-str (-> editing-style
-                                       (select-keys [:fill-color :fill-opacity :fill-outline-color :fill-extrusion-color :fill-extrusion-opacity])
-                                       (update :fill-color #(if (nil? %) "NOT SET" %))
-                                       (update :fill-opacity #(if (nil? %) "NOT SET" %))
-                                       (update :fill-outline-color #(if (nil? %) "NOT SET" %))
-                                       (update :fill-extrusion-color #(if (nil? %) "NOT SET" %))
-                                       (update :fill-extrusion-opacity #(if (nil? %) "NOT SET" %))))]]]))]))}))
+                 ;; Status information
+                 [:div {:style {:padding-top "15px" :border-top "1px solid #eee"}}
+                  [:p {:style {:color "#666" :font-size "12px" :margin "0 0 10px 0" :font-weight "bold"}}
+                   (str "Current Layer: " target-layer)]
+                  [:p {:style {:color "#666" :font-size "11px" :margin "0" :font-style "italic"}}
+                   "Only works with Dark or Light vector styles"]
+                  [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
+                   "Styles: " (pr-str (-> editing-style
+                                          (select-keys [:fill-color :fill-opacity :fill-outline-color :fill-extrusion-color :fill-extrusion-opacity])
+                                          (update :fill-color #(if (nil? %) "NOT SET" %))
+                                          (update :fill-opacity #(if (nil? %) "NOT SET" %))
+                                          (update :fill-outline-color #(if (nil? %) "NOT SET" %))
+                                          (update :fill-extrusion-color #(if (nil? %) "NOT SET" %))
+                                          (update :fill-extrusion-opacity #(if (nil? %) "NOT SET" %))))]]])]))]))}))

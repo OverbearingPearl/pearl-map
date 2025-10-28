@@ -36,12 +36,6 @@
       :fx [[:dispatch [:style-editor/apply-single-style style-key value]]]})))
 
 (re-frame/reg-event-fx
- :style-editor/actually-apply-styles
- (fn [{:keys [db]} [_ style]]
-   {:fx [[:dispatch [:style-editor/apply-styles style]]]}))
-
-
-(re-frame/reg-event-fx
  :style-editor/apply-single-style
  (fn [{:keys [db]} [_ style-key value]]
    (try
@@ -59,30 +53,11 @@
        {:db db}))))
 
 (re-frame/reg-event-fx
- :style-editor/apply-styles
- (fn [{:keys [db]} [_ style]]
-   (try
-     (style-editor-views/apply-current-style style)
-     {:db db}
-     (catch js/Error e
-       (js/console.error "Failed to apply styles:" e)
-       {:db db}))))
-
-(re-frame/reg-event-fx
- :style-editor/set-and-apply-style
- (fn [{:keys [db]} [_ style]]
-   {:db (assoc db :style-editor/editing-style style)
-    :fx [[:dispatch [:style-editor/apply-styles style]]]}))
-
-(defn get-layer-styles [layer-id current-style]
-  (style-editor-views/get-layer-styles layer-id current-style))
-
-(re-frame/reg-event-fx
  :style-editor/reset-styles-immediately
  (fn [{:keys [db]} _]
    (let [target-layer (get db :style-editor/target-layer)
          current-style (:current-style db)
-         current-styles (get-layer-styles target-layer current-style)]
+         current-styles (style-editor-views/get-layer-styles target-layer current-style)]
      {:db (assoc db :style-editor/editing-style current-styles)})))
 
 (re-frame/reg-event-fx
@@ -90,5 +65,5 @@
  (fn [{:keys [db]} _]
    (let [target-layer (get db :style-editor/target-layer)
          current-style (:current-style db)
-         current-styles (style-editor-views/get-current-building-styles target-layer current-style)]
+         current-styles (style-editor-views/get-layer-styles target-layer current-style)]
      {:db (assoc db :style-editor/editing-style current-styles)})))
