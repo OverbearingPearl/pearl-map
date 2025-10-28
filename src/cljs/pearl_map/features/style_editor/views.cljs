@@ -162,166 +162,171 @@
               (when layer-exists?
                 [:div
                  ;; Style controls
-                 [:div {:style {:margin-bottom "10px"}}
-                  [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Fill Color"]
-                  (let [current-zoom (get-current-zoom)
-                        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-color" current-zoom)]
-                    (if (> (count zoom-pairs) 1)
-                      ;; Multiple zoom levels
-                      [:div {:key "multiple-zoom-colors" :style {:display "flex" :gap "5px" :flex-wrap "wrap"}}
-                       (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
-                         [:div {:key (str "color-" zoom "-" index) :style {:position "relative" :flex "1" :min-width "60px"}}
-                          [:input {:type "color"
-                                   :value (if (= value "transparent") "#f0f0f0" (or value "#f0f0f0"))
-                                   :on-change #(let [new-color (-> % .-target .-value)]
-                                                 (when new-color
-                                                   (update-building-style :fill-color new-color zoom)))
-                                   :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
-                                           :opacity (if (= value "transparent") 0.3 1.0)
-                                           :background "transparent"}}]
-                          [:div {:key (str "label-" zoom) :style {:font-size "10px" :text-align "center" :margin-top "2px" :color "#666"}}
-                           (str "z" zoom)]
-                          (when (= value "transparent")
-                            [:div {:key (str "transparent-" zoom) :style {:position "absolute" :top "0" :left "0" :right "0" :height "30px"
-                                                                          :display "flex" :align-items "center" :justify-content "center"
-                                                                          :background "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
-                                                                          :border-radius "4px" :color "#666" :font-weight "bold" :pointer-events "none"
-                                                                          :font-size "8px" :line-height "1"}}
-                             "TRANSPARENT"])])]
-                      ;; Single zoom level
+                 (when (not (#{"extruded-building" "extruded-building-top"} target-layer))
+                   [:div {:style {:margin-bottom "10px"}}
+                    [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Fill Color"]
+                    (let [current-zoom (get-current-zoom)
+                          zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-color" current-zoom)]
+                      (if (> (count zoom-pairs) 1)
+                        ;; Multiple zoom levels
+                        [:div {:key "multiple-zoom-colors" :style {:display "flex" :gap "5px" :flex-wrap "wrap"}}
+                         (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
+                           [:div {:key (str "color-" zoom "-" index) :style {:position "relative" :flex "1" :min-width "60px"}}
+                            [:input {:type "color"
+                                     :value (if (= value "transparent") "#f0f0f0" (or value "#f0f0f0"))
+                                     :on-change #(let [new-color (-> % .-target .-value)]
+                                                   (when new-color
+                                                     (update-building-style :fill-color new-color zoom)))
+                                     :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
+                                             :opacity (if (= value "transparent") 0.3 1.0)
+                                             :background "transparent"}}]
+                            [:div {:key (str "label-" zoom) :style {:font-size "10px" :text-align "center" :margin-top "2px" :color "#666"}}
+                             (str "z" zoom)]
+                            (when (= value "transparent")
+                              [:div {:key (str "transparent-" zoom) :style {:position "absolute" :top "0" :left "0" :right "0" :height "30px"
+                                                                            :display "flex" :align-items "center" :justify-content "center"
+                                                                            :background "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
+                                                                            :border-radius "4px" :color "#666" :font-weight "bold" :pointer-events "none"
+                                                                            :font-size "8px" :line-height "1"}}
+                               "TRANSPARENT"])])]
+                        ;; Single zoom level
+                        [:div {:style {:position "relative"}}
+                         [:input {:type "color"
+                                  :value (let [color-value (:fill-color editing-style)]
+                                           (if (= color-value "transparent")
+                                             "#f0f0f0"
+                                             (or color-value "#f0f0f0")))
+                                  :on-change #(update-building-style :fill-color (-> % .-target .-value))
+                                  :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
+                                          :opacity (if (= (:fill-color editing-style) "transparent") 0.3 1.0)
+                                          :background "transparent"}}]
+                         (when (= (:fill-color editing-style) "transparent")
+                           [:div {:style {:position "absolute" :top "0" :left "0" :right "0" :height "30px"
+                                          :display "flex" :align-items "center" :justify-content "center"
+                                          :background "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
+                                          :border-radius "4px" :color "#666" :font-weight "bold" :pointer-events "none"
+                                          :font-size "10px" :line-height "1"}}
+                            "TRANSPARENT"])]))])
+
+                 (when (not (#{"extruded-building" "extruded-building-top"} target-layer))
+                   [:div {:style {:margin-bottom "10px"}}
+                    [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Opacity"]
+                    (let [current-zoom (get-current-zoom)
+                          zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-opacity" current-zoom)]
+                      (if (> (count zoom-pairs) 1)
+                        ;; Multiple zoom levels
+                        [:div {:key "multiple-zoom-opacities"}
+                         (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
+                           [:div {:key (str "opacity-" zoom "-" index) :style {:margin-bottom "10px"}}
+                            [:div {:key (str "header-" zoom) :style {:display "flex" :justify-content "space-between" :align-items "center" :margin-bottom "5px"}}
+                             [:span {:key (str "zoom-label-" zoom) :style {:font-size "11px" :color "#666"}} (str "z" zoom)]
+                             [:span {:key (str "value-label-" zoom) :style {:font-size "11px" :color "#666"}}
+                              (str (-> (or value 0) (* 100) js/Math.round) "%")]]
+                            [:input {:key (str "slider-" zoom)
+                                     :type "range"
+                                     :min "0" :max "1" :step "0.1"
+                                     :value (or value 0)
+                                     :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
+                                                   (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
+                                                     (update-building-style :fill-opacity new-opacity zoom)))
+                                     :style {:width "100%"}}]])]
+                        ;; Single zoom level
+                        [:div
+                         [:input {:type "range"
+                                  :min "0" :max "1" :step "0.1"
+                                  :value (let [opacity (:fill-opacity editing-style)
+                                               color-transparent? (= (:fill-color editing-style) "transparent")]
+                                           (cond
+                                             color-transparent? 0
+                                             (number? opacity) opacity
+                                             :else 1))
+                                  :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
+                                                (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
+                                                  (update-building-style :fill-opacity new-opacity)))
+                                  :style {:width "100%"}}]
+                         [:span {:style {:font-size "12px" :color "#666"}}
+                          (str "Current: " (let [opacity (:fill-opacity editing-style)
+                                                 color-transparent? (= (:fill-color editing-style) "transparent")]
+                                             (cond
+                                               color-transparent? "0% (transparent)"
+                                               (number? opacity) (-> opacity (* 100) js/Math.round (str "%"))
+                                               :else "100% (default)")))]]))])
+
+                 (when (= target-layer "building")
+                   [:div {:style {:margin-bottom "10px"}}
+                    [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Outline Color"]
+                    (let [outline-color (:fill-outline-color editing-style)]
                       [:div {:style {:position "relative"}}
                        [:input {:type "color"
-                                :value (let [color-value (:fill-color editing-style)]
-                                         (if (= color-value "transparent")
-                                           "#f0f0f0"
-                                           (or color-value "#f0f0f0")))
-                                :on-change #(update-building-style :fill-color (-> % .-target .-value))
+                                :value (if (some? outline-color)
+                                         (if (= outline-color "transparent") "#f0f0f0" outline-color)
+                                         "#f0f0f0")
+                                :on-change #(update-building-style :fill-outline-color (-> % .-target .-value))
                                 :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
-                                        :opacity (if (= (:fill-color editing-style) "transparent") 0.3 1.0)
+                                        :opacity (if (or (= outline-color "transparent") (nil? outline-color)) 0.3 1.0)
                                         :background "transparent"}}]
-                       (when (= (:fill-color editing-style) "transparent")
+                       (when (or (= outline-color "transparent") (nil? outline-color))
                          [:div {:style {:position "absolute" :top "0" :left "0" :right "0" :height "30px"
                                         :display "flex" :align-items "center" :justify-content "center"
                                         :background "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
                                         :border-radius "4px" :color "#666" :font-weight "bold" :pointer-events "none"
                                         :font-size "10px" :line-height "1"}}
-                          "TRANSPARENT"])]))]
+                          (if (nil? outline-color) "NOT SET" "TRANSPARENT")])])])
 
-                 [:div {:style {:margin-bottom "10px"}}
-                  [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Opacity"]
-                  (let [current-zoom (get-current-zoom)
-                        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-opacity" current-zoom)]
-                    (if (> (count zoom-pairs) 1)
-                      ;; Multiple zoom levels
-                      [:div {:key "multiple-zoom-opacities"}
-                       (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
-                         [:div {:key (str "opacity-" zoom "-" index) :style {:margin-bottom "10px"}}
-                          [:div {:key (str "header-" zoom) :style {:display "flex" :justify-content "space-between" :align-items "center" :margin-bottom "5px"}}
-                           [:span {:key (str "zoom-label-" zoom) :style {:font-size "11px" :color "#666"}} (str "z" zoom)]
-                           [:span {:key (str "value-label-" zoom) :style {:font-size "11px" :color "#666"}}
-                            (str (-> (or value 0) (* 100) js/Math.round) "%")]]
-                          [:input {:key (str "slider-" zoom)
-                                   :type "range"
-                                   :min "0" :max "1" :step "0.1"
-                                   :value (or value 0)
-                                   :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
-                                                 (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
-                                                   (update-building-style :fill-opacity new-opacity zoom)))
-                                   :style {:width "100%"}}]])]
-                      ;; Single zoom level
-                      [:div
-                       [:input {:type "range"
-                                :min "0" :max "1" :step "0.1"
-                                :value (let [opacity (:fill-opacity editing-style)
-                                             color-transparent? (= (:fill-color editing-style) "transparent")]
-                                         (cond
-                                           color-transparent? 0
-                                           (number? opacity) opacity
-                                           :else 1))
-                                :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
-                                              (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
-                                                (update-building-style :fill-opacity new-opacity)))
-                                :style {:width "100%"}}]
-                       [:span {:style {:font-size "12px" :color "#666"}}
-                        (str "Current: " (let [opacity (:fill-opacity editing-style)
-                                               color-transparent? (= (:fill-color editing-style) "transparent")]
-                                           (cond
-                                             color-transparent? "0% (transparent)"
-                                             (number? opacity) (-> opacity (* 100) js/Math.round (str "%"))
-                                             :else "100% (default)")))]]))]
+                 (when (not (#{"building" "building-top"} target-layer))
+                   [:div {:style {:margin-bottom "15px"}}
+                    [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Extrusion Color"]
+                    (let [extrusion-color (:fill-extrusion-color editing-style)]
+                      [:div {:style {:position "relative"}}
+                       [:input {:type "color"
+                                :value (if (some? extrusion-color)
+                                         (if (= extrusion-color "transparent") "#f0f0f0" extrusion-color)
+                                         "#f0f0f0")
+                                :on-change #(update-building-style :fill-extrusion-color (-> % .-target .-value))
+                                :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
+                                        :opacity (if (or (= extrusion-color "transparent") (nil? extrusion-color)) 0.3 1.0)
+                                        :background "transparent"}}]
+                       (when (or (= extrusion-color "transparent") (nil? extrusion-color))
+                         [:div {:style {:position "absolute" :top "0" :left "0" :right "0" :height "30px"
+                                        :display "flex" :align-items "center" :justify-content "center"
+                                        :background "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
+                                        :border-radius "4px" :color "#666" :font-weight "bold" :pointer-events "none"
+                                        :font-size "10px" :line-height "1"}}
+                          (if (nil? extrusion-color) "NOT SET" "TRANSPARENT")])])])
 
-                 [:div {:style {:margin-bottom "10px"}}
-                  [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Outline Color"]
-                  (let [outline-color (:fill-outline-color editing-style)]
-                    [:div {:style {:position "relative"}}
-                     [:input {:type "color"
-                              :value (if (some? outline-color)
-                                       (if (= outline-color "transparent") "#f0f0f0" outline-color)
-                                       "#f0f0f0")
-                              :on-change #(update-building-style :fill-outline-color (-> % .-target .-value))
-                              :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
-                                      :opacity (if (or (= outline-color "transparent") (nil? outline-color)) 0.3 1.0)
-                                      :background "transparent"}}]
-                     (when (or (= outline-color "transparent") (nil? outline-color))
-                       [:div {:style {:position "absolute" :top "0" :left "0" :right "0" :height "30px"
-                                      :display "flex" :align-items "center" :justify-content "center"
-                                      :background "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
-                                      :border-radius "4px" :color "#666" :font-weight "bold" :pointer-events "none"
-                                      :font-size "10px" :line-height "1"}}
-                        (if (nil? outline-color) "NOT SET" "TRANSPARENT")])])]
-
-                 [:div {:style {:margin-bottom "15px"}}
-                  [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Extrusion Color"]
-                  (let [extrusion-color (:fill-extrusion-color editing-style)]
-                    [:div {:style {:position "relative"}}
-                     [:input {:type "color"
-                              :value (if (some? extrusion-color)
-                                       (if (= extrusion-color "transparent") "#f0f0f0" extrusion-color)
-                                       "#f0f0f0")
-                              :on-change #(update-building-style :fill-extrusion-color (-> % .-target .-value))
-                              :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
-                                      :opacity (if (or (= extrusion-color "transparent") (nil? extrusion-color)) 0.3 1.0)
-                                      :background "transparent"}}]
-                     (when (or (= extrusion-color "transparent") (nil? extrusion-color))
-                       [:div {:style {:position "absolute" :top "0" :left "0" :right "0" :height "30px"
-                                      :display "flex" :align-items "center" :justify-content "center"
-                                      :background "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
-                                      :border-radius "4px" :color "#666" :font-weight "bold" :pointer-events "none"
-                                      :font-size "10px" :line-height "1"}}
-                        (if (nil? extrusion-color) "NOT SET" "TRANSPARENT")])])]
-
-                 [:div {:style {:margin-bottom "10px"}}
-                  [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Extrusion Opacity"]
-                  (let [current-zoom (get-current-zoom)
-                        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-extrusion-opacity" current-zoom)]
-                    (if (> (count zoom-pairs) 1)
-                      ;; Multiple zoom levels
-                      [:div {:key "multiple-zoom-extrusion-opacities"}
-                       (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
-                         [:div {:key (str "extrusion-opacity-" zoom "-" index) :style {:margin-bottom "10px"}}
-                          [:div {:key (str "header-" zoom) :style {:display "flex" :justify-content "space-between" :align-items "center" :margin-bottom "5px"}}
-                           [:span {:key (str "zoom-label-" zoom) :style {:font-size "11px" :color "#666"}} (str "z" zoom)]
-                           [:span {:key (str "value-label-" zoom) :style {:font-size "11px" :color "#666"}}
-                            (str (-> (or value 0) (* 100) js/Math.round) "%")]]
-                          [:input {:key (str "slider-" zoom)
-                                   :type "range"
-                                   :min "0" :max "1" :step "0.1"
-                                   :value (or value 0)
-                                   :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
-                                                 (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
-                                                   (update-building-style :fill-extrusion-opacity new-opacity zoom)))
-                                   :style {:width "100%"}}]])]
-                      ;; Single zoom level
-                      [:div
-                       [:input {:type "range"
-                                :min "0" :max "1" :step "0.1"
-                                :value (or (:fill-extrusion-opacity editing-style) 1)
-                                :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
-                                              (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
-                                                (update-building-style :fill-extrusion-opacity new-opacity)))
-                                :style {:width "100%"}}]
-                       [:span {:style {:font-size "12px" :color "#666"}}
-                        (str "Current: " (-> (or (:fill-extrusion-opacity editing-style) 1) (* 100) js/Math.round (str "%")))]]))]
+                 (when (not (#{"building" "building-top"} target-layer))
+                   [:div {:style {:margin-bottom "10px"}}
+                    [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Extrusion Opacity"]
+                    (let [current-zoom (get-current-zoom)
+                          zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-extrusion-opacity" current-zoom)]
+                      (if (> (count zoom-pairs) 1)
+                        ;; Multiple zoom levels
+                        [:div {:key "multiple-zoom-extrusion-opacities"}
+                         (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
+                           [:div {:key (str "extrusion-opacity-" zoom "-" index) :style {:margin-bottom "10px"}}
+                            [:div {:key (str "header-" zoom) :style {:display "flex" :justify-content "space-between" :align-items "center" :margin-bottom "5px"}}
+                             [:span {:key (str "zoom-label-" zoom) :style {:font-size "11px" :color "#666"}} (str "z" zoom)]
+                             [:span {:key (str "value-label-" zoom) :style {:font-size "11px" :color "#666"}}
+                              (str (-> (or value 0) (* 100) js/Math.round) "%")]]
+                            [:input {:key (str "slider-" zoom)
+                                     :type "range"
+                                     :min "0" :max "1" :step "0.1"
+                                     :value (or value 0)
+                                     :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
+                                                   (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
+                                                     (update-building-style :fill-extrusion-opacity new-opacity zoom)))
+                                     :style {:width "100%"}}]])]
+                        ;; Single zoom level
+                        [:div
+                         [:input {:type "range"
+                                  :min "0" :max "1" :step "0.1"
+                                  :value (or (:fill-extrusion-opacity editing-style) 1)
+                                  :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
+                                                (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
+                                                  (update-building-style :fill-extrusion-opacity new-opacity)))
+                                  :style {:width "100%"}}]
+                         [:span {:style {:font-size "12px" :color "#666"}}
+                          (str "Current: " (-> (or (:fill-extrusion-opacity editing-style) 1) (* 100) js/Math.round (str "%")))]]))])
 
                  ;; Status information
                  [:div {:style {:padding-top "15px" :border-top "1px solid #eee"}}
