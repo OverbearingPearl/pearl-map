@@ -9,11 +9,13 @@
   {:light {:fill-color "#f0f0f0"
            :fill-opacity 1.0
            :fill-outline-color "#cccccc"
-           :fill-extrusion-color "#f0f0f0"}
+           :fill-extrusion-color "#f0f0f0"
+           :fill-extrusion-opacity 1.0}
    :dark {:fill-color "#2d3748"
           :fill-opacity 1.0
           :fill-outline-color "#4a5568"
-          :fill-extrusion-color "#2d3748"}})
+          :fill-extrusion-color "#2d3748"
+          :fill-extrusion-opacity 1.0}})
 
 (defn get-current-zoom []
   (map-engine/get-current-zoom))
@@ -22,7 +24,7 @@
 
 (defn get-layer-styles [layer-id current-style]
   (let [current-zoom (get-current-zoom)
-        style-keys [:fill-color :fill-opacity :fill-outline-color :fill-extrusion-color]
+        style-keys [:fill-color :fill-opacity :fill-outline-color :fill-extrusion-color :fill-extrusion-opacity]
         map-instance (map-engine/get-map-instance)]
 
     ;; For raster style, explicitly return unsupported state
@@ -30,7 +32,8 @@
       {:fill-color :unsupported
        :fill-opacity :unsupported
        :fill-outline-color :unsupported
-       :fill-extrusion-color :unsupported}
+       :fill-extrusion-color :unsupported
+       :fill-extrusion-opacity :unsupported}
 
       ;; For vector styles, proceed with normal logic
       (->> style-keys
@@ -41,6 +44,9 @@
                         ;; Property exists - parse normally
                         (let [parsed-value (cond
                                              (= style-key :fill-opacity)
+                                             (map-engine/parse-numeric-expression current-value current-zoom)
+
+                                             (= style-key :fill-extrusion-opacity)
                                              (map-engine/parse-numeric-expression current-value current-zoom)
 
                                              (#{:fill-color :fill-outline-color :fill-extrusion-color} style-key)
@@ -95,7 +101,7 @@
                                                  (str "#" value))
                                :else (str "#" (.toString (js/parseInt (str value)) 16)))
 
-                             (= style-key :fill-opacity)
+                             (#{:fill-opacity :fill-extrusion-opacity} style-key)
                              ;; For opacity, parse to number
                              (let [num-value (if (string? value)
                                                (let [parsed (js/parseFloat value)]
@@ -277,7 +283,7 @@
                                              (number? opacity) (-> opacity (* 100) js/Math.round (str "%"))
                                              :else "100% (default)")))]]))]
 
-                 [:div {:style {:margin-bottom "15px"}}
+                 [:div {:style {:margin-bottom "10px"}}
                   [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Outline Color"]
                   (let [outline-color (:fill-outline-color editing-style)]
                     [:div {:style {:position "relative"}}
@@ -317,6 +323,39 @@
                                       :font-size "10px" :line-height "1"}}
                         (if (nil? extrusion-color) "NOT SET" "TRANSPARENT")])])]
 
+                 [:div {:style {:margin-bottom "10px"}}
+                  [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Extrusion Opacity"]
+                  (let [current-zoom (get-current-zoom)
+                        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-extrusion-opacity" current-zoom)]
+                    (if (> (count zoom-pairs) 1)
+                      ;; Multiple zoom levels
+                      [:div {:key "multiple-zoom-extrusion-opacities"}
+                       (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
+                         [:div {:key (str "extrusion-opacity-" zoom "-" index) :style {:margin-bottom "10px"}}
+                          [:div {:key (str "header-" zoom) :style {:display "flex" :justify-content "space-between" :align-items "center" :margin-bottom "5px"}}
+                           [:span {:key (str "zoom-label-" zoom) :style {:font-size "11px" :color "#666"}} (str "z" zoom)]
+                           [:span {:key (str "value-label-" zoom) :style {:font-size "11px" :color "#666"}}
+                            (str (-> (or value 0) (* 100) js/Math.round) "%")]]
+                          [:input {:key (str "slider-" zoom)
+                                   :type "range"
+                                   :min "0" :max "1" :step "0.1"
+                                   :value (or value 0)
+                                   :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
+                                                 (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
+                                                   (update-building-style :fill-extrusion-opacity new-opacity zoom)))
+                                   :style {:width "100%"}}]])]
+                      ;; Single zoom level
+                      [:div
+                       [:input {:type "range"
+                                :min "0" :max "1" :step "0.1"
+                                :value (or (:fill-extrusion-opacity editing-style) 1)
+                                :on-change #(let [new-opacity (-> % .-target .-value js/parseFloat)]
+                                              (when (and (not (js/isNaN new-opacity)) (>= new-opacity 0))
+                                                (update-building-style :fill-extrusion-opacity new-opacity)))
+                                :style {:width "100%"}}]
+                       [:span {:style {:font-size "12px" :color "#666"}}
+                        (str "Current: " (-> (or (:fill-extrusion-opacity editing-style) 1) (* 100) js/Math.round (str "%")))]]))]
+
                  ;; Action buttons
                  [:div {:style {:display "flex" :gap "10px" :margin-bottom "15px" :flex-wrap "wrap"}}
                   [ui-buttons/primary-button {:on-click #(re-frame/dispatch [:style-editor/set-and-apply-style (:light default-building-styles)])
@@ -335,8 +374,9 @@
                 "Only works with Dark or Light vector styles"]
                [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
                 "Styles: " (pr-str (-> editing-style
-                                       (select-keys [:fill-color :fill-opacity :fill-outline-color :fill-extrusion-color])
+                                       (select-keys [:fill-color :fill-opacity :fill-outline-color :fill-extrusion-color :fill-extrusion-opacity])
                                        (update :fill-color #(if (nil? %) "NOT SET" %))
                                        (update :fill-opacity #(if (nil? %) "NOT SET" %))
                                        (update :fill-outline-color #(if (nil? %) "NOT SET" %))
-                                       (update :fill-extrusion-color #(if (nil? %) "NOT SET" %))))]]]))]))}))
+                                       (update :fill-extrusion-color #(if (nil? %) "NOT SET" %))
+                                       (update :fill-extrusion-opacity #(if (nil? %) "NOT SET" %))))]]]))]))}))
