@@ -144,26 +144,3 @@
                        (.resetState renderer)
                        (.render renderer scene camera)
                        (.triggerRepaint map-instance))))}))
-
-;; Test function remains unchanged
-(defn test-threejs-rendering []
-  (js/console.log "=== Testing Three.js rendering ===")
-  (let [^js scene (three/Scene.)
-        ^js camera (three/PerspectiveCamera. 75 (/ (.-innerWidth js/window) (.-innerHeight js/window)) 0.1 1000)
-        ^js renderer (three/WebGLRenderer.)]
-
-    (.setSize renderer 200 200)
-    (-> js/document .-body (.appendChild (.-domElement renderer)))
-
-    (let [^js geometry (three/BoxGeometry. 1 1 1)
-          ^js material (three/MeshBasicMaterial. #js {:color 0x00ff00})
-          ^js cube (three/Mesh. geometry material)]
-      (.add scene cube)
-      (.set (.-position camera) 0 0 5)
-
-      (let [animate (fn animate-fn []
-                      (js/requestAnimationFrame animate-fn)
-                      (set! (.-rotation-x cube) (+ (.-rotation-x cube) 0.01))
-                      (set! (.-rotation-y cube) (+ (.-rotation-y cube) 0.01))
-                      (.render renderer scene camera))]
-        (animate)))))
