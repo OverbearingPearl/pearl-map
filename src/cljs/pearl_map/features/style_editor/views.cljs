@@ -72,7 +72,7 @@
       (throw e))))
 
 (defn apply-current-style [style]
-  (let [target-layer (get @re-frame.db/app-db :style-editor/target-layer "building")]
+  (let [target-layer (get @re-frame.db/app-db :style-editor/target-layer)]
     (apply-layer-style target-layer style)))
 
 (defn update-building-style
@@ -80,7 +80,7 @@
    (update-building-style style-key value nil))
   ([style-key value zoom]
    (when value
-     (let [target-layer (get @re-frame.db/app-db :style-editor/target-layer "buildings") ; Changed default to "buildings"
+     (let [target-layer (get @re-frame.db/app-db :style-editor/target-layer)
            current-zoom (or zoom (get-current-zoom))
            processed-value (cond
                              (#{:fill-color :fill-outline-color :fill-extrusion-color} style-key)
@@ -128,7 +128,7 @@
    {:component-did-mount
     (fn []
       (setup-map-listener)
-      (re-frame/dispatch [:style-editor/set-target-layer "buildings"]) ; Changed to "buildings"
+      (re-frame/dispatch [:style-editor/set-target-layer "building"])
       (let [^js map-inst (map-engine/get-map-instance)]
         (when (and map-inst (.isStyleLoaded map-inst))
           (re-frame/dispatch [:style-editor/reset-styles-immediately]))))
@@ -181,7 +181,8 @@
                                        (re-frame/dispatch [:style-editor/set-target-layer new-layer])
                                        (re-frame/dispatch [:style-editor/reset-styles-immediately]))
                          :style {:width "100%" :padding "5px" :border "1px solid #ddd" :border-radius "4px"}}
-                [:option {:value "buildings"} "Building"] ; Changed to "buildings"
+                [:option {:value "building"} "Building"]
+                [:option {:value "extruded-building"} "Building 3D (Extruded)"]
                 [:option {:value "building-top"} "Building Top"]]]
 
               ;; Only show style controls if layer exists

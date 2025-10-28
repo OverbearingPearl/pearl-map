@@ -45,7 +45,7 @@
  :style-editor/apply-single-style
  (fn [{:keys [db]} [_ style-key value]]
    (try
-     (let [target-layer (get db :style-editor/target-layer "building")
+     (let [target-layer (get db :style-editor/target-layer)
            paint-property (case style-key
                             :fill-extrusion-color "fill-extrusion-color"
                             :fill-color "fill-color"
@@ -80,7 +80,7 @@
 (re-frame/reg-event-fx
  :style-editor/reset-styles-immediately
  (fn [{:keys [db]} _]
-   (let [target-layer (get db :style-editor/target-layer "building")
+   (let [target-layer (get db :style-editor/target-layer)
          current-style (:current-style db)
          current-styles (get-layer-styles target-layer current-style)]
      {:db (assoc db :style-editor/editing-style current-styles)})))
@@ -88,7 +88,7 @@
 (re-frame/reg-event-fx
  :style-editor/on-map-load
  (fn [{:keys [db]} _]
-   (let [target-layer (get db :style-editor/target-layer "building")
+   (let [target-layer (get db :style-editor/target-layer)
          current-style (:current-style db)
          current-styles (style-editor-views/get-current-building-styles target-layer current-style)]
      {:db (assoc db :style-editor/editing-style current-styles)})))

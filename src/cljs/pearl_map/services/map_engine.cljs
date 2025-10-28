@@ -9,10 +9,12 @@
             ["three" :as three]))
 
 (defn isExpression [x]
-  (and (object? x)
-       (or (some? (.-stops x))
-           (some? (.-property x))
-           (some? (.-type x)))))
+  (if (array? x)
+    (and (string? (first x)) (> (count x) 1))
+    (and (object? x)
+         (or (some? (.-stops x))
+             (some? (.-property x))
+             (some? (.-type x))))))
 
 (defn- evaluate [expr properties]
   (cond
@@ -134,17 +136,17 @@
   (when-let [^js map-obj (get-map-instance)]
     (.on map-obj "error" #(callback %))))
 
-(defn add-buildings-layer []
+(defn add-extruded-buildings-layer []
   (when-let [^js map-obj (get-map-instance)]
     (try
       (when (.getSource map-obj "carto")
-        (when-not (.getLayer map-obj "buildings")
+        (when-not (.getLayer map-obj "extruded-building")
           (let [current-style (:current-style @db/app-db)
                 initial-color (if (= current-style (:dark style-urls))
                                 "#2d3748"   ;; Corresponds to default-building-styles :dark :fill-extrusion-color
                                 "#f0f0f0")] ;; Corresponds to default-building-styles :light :fill-extrusion-color
             (let [layer-spec (clj->js
-                              {:id "buildings"
+                              {:id "extruded-building"
                                :type "fill-extrusion"
                                :source "carto"
                                :source-layer "building"
@@ -160,14 +162,14 @@
                                        :fill-extrusion-translate [0, 0]
                                        :fill-extrusion-translate-anchor "map"}})
                   layer-type (.-type layer-spec)]
-              (js/console.log "Adding buildings layer with spec:" layer-spec "type:" layer-type)
+              (js/console.log "Adding extruded buildings layer with spec:" layer-spec "type:" layer-type)
               (.addLayer map-obj layer-spec))
-            (.on map-obj "click" "buildings"
+            (.on map-obj "click" "extruded-building"
                  (fn [e]
                    (when-let [feature (first (.-features e))]
                      (js/console.log "Clicked Feature --- ID:" (.-id feature) "--- Properties:" (js->clj (.-properties feature) :keywordize-keys true))))))))
       (catch js/Error e
-        (js/console.error "Failed to add buildings layer:" e)))))
+        (js/console.error "Failed to add extruded buildings layer:" e)))))
 
 (defn register-custom-layer [layer-id layer-impl]
   (re-frame/dispatch [:register-custom-layer layer-id layer-impl]))
@@ -238,7 +240,7 @@
     (.setStyle map-obj style-url)
     (.once map-obj "idle"
            (fn []
-             (add-buildings-layer)
+             (add-extruded-buildings-layer)
              (reapply-custom-layers! (:layers current-state))
              (apply-map-state! current-state)))))
 
@@ -403,21 +405,35 @@
 (defn get-zoom-value-pairs [layer-id property-name current-zoom]
   (let [value (get-paint-property layer-id property-name)]
     (when value
-      (cond
-        (and (isExpression value) (.-stops value))
-        (let [stops (.-stops value)]
+      (let [clj-value (js->clj value :keywordize-keys true)]
+        (cond
+          ;; object-style stops
+          (and (map? clj-value) (:stops clj-value))
           (mapv (fn [[zoom prop-value]]
                   {:zoom zoom
                    :value (if (#{"fill-color" "fill-outline-color" "fill-extrusion-color"} property-name)
                             (parse-color-expression prop-value current-zoom)
                             (parse-numeric-expression prop-value current-zoom))})
-                stops))
+                (:stops clj-value))
 
-        :else
-        [{:zoom current-zoom
-          :value (if (#{"fill-color" "fill-outline-color" "fill-extrusion-color"} property-name)
-                   (parse-color-expression value current-zoom)
-                   (parse-numeric-expression value current-zoom))}]))))
+          ;; array-style interpolate on zoom
+          (and (vector? clj-value)
+               (>= (count clj-value) 4)
+               (= "interpolate" (first clj-value))
+               (= ["zoom"] (get clj-value 2)))
+          (let [stops-pairs (partition 2 (subvec clj-value 3))]
+            (mapv (fn [[zoom prop-value]]
+                    {:zoom zoom
+                     :value (if (#{"fill-color" "fill-outline-color" "fill-extrusion-color"} property-name)
+                              (parse-color-expression prop-value current-zoom)
+                              (parse-numeric-expression prop-value current-zoom))})
+                  stops-pairs))
+
+          :else
+          [{:zoom current-zoom
+            :value (if (#{"fill-color" "fill-outline-color" "fill-extrusion-color"} property-name)
+                     (parse-color-expression value current-zoom)
+                     (parse-numeric-expression value current-zoom))}])))))
 
 (defn update-single-value [layer-id property-name new-value]
   "Update a property to a single value (not a stops expression)"
@@ -425,29 +441,18 @@
 
 (defn update-zoom-value-pair [layer-id property-name zoom new-value]
   (let [current-value (get-paint-property layer-id property-name)
-        current-zoom (get-current-zoom)]
+        current-zoom (get-current-zoom)
+        clj-value (if (some? current-value) (js->clj current-value :keywordize-keys true) nil)]
     (cond
-      ;; Case 1: Editing at current zoom, and property is a simple value.
-      ;; Result: Return the new simple value.
-      (and (= zoom current-zoom) (not (isExpression current-value)))
-      new-value
-
-      ;; Case 2: Editing at a different zoom, and property is a simple value.
-      ;; Result: Create a new zoom-based 'interpolate' expression.
-      (and (not= zoom current-zoom) (not (isExpression current-value)))
-      (if (some? current-value)
-        ;; If there's a current value, create a two-stop interpolation.
-        {:stops [[current-zoom current-value] [zoom new-value]]}
-        ;; If no current value, we can't interpolate. Just set the new value as a constant.
-        ;; This is a safe fallback to prevent crashes, though it has UX implications
-        ;; (the multi-zoom UI might disappear).
+      ;; Not an expression, create one if needed
+      (not (isExpression current-value))
+      (if (and (not= zoom current-zoom) (some? current-value))
+        ["interpolate" ["linear"] ["zoom"] current-zoom current-value zoom new-value]
         new-value)
 
-      ;; Case 3: Property is already a zoom-based expression with stops.
-      ;; Result: Update or add the stop for the edited zoom level.
-      (and (isExpression current-value) (.-stops current-value))
-      (let [expr-map (js->clj current-value :keywordize-keys true)
-            stops (vec (:stops expr-map))
+      ;; object-style stops
+      (and (map? clj-value) (:stops clj-value))
+      (let [stops (vec (:stops clj-value))
             stop-exists? (some #(= zoom (first %)) stops)
             updated-stops (if stop-exists?
                             (mapv (fn [[stop-zoom stop-value]]
@@ -456,7 +461,26 @@
                                       [stop-zoom stop-value]))
                                   stops)
                             (sort-by first (conj stops [zoom new-value])))]
-        (assoc expr-map :stops updated-stops))
+        (assoc clj-value :stops updated-stops))
+
+      ;; array-style interpolate on zoom
+      (and (vector? clj-value)
+           (>= (count clj-value) 4)
+           (= "interpolate" (first clj-value))
+           (= ["zoom"] (get clj-value 2)))
+      (let [header (subvec clj-value 0 3)
+            stops (subvec clj-value 3)
+            stops-pairs (partition 2 stops)
+            stop-exists? (some #(= zoom (first %)) stops-pairs)
+            updated-stops-pairs (if stop-exists?
+                                  (mapv (fn [[stop-zoom stop-value]]
+                                          (if (= stop-zoom zoom)
+                                            [stop-zoom new-value]
+                                            [stop-zoom stop-value]))
+                                        stops-pairs)
+                                  (sort-by first (conj stops-pairs [zoom new-value])))
+            updated-stops (reduce into [] updated-stops-pairs)]
+        (vec (concat header updated-stops)))
 
       ;; Default case: Fallback to setting the new value as a constant.
       :else
