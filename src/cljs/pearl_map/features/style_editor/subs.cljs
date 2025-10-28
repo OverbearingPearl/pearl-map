@@ -11,7 +11,8 @@
  (fn [db]
    (get db :style-editor/editing-style {:fill-color "#f0f0f0"
                                         :fill-opacity 1.0
-                                        :fill-outline-color "#cccccc"})))
+                                        :fill-outline-color "#cccccc"
+                                        :fill-extrusion-color "#f0f0f0"})))
 
 (re-frame/reg-sub
  :style-editor/editing-style-value

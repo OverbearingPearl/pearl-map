@@ -6,7 +6,8 @@
    :custom-layers {}
    :style-editor/editing-style {:fill-color "#f0f0f0"
                                 :fill-opacity 1.0
-                                :fill-outline-color "#cccccc"}
+                                :fill-outline-color "#cccccc"
+                                :fill-extrusion-color "#f0f0f0"}
    :map/light-properties {:anchor "viewport"
                           :color "#ffffff"
                           :intensity 0.5

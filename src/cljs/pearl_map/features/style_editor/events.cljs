@@ -45,8 +45,14 @@
  :style-editor/apply-single-style
  (fn [{:keys [db]} [_ style-key value]]
    (try
-     (let [target-layer (get db :style-editor/target-layer "building")]
-       (map-engine/set-paint-property target-layer (name style-key) value))
+     (let [target-layer (get db :style-editor/target-layer "building")
+           paint-property (case style-key
+                            :fill-extrusion-color "fill-extrusion-color"
+                            :fill-color "fill-color"
+                            :fill-outline-color "fill-outline-color"
+                            :fill-opacity "fill-opacity"
+                            (name style-key))]
+       (map-engine/set-paint-property target-layer paint-property value))
      {:db db}
      (catch js/Error e
        (js/console.error "Failed to apply single style:" e)

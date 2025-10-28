@@ -8,10 +8,12 @@
 (def default-building-styles
   {:light {:fill-color "#f0f0f0"
            :fill-opacity 1.0
-           :fill-outline-color "#cccccc"}
+           :fill-outline-color "#cccccc"
+           :fill-extrusion-color "#f0f0f0"}
    :dark {:fill-color "#2d3748"
           :fill-opacity 1.0
-          :fill-outline-color "#4a5568"}})
+          :fill-outline-color "#4a5568"
+          :fill-extrusion-color "#2d3748"}})
 
 (defn get-current-zoom []
   (map-engine/get-current-zoom))
@@ -20,14 +22,15 @@
 
 (defn get-layer-styles [layer-id current-style]
   (let [current-zoom (get-current-zoom)
-        style-keys [:fill-color :fill-opacity :fill-outline-color]
+        style-keys [:fill-color :fill-opacity :fill-outline-color :fill-extrusion-color]
         map-instance (map-engine/get-map-instance)]
 
     ;; For raster style, explicitly return unsupported state
     (if (= current-style "raster-style")
       {:fill-color :unsupported
        :fill-opacity :unsupported
-       :fill-outline-color :unsupported}
+       :fill-outline-color :unsupported
+       :fill-extrusion-color :unsupported}
 
       ;; For vector styles, proceed with normal logic
       (->> style-keys
@@ -40,7 +43,7 @@
                                              (= style-key :fill-opacity)
                                              (map-engine/parse-numeric-expression current-value current-zoom)
 
-                                             (#{:fill-color :fill-outline-color} style-key)
+                                             (#{:fill-color :fill-outline-color :fill-extrusion-color} style-key)
                                              (map-engine/parse-color-expression current-value current-zoom)
 
                                              :else
@@ -77,12 +80,20 @@
    (update-building-style style-key value nil))
   ([style-key value zoom]
    (when value
-     (let [target-layer (get @re-frame.db/app-db :style-editor/target-layer "building")
+     (let [target-layer (get @re-frame.db/app-db :style-editor/target-layer "buildings") ; Changed default to "buildings"
            current-zoom (or zoom (get-current-zoom))
            processed-value (cond
-                             (#{:fill-color :fill-outline-color} style-key)
-                             ;; For colors, just pass the value directly
-                             (if (string? value) value (str value))
+                             (#{:fill-color :fill-outline-color :fill-extrusion-color} style-key)
+                             ;; For colors, ensure it's a valid color string or "transparent"
+                             (cond
+                               (nil? value) nil
+                               (= value "transparent") "transparent"
+                               (string? value) (if (or (.startsWith value "#")
+                                                       (.startsWith value "rgb")
+                                                       (.startsWith value "hsl"))
+                                                 value
+                                                 (str "#" value))
+                               :else (str "#" (.toString (js/parseInt (str value)) 16)))
 
                              (= style-key :fill-opacity)
                              ;; For opacity, parse to number
@@ -102,12 +113,13 @@
     (when map-inst
       (.off map-inst "load")
       (.off map-inst "styledata")
+      (.off map-inst "idle")
 
       (.on map-inst "load"
            (fn []
              (re-frame/dispatch [:style-editor/on-map-load])))
 
-      (.on map-inst "styledata"
+      (.on map-inst "idle"
            (fn []
              (re-frame/dispatch [:style-editor/reset-styles-immediately]))))))
 
@@ -116,8 +128,10 @@
    {:component-did-mount
     (fn []
       (setup-map-listener)
-      (re-frame/dispatch [:style-editor/set-target-layer "building"])
-      (re-frame/dispatch [:style-editor/reset-styles-immediately]))
+      (re-frame/dispatch [:style-editor/set-target-layer "buildings"]) ; Changed to "buildings"
+      (let [^js map-inst (map-engine/get-map-instance)]
+        (when (and map-inst (.isStyleLoaded map-inst))
+          (re-frame/dispatch [:style-editor/reset-styles-immediately]))))
     :reagent-render
     (fn []
       (let [editing-style @(re-frame/subscribe [:style-editor/editing-style])
@@ -158,7 +172,7 @@
                  [:p {:style {:margin "0" :color "#721c24" :font-size "12px" :font-weight "bold"}}
                   (str "Layer '" target-layer "' does not exist in current style.")]
                  [:p {:style {:margin "5px 0 0 0" :color "#721c24" :font-size "11px"}}
-                  "Style editing will not work for this layer."]])
+                  "Style editing will not work for this layer. Please make sure you are using a vector style (Dark or Light)."]])
               ;; Layer selector
               [:div {:style {:margin-bottom "15px"}}
                [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Target Layer"]
@@ -167,7 +181,7 @@
                                        (re-frame/dispatch [:style-editor/set-target-layer new-layer])
                                        (re-frame/dispatch [:style-editor/reset-styles-immediately]))
                          :style {:width "100%" :padding "5px" :border "1px solid #ddd" :border-radius "4px"}}
-                [:option {:value "building"} "Building"]
+                [:option {:value "buildings"} "Building"] ; Changed to "buildings"
                 [:option {:value "building-top"} "Building Top"]]]
 
               ;; Only show style controls if layer exists
@@ -282,6 +296,26 @@
                                       :font-size "10px" :line-height "1"}}
                         (if (nil? outline-color) "NOT SET" "TRANSPARENT")])])]
 
+                 [:div {:style {:margin-bottom "15px"}}
+                  [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Extrusion Color"]
+                  (let [extrusion-color (:fill-extrusion-color editing-style)]
+                    [:div {:style {:position "relative"}}
+                     [:input {:type "color"
+                              :value (if (some? extrusion-color)
+                                       (if (= extrusion-color "transparent") "#f0f0f0" extrusion-color)
+                                       "#f0f0f0")
+                              :on-change #(update-building-style :fill-extrusion-color (-> % .-target .-value))
+                              :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
+                                      :opacity (if (or (= extrusion-color "transparent") (nil? extrusion-color)) 0.3 1.0)
+                                      :background "transparent"}}]
+                     (when (or (= extrusion-color "transparent") (nil? extrusion-color))
+                       [:div {:style {:position "absolute" :top "0" :left "0" :right "0" :height "30px"
+                                      :display "flex" :align-items "center" :justify-content "center"
+                                      :background "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
+                                      :border-radius "4px" :color "#666" :font-weight "bold" :pointer-events "none"
+                                      :font-size "10px" :line-height "1"}}
+                        (if (nil? extrusion-color) "NOT SET" "TRANSPARENT")])])]
+
                  ;; Action buttons
                  [:div {:style {:display "flex" :gap "10px" :margin-bottom "15px" :flex-wrap "wrap"}}
                   [ui-buttons/primary-button {:on-click #(re-frame/dispatch [:style-editor/set-and-apply-style (:light default-building-styles)])
@@ -300,7 +334,8 @@
                 "Only works with Dark or Light vector styles"]
                [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
                 "Styles: " (pr-str (-> editing-style
-                                       (select-keys [:fill-color :fill-opacity :fill-outline-color])
+                                       (select-keys [:fill-color :fill-opacity :fill-outline-color :fill-extrusion-color])
                                        (update :fill-color #(if (nil? %) "NOT SET" %))
                                        (update :fill-opacity #(if (nil? %) "NOT SET" %))
-                                       (update :fill-outline-color #(if (nil? %) "NOT SET" %))))]]]))]))}))
+                                       (update :fill-outline-color #(if (nil? %) "NOT SET" %))
+                                       (update :fill-extrusion-color #(if (nil? %) "NOT SET" %))))]]]))]))}))

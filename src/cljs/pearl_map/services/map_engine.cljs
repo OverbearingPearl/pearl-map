@@ -73,7 +73,7 @@
    4114839
    308687746
    308145239
-   69034127 
+   69034127
    335101043
    4114841])
 
@@ -139,21 +139,33 @@
     (try
       (when (.getSource map-obj "carto")
         (when-not (.getLayer map-obj "buildings")
-          (.addLayer map-obj
-                     (clj->js
-                      {:id "buildings"
-                       :type "fill-extrusion"
-                       :source "carto"
-                       :source-layer "building"
-                       :filter (into ["!in" "$id"] eiffel-tower-osm-ids)
-                       :paint {:fill-extrusion-color "#f0f0f0"
-                               :fill-extrusion-height ["coalesce" ["get" "height"] ["get" "render_height"] 0]
-                               :fill-extrusion-base ["coalesce" ["get" "min_height"] ["get" "render_min_height"] 0]
-                               :fill-extrusion-opacity 1.0}}))
-          (.on map-obj "click" "buildings"
-               (fn [e]
-                 (when-let [feature (first (.-features e))]
-                   (js/console.log "Clicked Feature --- ID:" (.-id feature) "--- Properties:" (js->clj (.-properties feature) :keywordize-keys true)))))))
+          (let [current-style (:current-style @db/app-db)
+                initial-color (if (= current-style (:dark style-urls))
+                                "#2d3748"   ;; Corresponds to default-building-styles :dark :fill-extrusion-color
+                                "#f0f0f0")] ;; Corresponds to default-building-styles :light :fill-extrusion-color
+            (let [layer-spec (clj->js
+                              {:id "buildings"
+                               :type "fill-extrusion"
+                               :source "carto"
+                               :source-layer "building"
+                               :filter (into ["!in" "$id"] eiffel-tower-osm-ids)
+                               :paint {:fill-extrusion-color
+                                       (if (string? initial-color)
+                                         initial-color
+                                         "#f0f0f0")  ;; Fallback default color
+                                       :fill-extrusion-height ["coalesce" ["get" "height"] ["get" "render_height"] 10]  ;; Minimum height of 10 meters
+                                       :fill-extrusion-base ["coalesce" ["get" "min_height"] ["get" "render_min_height"] 0]
+                                       :fill-extrusion-opacity 1.0
+                                       :fill-extrusion-vertical-gradient true
+                                       :fill-extrusion-translate [0, 0]
+                                       :fill-extrusion-translate-anchor "map"}})
+                  layer-type (.-type layer-spec)]
+              (js/console.log "Adding buildings layer with spec:" layer-spec "type:" layer-type)
+              (.addLayer map-obj layer-spec))
+            (.on map-obj "click" "buildings"
+                 (fn [e]
+                   (when-let [feature (first (.-features e))]
+                     (js/console.log "Clicked Feature --- ID:" (.-id feature) "--- Properties:" (js->clj (.-properties feature) :keywordize-keys true))))))))
       (catch js/Error e
         (js/console.error "Failed to add buildings layer:" e)))))
 
@@ -228,8 +240,7 @@
            (fn []
              (add-buildings-layer)
              (reapply-custom-layers! (:layers current-state))
-             (apply-map-state! current-state)
-             (re-frame/dispatch [:style-editor/reset-styles-immediately])))))
+             (apply-map-state! current-state)))))
 
 (defn change-map-style [style-url]
   (let [^js map-obj (get-map-instance)
@@ -241,7 +252,13 @@
 (defn get-paint-property [layer-id property-name]
   (when-let [^js map-obj (get-map-instance)]
     (when (.getLayer map-obj layer-id)
-      (.getPaintProperty map-obj layer-id property-name))))
+      (try
+        (.getPaintProperty map-obj layer-id property-name)
+        (catch js/Error e
+          ;; This can happen if property is not applicable for layer type.
+          ;; MapLibre throws a TypeError in this case.
+          ;; We can safely ignore it and return nil.
+          nil)))))
 
 (defn layer-exists? [layer-id]
   (when-let [^js map-obj (get-map-instance)]
@@ -250,15 +267,32 @@
 (defn set-paint-property [layer-id property-name value]
   (when-let [^js map-obj (get-map-instance)]
     (when (.getLayer map-obj layer-id)
-      ;; Convert Clojure maps to JavaScript objects for expressions
-      (let [js-value (if (map? value)
-                       (clj->js value)
-                       value)]
-        (try
-          (.setPaintProperty map-obj layer-id property-name js-value)
-          (catch js/Error e
-            (js/console.error (str "Failed to set property " property-name " on layer " layer-id ":") e)
-            (throw e)))))))
+      ;; Skip if value is nil or undefined
+      (when (some? value)
+        ;; Convert Clojure maps to JavaScript objects for expressions
+        (let [js-value (cond
+                         (map? value) (clj->js value)
+                         (#{"fill-extrusion-color" "fill-color" "fill-outline-color"} property-name)
+                         (cond
+                           (= value "transparent") "transparent"
+                           (string? value) (if (or (.startsWith value "#")
+                                                   (.startsWith value "rgb")
+                                                   (.startsWith value "hsl"))
+                                             value
+                                             (str "#" value))
+                           :else (str "#" (.toString (js/parseInt (str value)) 16)))
+                         :else value)
+              layer-type (.-type (.getLayer map-obj layer-id))]
+          (try
+            (js/console.log "Setting paint property:" layer-id property-name js-value "on layer type:" layer-type)
+            ;; For fill-extrusion layers, ensure the property is supported
+            (when (or (not= "fill-extrusion-color" property-name)
+                      (= "fill-extrusion" layer-type))
+              (.setPaintProperty map-obj layer-id property-name js-value))
+            (catch js/Error e
+              (js/console.error (str "Failed to set property " property-name
+                                     " on layer " layer-id " (type: " layer-type "):") e)
+              (throw e))))))))
 
 (defn get-current-zoom []
   (when-let [^js map-obj (get-map-instance)]
@@ -393,23 +427,38 @@
   (let [current-value (get-paint-property layer-id property-name)
         current-zoom (get-current-zoom)]
     (cond
-      (and (= zoom current-zoom)
-           (not (isExpression current-value)))
+      ;; Case 1: Editing at current zoom, and property is a simple value.
+      ;; Result: Return the new simple value.
+      (and (= zoom current-zoom) (not (isExpression current-value)))
       new-value
 
-      (and (not= zoom current-zoom)
-           (not (isExpression current-value)))
-      {:stops [[current-zoom current-value] [zoom new-value]]}
+      ;; Case 2: Editing at a different zoom, and property is a simple value.
+      ;; Result: Create a new zoom-based 'interpolate' expression.
+      (and (not= zoom current-zoom) (not (isExpression current-value)))
+      (if (some? current-value)
+        ;; If there's a current value, create a two-stop interpolation.
+        {:stops [[current-zoom current-value] [zoom new-value]]}
+        ;; If no current value, we can't interpolate. Just set the new value as a constant.
+        ;; This is a safe fallback to prevent crashes, though it has UX implications
+        ;; (the multi-zoom UI might disappear).
+        new-value)
 
+      ;; Case 3: Property is already a zoom-based expression with stops.
+      ;; Result: Update or add the stop for the edited zoom level.
       (and (isExpression current-value) (.-stops current-value))
-      (let [stops (.-stops current-value)
-            updated-stops (mapv (fn [[stop-zoom stop-value]]
-                                  (if (= stop-zoom zoom)
-                                    [stop-zoom new-value]
-                                    [stop-zoom stop-value]))
-                                stops)]
-        {:stops updated-stops})
+      (let [expr-map (js->clj current-value :keywordize-keys true)
+            stops (vec (:stops expr-map))
+            stop-exists? (some #(= zoom (first %)) stops)
+            updated-stops (if stop-exists?
+                            (mapv (fn [[stop-zoom stop-value]]
+                                    (if (= stop-zoom zoom)
+                                      [stop-zoom new-value]
+                                      [stop-zoom stop-value]))
+                                  stops)
+                            (sort-by first (conj stops [zoom new-value])))]
+        (assoc expr-map :stops updated-stops))
 
+      ;; Default case: Fallback to setting the new value as a constant.
       :else
       new-value)))
 
