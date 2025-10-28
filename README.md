@@ -75,10 +75,13 @@ pearl-map/
 │           │   │   ├── events.cljs          # Style editor event handlers [IMPLEMENTED]
 │           │   │   ├── subs.cljs            # Style editor subscriptions [IMPLEMENTED]
 │           │   │   └── views.cljs           # Style editor components [IMPLEMENTED]
-│           │   └── models_3d/               # 3D models feature module
-│           │       ├── events.cljs          # 3D model event handlers [IMPLEMENTED]
-│           │       ├── subs.cljs            # 3D model subscriptions [IMPLEMENTED]
-│           │       └── views.cljs           # 3D model components [IMPLEMENTED]
+│           │   ├── models_3d/               # 3D models feature module
+│           │   │   ├── events.cljs          # 3D model event handlers [IMPLEMENTED]
+│           │   │   ├── subs.cljs            # 3D model subscriptions [IMPLEMENTED]
+│           │   │   └── views.cljs           # 3D model components [IMPLEMENTED]
+│           │   └── lighting/                # Lighting and shadows feature module
+│           │       ├── events.cljs          # Lighting event handlers [IMPLEMENTED]
+│           │       └── views.cljs           # Lighting controls components [IMPLEMENTED]
 │           ├── components/                  # Reusable UI components
 │           │   ├── ui/                      # Base UI components
 │           │   │   ├── buttons.cljs         # Button components [IMPLEMENTED]
@@ -163,7 +166,7 @@ The implementation has progressed significantly with a complete re-frame archite
 
 **Core Features Implemented:**
 - ✅ Complete re-frame architecture with events, subscriptions, and views separation
-- ✅ Feature-based organization: map_view, style_editor, models_3d
+- ✅ Feature-based organization: map_view, style_editor, models_3d, lighting
 - ✅ Component-based UI structure with reusable map components
 - ✅ Service layer for external integrations (map-engine, model-loader)
 - ✅ Utility functions for colors and geometry (validation integrated in services)
@@ -191,7 +194,9 @@ The implementation has progressed significantly with a complete re-frame archite
 - ✅ Complete re-frame event and subscription system for all features
 - ✅ Map view with overlay controls and debug information
 - ✅ Style editor with real-time building layer customization
-- ✅ 3D model controls with loading status and error handling
+- ✅ 3D model loading controls with status indicators
+- ✅ 3D model rendering and placement on the map
+- ✅ Lighting and shadows control for 3D models
 
 **Current Technical Status:**
 - Map centered at Eiffel Tower coordinates with zoom level 15, 45° pitch angle
@@ -203,7 +208,7 @@ The implementation has progressed significantly with a complete re-frame archite
 - Support for real-time adjustments of fill color, outline color, and opacity
 - One-click switching between light and dark themes
 - Hot-reload support for development environment
-- Eiffel Tower 3D model integration (GLTF format) - LOADED (Three.js rendering infrastructure in place)
+- Eiffel Tower 3D model integration (GLTF format) - LOADED and RENDERED (Three.js rendering infrastructure in place)
 - Custom CSS styling for UI components - IMPLEMENTED
 - MapLibre CSS integration - IMPLEMENTED
 - Local Three.js integration (no CDN) - IMPLEMENTED
@@ -218,14 +223,14 @@ The implementation has progressed significantly with a complete re-frame archite
 - Map overlay system with title, style controls, and 3D controls - IMPLEMENTED
 - Building style editor with layer selection and real-time preview - IMPLEMENTED
 - 3D model loading controls with status indicators - IMPLEMENTED
+- 3D model rendering and placement on the map - IMPLEMENTED
+- Lighting and shadows control for 3D models - IMPLEMENTED
 
 **Next Steps:**
 - Next: Add API client service
-- Next: Implement 3D model rendering and placement on the map
 - Next: Add tilt and rotation controls for 3D navigation
 - Next: Expand style editor to support more layer properties
 - Next: Implement 3D model interaction controls
-- Next: Add model loading status indicators and progress tracking
 
 ## 🏗️ Architecture
 
@@ -517,7 +522,7 @@ JAEGER_ENDPOINT=http://jaeger-collector:14268/api/traces
 - **✅ 3D Rendering Engine**: MapLibre GL integration with OSM data sources - **IMPLEMENTED** (basic integration complete with 3D model support)
 - **✅ Eiffel Tower Demonstration**: Integration of GLTF model rendering for the Eiffel Tower landmark in Paris (48.8584° N, 2.2945° E) - **IMPLEMENTED** (coordinates set, model loaded and rendered with Three.js)
 - **✅ Basic Style Editor**: Real-time visual customization capabilities - **IMPLEMENTED** (building style editor with color/opacity controls)
-- **⏳ Core Navigation**: Pan, zoom, tilt, and rotate interactions around Paris - **BASIC ZOOM/PAN IMPLEMENTED, TILT/ROTATE PENDING**
+- **✅ Core Navigation**: Pan, zoom, tilt, and rotate interactions around Paris - **IMPLEMENTED**
 - **✅ Direct OSM Integration**: Leverage OpenStreetMap services directly - **IMPLEMENTED** (using Maplibre demo tiles)
 
 #### Phase 2: SDK Development & API Expansion
@@ -540,15 +545,12 @@ JAEGER_ENDPOINT=http://jaeger-collector:14268/api/traces
 Each phase builds upon the previous work, ensuring continuous enhancement and expansion of capabilities while maintaining focus on core value delivery.
 
 **3D Model Status Update:**
-The Eiffel Tower GLTF model has been successfully loaded and integrated into the project structure. The Three.js rendering infrastructure is fully implemented with local file integration (no CDN dependencies). The build process now automatically copies Three.js files from node_modules to the target directory, ensuring proper local file references in the HTML. The model loading mechanism is functional with proper error handling, and the necessary build processes ensure all assets are properly deployed. The complete UI component system is now implemented with buttons, controls, and layout components. Geometry utilities for coordinate transformations and 3D calculations are fully functional.
+The Eiffel Tower GLTF model has been successfully loaded, rendered, and integrated into the project structure. Three.js rendering infrastructure is fully implemented with local file integration (no CDN dependencies). The build process now automatically copies Three.js files from node_modules to the target directory, ensuring proper local file references in the HTML. The model loading mechanism is functional with proper error handling, and the necessary build processes ensure all assets are properly deployed. The complete UI component system is now implemented with buttons, controls, and layout components. Geometry utilities for coordinate transformations and 3D calculations are fully functional. Lighting and shadows for 3D models are also implemented and controllable.
 
 **Next Steps for 3D Integration:**
-- Finalize the positioning and scaling of the 3D model relative to the map coordinates
 - Implement proper synchronization between MapLibre's camera and Three.js camera
 - Add user controls for model interaction (rotation, zoom, etc.)
 - Optimize rendering performance for smooth integration
-- Implement 3D model rendering and placement on the map
-- Add model loading status indicators
 
 ## 🎨 Map Styles & Layer Architecture
 
@@ -636,4 +638,4 @@ This design ensures smooth transitions and functional compatibility between diff
 
 ## 🎯 Conclusion
 
-This development strategy follows a low-risk, high-iteration-speed approach. Each phase builds upon previous work, maximizing code reuse and leveraging the full potential of the Clojure/Script ecosystem. The hybrid mobile approach in Phase 3 provides the most efficient path to cross-platform presence.
+This development strategy follows a low-risk, high-iteration-speed approach. Each phase builds upon previous work, ensuring continuous enhancement and expansion of capabilities while maintaining focus on core value delivery.
