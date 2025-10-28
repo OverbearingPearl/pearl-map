@@ -9,12 +9,12 @@
             ["three" :as three]))
 
 (defn isExpression [x]
-  (if (array? x)
-    (and (string? (first x)) (> (count x) 1))
-    (and (object? x)
-         (or (some? (.-stops x))
-             (some? (.-property x))
-             (some? (.-type x))))))
+  (cond
+    (array? x) (and (string? (first x)) (> (count x) 1))
+    (object? x) (or (some? (.-stops x))
+                    (some? (.-property x))
+                    (some? (.-type x)))
+    :else false))
 
 (defn- evaluate [expr properties]
   (cond
@@ -136,57 +136,37 @@
   (when-let [^js map-obj (get-map-instance)]
     (.on map-obj "error" #(callback %))))
 
+(defn- create-extruded-layer-spec [layer-id initial-color]
+  (clj->js
+   {:id layer-id
+    :type "fill-extrusion"
+    :source "carto"
+    :source-layer "building"
+    :filter (into ["!in" "$id"] eiffel-tower-osm-ids)
+    :paint {:fill-extrusion-color initial-color
+            :fill-extrusion-height ["coalesce" ["get" "height"] ["get" "render_height"] 10]
+            :fill-extrusion-base (if (= layer-id "extruded-building-top")
+                                   ["coalesce" ["get" "height"] ["get" "render_height"] 10]
+                                   ["coalesce" ["get" "min_height"] ["get" "render_min_height"] 0])
+            :fill-extrusion-opacity 1.0
+            :fill-extrusion-vertical-gradient (if (= layer-id "extruded-building-top") false true)
+            :fill-extrusion-translate [0, 0]
+            :fill-extrusion-translate-anchor "map"}}))
+
 (defn add-extruded-buildings-layer []
   (when-let [^js map-obj (get-map-instance)]
     (try
       (when (.getSource map-obj "carto")
         (let [current-style (:current-style @db/app-db)
               initial-color (if (= current-style (:dark style-urls))
-                              "#2d3748"   ;; Corresponds to default-building-styles :dark :fill-extrusion-color
-                              "#f0f0f0")] ;; Corresponds to default-building-styles :light :fill-extrusion-color
-          ;; Add extruded-building layer
-          (when-not (.getLayer map-obj "extruded-building")
-            (let [extruded-layer-spec (clj->js
-                                       {:id "extruded-building"
-                                        :type "fill-extrusion"
-                                        :source "carto"
-                                        :source-layer "building"
-                                        :filter (into ["!in" "$id"] eiffel-tower-osm-ids)
-                                        :paint {:fill-extrusion-color
-                                                (if (string? initial-color)
-                                                  initial-color
-                                                  "#f0f0f0")  ;; Fallback default color
-                                                :fill-extrusion-height ["coalesce" ["get" "height"] ["get" "render_height"] 10]  ;; Minimum height of 10 meters
-                                                :fill-extrusion-base ["coalesce" ["get" "min_height"] ["get" "render_min_height"] 0]
-                                                :fill-extrusion-opacity 1.0
-                                                :fill-extrusion-vertical-gradient true
-                                                :fill-extrusion-translate [0, 0]
-                                                :fill-extrusion-translate-anchor "map"}})
-                  extruded-layer-type (.-type extruded-layer-spec)]
-              (js/console.log "Adding extruded buildings layer with spec:" extruded-layer-spec "type:" extruded-layer-type)
-              (.addLayer map-obj extruded-layer-spec)))
+                              "#2d3748"
+                              "#f0f0f0")]
 
-          ;; Add extruded-building-top layer
-          (when-not (.getLayer map-obj "extruded-building-top")
-            (let [top-layer-spec (clj->js
-                                  {:id "extruded-building-top"
-                                   :type "fill-extrusion"
-                                   :source "carto"
-                                   :source-layer "building"
-                                   :filter (into ["!in" "$id"] eiffel-tower-osm-ids)
-                                   :paint {:fill-extrusion-color
-                                           (if (string? initial-color)
-                                             initial-color
-                                             "#f0f0f0")
-                                           :fill-extrusion-height ["coalesce" ["get" "height"] ["get" "render_height"] 10]
-                                           :fill-extrusion-base ["coalesce" ["get" "height"] ["get" "render_height"] 10] ;; Base is also height for the top layer
-                                           :fill-extrusion-opacity 1.0
-                                           :fill-extrusion-vertical-gradient false
-                                           :fill-extrusion-translate [0, 0]
-                                           :fill-extrusion-translate-anchor "map"}})
-                  top-layer-type (.-type top-layer-spec)]
-              (js/console.log "Adding extruded-building-top layer with spec:" top-layer-spec "type:" top-layer-type)
-              (.addLayer map-obj top-layer-spec)))
+          (doseq [layer-id ["extruded-building" "extruded-building-top"]]
+            (when-not (.getLayer map-obj layer-id)
+              (let [spec (create-extruded-layer-spec layer-id initial-color)]
+                (js/console.log "Adding layer with spec:" spec "type:" (.-type spec))
+                (.addLayer map-obj spec))))
 
           (.on map-obj "click" "extruded-building"
                (fn [e]
@@ -293,9 +273,7 @@
 (defn set-paint-property [layer-id property-name value]
   (when-let [^js map-obj (get-map-instance)]
     (when (.getLayer map-obj layer-id)
-      ;; Skip if value is nil or undefined
       (when (some? value)
-        ;; Convert Clojure maps to JavaScript objects for expressions
         (let [js-value (cond
                          (map? value) (clj->js value)
                          (#{"fill-extrusion-color" "fill-color" "fill-outline-color"} property-name)
@@ -311,7 +289,6 @@
               layer-type (.-type (.getLayer map-obj layer-id))]
           (try
             (js/console.log "Setting paint property:" layer-id property-name js-value "on layer type:" layer-type)
-            ;; For fill-extrusion layers, ensure the property is supported
             (when (or (not= "fill-extrusion-color" property-name)
                       (= "fill-extrusion" layer-type))
               (.setPaintProperty map-obj layer-id property-name js-value))
@@ -345,8 +322,18 @@
 (defn parse-color-expression [color-value current-zoom]
   (when color-value
     (cond
-      (and (string? color-value) (= color-value "transparent"))
-      "transparent"
+      (string? color-value)
+      (cond
+        (= color-value "transparent") "transparent"
+        (.startsWith color-value "#") color-value
+        :else (try
+                (-> (color color-value)
+                    (.hex)
+                    (.toString)
+                    (.toLowerCase))
+                (catch js/Error e
+                  (js/console.warn "Failed to parse color string:" color-value)
+                  nil)))
 
       (isExpression color-value)
       (try
@@ -359,18 +346,6 @@
         (catch js/Error e
           (js/console.warn "Failed to evaluate color expression:" e)
           nil))
-
-      (string? color-value)
-      (if (.startsWith color-value "#")
-        color-value
-        (try
-          (-> (color color-value)
-              (.hex)
-              (.toString)
-              (.toLowerCase))
-          (catch js/Error e
-            (js/console.warn "Failed to parse color string:" color-value)
-            nil)))
 
       (number? color-value)
       (try
@@ -429,15 +404,16 @@
 (defn get-zoom-value-pairs [layer-id property-name current-zoom]
   (let [value (get-paint-property layer-id property-name)]
     (when value
-      (let [clj-value (js->clj value :keywordize-keys true)]
+      (let [clj-value (js->clj value :keywordize-keys true)
+            parse-fn (if (#{"fill-color" "fill-outline-color" "fill-extrusion-color"} property-name)
+                       parse-color-expression
+                       parse-numeric-expression)]
         (cond
           ;; object-style stops
           (and (map? clj-value) (:stops clj-value))
           (mapv (fn [[zoom prop-value]]
                   {:zoom zoom
-                   :value (if (#{"fill-color" "fill-outline-color" "fill-extrusion-color"} property-name)
-                            (parse-color-expression prop-value current-zoom)
-                            (parse-numeric-expression prop-value current-zoom))})
+                   :value (parse-fn prop-value current-zoom)})
                 (:stops clj-value))
 
           ;; array-style interpolate on zoom
@@ -448,16 +424,12 @@
           (let [stops-pairs (partition 2 (subvec clj-value 3))]
             (mapv (fn [[zoom prop-value]]
                     {:zoom zoom
-                     :value (if (#{"fill-color" "fill-outline-color" "fill-extrusion-color"} property-name)
-                              (parse-color-expression prop-value current-zoom)
-                              (parse-numeric-expression prop-value current-zoom))})
+                     :value (parse-fn prop-value current-zoom)})
                   stops-pairs))
 
           :else
           [{:zoom current-zoom
-            :value (if (#{"fill-color" "fill-outline-color" "fill-extrusion-color"} property-name)
-                     (parse-color-expression value current-zoom)
-                     (parse-numeric-expression value current-zoom))}])))))
+            :value (parse-fn value current-zoom)}])))))
 
 (defn update-single-value [layer-id property-name new-value]
   "Update a property to a single value (not a stops expression)"
@@ -518,10 +490,7 @@
                         (or (string? v)
                             (number? v)
                             (nil? v)
-                            (and (object? v)
-                                 (or (some? (.-stops v))
-                                     (some? (.-property v))
-                                     (some? (.-type v))))
+                            (isExpression v)
                             (and (map? v)
                                  (or (:stops v)
                                      (:property v)
