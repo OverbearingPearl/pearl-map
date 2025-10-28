@@ -8,6 +8,7 @@
                                 :fill-opacity 1.0
                                 :fill-outline-color "#cccccc"
                                 :fill-extrusion-color "#f0f0f0"}
+   :style-editor/target-layer "building" ;; Default target layer
    :map/light-properties {:anchor "viewport"
                           :color "#ffffff"
                           :intensity 0.5

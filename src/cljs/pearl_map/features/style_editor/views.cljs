@@ -188,8 +188,9 @@
                                        (re-frame/dispatch [:style-editor/reset-styles-immediately]))
                          :style {:width "100%" :padding "5px" :border "1px solid #ddd" :border-radius "4px"}}
                 [:option {:value "building"} "Building"]
+                [:option {:value "building-top"} "Building Top"] ;; Added building-top
                 [:option {:value "extruded-building"} "Building 3D (Extruded)"]
-                [:option {:value "building-top"} "Building Top"]]]
+                [:option {:value "extruded-building-top"} "Building 3D Top"]]]
 
               ;; Only show style controls if layer exists
               (when layer-exists?

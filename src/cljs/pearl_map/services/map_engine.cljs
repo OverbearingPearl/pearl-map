@@ -140,34 +140,58 @@
   (when-let [^js map-obj (get-map-instance)]
     (try
       (when (.getSource map-obj "carto")
-        (when-not (.getLayer map-obj "extruded-building")
-          (let [current-style (:current-style @db/app-db)
-                initial-color (if (= current-style (:dark style-urls))
-                                "#2d3748"   ;; Corresponds to default-building-styles :dark :fill-extrusion-color
-                                "#f0f0f0")] ;; Corresponds to default-building-styles :light :fill-extrusion-color
-            (let [layer-spec (clj->js
-                              {:id "extruded-building"
-                               :type "fill-extrusion"
-                               :source "carto"
-                               :source-layer "building"
-                               :filter (into ["!in" "$id"] eiffel-tower-osm-ids)
-                               :paint {:fill-extrusion-color
-                                       (if (string? initial-color)
-                                         initial-color
-                                         "#f0f0f0")  ;; Fallback default color
-                                       :fill-extrusion-height ["coalesce" ["get" "height"] ["get" "render_height"] 10]  ;; Minimum height of 10 meters
-                                       :fill-extrusion-base ["coalesce" ["get" "min_height"] ["get" "render_min_height"] 0]
-                                       :fill-extrusion-opacity 1.0
-                                       :fill-extrusion-vertical-gradient true
-                                       :fill-extrusion-translate [0, 0]
-                                       :fill-extrusion-translate-anchor "map"}})
-                  layer-type (.-type layer-spec)]
-              (js/console.log "Adding extruded buildings layer with spec:" layer-spec "type:" layer-type)
-              (.addLayer map-obj layer-spec))
-            (.on map-obj "click" "extruded-building"
-                 (fn [e]
-                   (when-let [feature (first (.-features e))]
-                     (js/console.log "Clicked Feature --- ID:" (.-id feature) "--- Properties:" (js->clj (.-properties feature) :keywordize-keys true))))))))
+        (let [current-style (:current-style @db/app-db)
+              initial-color (if (= current-style (:dark style-urls))
+                              "#2d3748"   ;; Corresponds to default-building-styles :dark :fill-extrusion-color
+                              "#f0f0f0")] ;; Corresponds to default-building-styles :light :fill-extrusion-color
+          ;; Add extruded-building layer
+          (when-not (.getLayer map-obj "extruded-building")
+            (let [extruded-layer-spec (clj->js
+                                       {:id "extruded-building"
+                                        :type "fill-extrusion"
+                                        :source "carto"
+                                        :source-layer "building"
+                                        :filter (into ["!in" "$id"] eiffel-tower-osm-ids)
+                                        :paint {:fill-extrusion-color
+                                                (if (string? initial-color)
+                                                  initial-color
+                                                  "#f0f0f0")  ;; Fallback default color
+                                                :fill-extrusion-height ["coalesce" ["get" "height"] ["get" "render_height"] 10]  ;; Minimum height of 10 meters
+                                                :fill-extrusion-base ["coalesce" ["get" "min_height"] ["get" "render_min_height"] 0]
+                                                :fill-extrusion-opacity 1.0
+                                                :fill-extrusion-vertical-gradient true
+                                                :fill-extrusion-translate [0, 0]
+                                                :fill-extrusion-translate-anchor "map"}})
+                  extruded-layer-type (.-type extruded-layer-spec)]
+              (js/console.log "Adding extruded buildings layer with spec:" extruded-layer-spec "type:" extruded-layer-type)
+              (.addLayer map-obj extruded-layer-spec)))
+
+          ;; Add extruded-building-top layer
+          (when-not (.getLayer map-obj "extruded-building-top")
+            (let [top-layer-spec (clj->js
+                                  {:id "extruded-building-top"
+                                   :type "fill-extrusion"
+                                   :source "carto"
+                                   :source-layer "building"
+                                   :filter (into ["!in" "$id"] eiffel-tower-osm-ids)
+                                   :paint {:fill-extrusion-color
+                                           (if (string? initial-color)
+                                             initial-color
+                                             "#f0f0f0")
+                                           :fill-extrusion-height ["coalesce" ["get" "height"] ["get" "render_height"] 10]
+                                           :fill-extrusion-base ["coalesce" ["get" "height"] ["get" "render_height"] 10] ;; Base is also height for the top layer
+                                           :fill-extrusion-opacity 1.0
+                                           :fill-extrusion-vertical-gradient false
+                                           :fill-extrusion-translate [0, 0]
+                                           :fill-extrusion-translate-anchor "map"}})
+                  top-layer-type (.-type top-layer-spec)]
+              (js/console.log "Adding extruded-building-top layer with spec:" top-layer-spec "type:" top-layer-type)
+              (.addLayer map-obj top-layer-spec)))
+
+          (.on map-obj "click" "extruded-building"
+               (fn [e]
+                 (when-let [feature (first (.-features e))]
+                   (js/console.log "Clicked Feature --- ID:" (.-id feature) "--- Properties:" (js->clj (.-properties feature) :keywordize-keys true)))))))
       (catch js/Error e
         (js/console.error "Failed to add extruded buildings layer:" e)))))
 
