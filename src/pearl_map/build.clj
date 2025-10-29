@@ -53,7 +53,6 @@
         (println "⚠️  GLTF source directory not found:" (.getAbsolutePath source-dir))
         (println "Expected path:" (.getAbsolutePath source-dir))))))
 
-
 (defn ^:export build-hook []
   (copy-maplibre-css)
   (copy-gltf-files))
