@@ -73,7 +73,7 @@
                     ;; Load the Eiffel Tower model
                     (model-loader/load-model
                      loader
-                     "/models/eiffel_tower/scene.gltf"
+                     "/models/eiffel_tower/scene.glb"
                      (fn [gltf]
                        (let [model-scene (.-scene gltf)
                              box (three/Box3.)

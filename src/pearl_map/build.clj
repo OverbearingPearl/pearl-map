@@ -60,10 +60,13 @@
   (copy-file! "node_modules/maplibre-gl/dist/maplibre-gl.css" "target/public/css/maplibre-gl.css"))
 
 (defn copy-gltf-files
-  "Build hook to copy GLTF model files from resources to target directory"
+  "Build hook to copy GLB model and license from resources to target directory."
   []
-  (log-info "Copying GLTF model files from resources...")
-  (copy-directory! "resources/public/models/eiffel_tower" "target/public/models/eiffel_tower"))
+  (log-info "Copying GLB model files...")
+  (let [source-dir "resources/public/models/eiffel_tower"
+        target-dir "target/public/models/eiffel_tower"]
+    (copy-file! (str source-dir "/scene.glb") (str target-dir "/scene.glb"))
+    (copy-file! (str source-dir "/license.txt") (str target-dir "/license.txt"))))
 
 (defn copy-index-html
   "Copies index.html from resources/public to target/public."

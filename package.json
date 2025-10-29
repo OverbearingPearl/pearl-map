@@ -4,9 +4,10 @@
     "main": "index.js",
     "scripts": {
         "dev": "shadow-cljs watch app",
-        "build": "shadow-cljs release app && clojure -M -m pearl-map.build",
+        "build:model": "gltf-pipeline -i resources/public/models/eiffel_tower/scene.gltf -o resources/public/models/eiffel_tower/scene.glb -b",
+        "build": "npm run build:model && shadow-cljs release app && clojure -M -m pearl-map.build",
         "clean": "rm -rf target/public",
-        "predev": "clojure -M -m pearl-map.build"
+        "predev": "npm run build:model && clojure -M -m pearl-map.build"
     },
     "keywords": ["map", "3d", "geospatial", "visualization"],
     "author": "OverbearingPearl",
@@ -21,6 +22,7 @@
         "three": "^0.169.0"
     },
     "devDependencies": {
+        "gltf-pipeline": "^4.1.0",
         "shadow-cljs": "^2.28.1"
     }
 }

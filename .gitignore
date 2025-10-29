@@ -174,6 +174,7 @@ dist
 .pnp.*
 
 # Project specific
+/resources/public/models/eiffel_tower/scene.glb # Generated GLB model
 /resources/public/js/                  # Compiled JavaScript from shadow-cljs
 /resources/public/css/maplibre-gl.css  # Copied CSS file (will be generated during build)
 /.shadow-cljs/                         # Shadow-cljs cache
