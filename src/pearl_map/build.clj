@@ -16,14 +16,12 @@
     (println "Ensuring target directory exists:" (.getAbsolutePath target-dir))
     (.mkdirs target-dir)
 
-    ;; Only copy if source exists and target doesn't exist
+    ;; Only copy if source exists
     (if (.exists source)
-      (if (.exists target)
-        (println "✓ maplibre-gl.css already exists in target, skipping copy")
-        (do
-          (println "Source file exists:" (.getAbsolutePath source))
-          (io/copy source target)
-          (println "✓ maplibre-gl.css copied successfully to:" (.getAbsolutePath target))))
+      (do
+        (println "Source file exists:" (.getAbsolutePath source))
+        (io/copy source target)
+        (println "✓ maplibre-gl.css copied successfully to:" (.getAbsolutePath target)))
       (do
         (println "⚠️  maplibre-gl.css not found in node_modules")
         (println "Expected path:" (.getAbsolutePath source))
