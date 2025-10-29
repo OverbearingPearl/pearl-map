@@ -30,7 +30,7 @@ jobs:
       - name: Install Clojure CLI
         uses: DeLaGuardo/setup-clojure@12.1
         with:
-          cli: '1.11.1.1429'
+          cli: '1.12.3.1577'
 
       - name: Install dependencies
         run: npm install
