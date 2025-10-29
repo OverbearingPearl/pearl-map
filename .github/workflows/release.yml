@@ -45,7 +45,8 @@ jobs:
       - name: Package for release
         run: |
           mv target/public ${{ steps.package_name.outputs.name }}
-          zip -r ${{ steps.package_name.outputs.name }}.zip ${{ steps.package_name.outputs.name }}
+          cd ${{ steps.package_name.outputs.name }}
+          zip -r ../${{ steps.package_name.outputs.name }}.zip .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
