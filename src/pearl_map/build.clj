@@ -51,7 +51,37 @@
         (println "⚠️  GLTF source directory not found:" (.getAbsolutePath source-dir))
         (println "Expected path:" (.getAbsolutePath source-dir))))))
 
+(defn copy-index-html
+  "Copies index.html from resources/public to target/public."
+  []
+  (println "Copying index.html...")
+  (let [source (io/file "resources/public/index.html")
+        target-dir (io/file "target/public")
+        target (io/file target-dir "index.html")]
+    (.mkdirs target-dir) ; Ensure target/public exists
+    (if (.exists source)
+      (do
+        (io/copy source target)
+        (println "✓ index.html copied successfully to:" (.getAbsolutePath target)))
+      (println "⚠️  index.html not found at:" (.getAbsolutePath source)))))
+
+(defn copy-main-css
+  "Copies style.css from resources/public/css to target/public/css."
+  []
+  (println "Copying style.css...")
+  (let [source (io/file "resources/public/css/style.css")
+        target-dir (io/file "target/public/css")
+        target (io/file target-dir "style.css")]
+    (.mkdirs target-dir) ; Ensure target/public/css exists
+    (if (.exists source)
+      (do
+        (io/copy source target)
+        (println "✓ style.css copied successfully to:" (.getAbsolutePath target)))
+      (println "⚠️  style.css not found at:" (.getAbsolutePath source)))))
+
 (defn ^:export build-hook []
+  (copy-index-html)
+  (copy-main-css) ; Also copy main style.css
   (copy-maplibre-css)
   (copy-gltf-files))
 
