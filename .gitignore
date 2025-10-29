@@ -174,12 +174,13 @@ dist
 .pnp.*
 
 # Project specific
-/resources/public/models/eiffel_tower/scene.glb # Generated GLB model
-/resources/public/js/                  # Compiled JavaScript from shadow-cljs
-/resources/public/css/maplibre-gl.css  # Copied CSS file (will be generated during build)
-/.shadow-cljs/                         # Shadow-cljs cache
-/.nrepl-port                           # nREPL port file
-/.clj-kondo/                           # Clj-kondo linting cache
-/.lsp/                                 # LSP configuration and cache
-/.calva/                               # Calva (VS Code extension) configuration
-/.cpcache/                             # Clojure CLI cache
+/resources/public/models/eiffel_tower/scene.glb        # Generated GLB model
+/resources/public/js/                                  # Compiled JavaScript from shadow-cljs
+/resources/public/css/maplibre-gl.css                  # Copied CSS file (will be generated during build)
+/src/cljs/pearl_map/features/models_3d/model_data.cljs # Generated ClojureScript file containing base64 encoded 3D model data
+/.shadow-cljs/                                         # Shadow-cljs cache
+/.nrepl-port                                           # nREPL port file
+/.clj-kondo/                                           # Clj-kondo linting cache
+/.lsp/                                                 # LSP configuration and cache
+/.calva/                                               # Calva (VS Code extension) configuration
+/.cpcache/                                             # Clojure CLI cache

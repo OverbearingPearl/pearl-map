@@ -5,7 +5,7 @@
     "scripts": {
         "dev": "shadow-cljs watch app",
         "build:model": "gltf-pipeline -i resources/public/models/eiffel_tower/scene.gltf -o resources/public/models/eiffel_tower/scene.glb -b",
-        "build": "npm run build:model && shadow-cljs release app && clojure -M -m pearl-map.build",
+        "build": "npm run build:model && clojure -M -m pearl-map.build && shadow-cljs release app && clojure -M -m pearl-map.build --cleanup",
         "clean": "rm -rf target/public",
         "predev": "npm run build:model && clojure -M -m pearl-map.build"
     },

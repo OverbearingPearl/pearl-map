@@ -5,6 +5,7 @@
             [re-frame.db :as rf-db]
             [pearl-map.app.db :as app-db]
             [pearl-map.services.model-loader :as model-loader]
+            [pearl-map.features.models-3d.model-data :as model-data]
             [pearl-map.utils.geometry :as geom]))
 
 (defn- maplibre-light-pos->three-direction
@@ -73,7 +74,7 @@
                     ;; Load the Eiffel Tower model
                     (model-loader/load-model
                      loader
-                     "/models/eiffel_tower/scene.glb"
+                     model-data/eiffel-tower-model-data
                      (fn [gltf]
                        (let [model-scene (.-scene gltf)
                              box (three/Box3.)
