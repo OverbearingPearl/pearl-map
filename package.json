@@ -4,9 +4,9 @@
     "main": "index.js",
     "scripts": {
         "dev": "shadow-cljs watch app",
-        "build": "shadow-cljs release app && clj -M -m pearl-map.build",
+        "build": "shadow-cljs release app && clojure -M -m pearl-map.build",
         "clean": "rm -rf target/public",
-        "predev": "clj -M -m pearl-map.build"
+        "predev": "clojure -M -m pearl-map.build"
     },
     "keywords": ["map", "3d", "geospatial", "visualization"],
     "author": "OverbearingPearl",
