@@ -52,3 +52,9 @@ jobs:
         with:
           files: "${{ steps.package_name.outputs.name }}.zip"
           fail_on_unmatched_files: true
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./target/public
