@@ -2,6 +2,8 @@
 
 [English](README.md) | [中文](README_zh.md)
 
+✨ [Live Demo](https://overbearingpearl.github.io/pearl-map/) ✨
+
 A high-performance, customizable 3D web mapping application built with Clojure and ClojureScript. Renders vector tiles and 3D terrain using MapLibre GL, powered by OpenStreetMap data, featuring a real-time style editor for dynamic visual customization.
 
 ## 📖 Overview
