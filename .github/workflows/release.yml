@@ -45,7 +45,7 @@ jobs:
       - name: Package for release
         run: |
           mkdir -p docs
-          mv target/public/* docs/
+          cp -r target/public/. docs/
           zip -r ${{ steps.package_name.outputs.name }}.zip docs
 
       - name: Create GitHub Release
