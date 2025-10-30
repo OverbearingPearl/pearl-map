@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pages: write # Add pages permission for GitHub Pages deployment status
+      id-token: write # Add id-token permission for GitHub Pages deployment status
 
     steps:
       - name: Checkout code
@@ -48,11 +50,31 @@ jobs:
           cp -r target/public/. docs/
           (cd docs && zip -r ../${{ steps.package_name.outputs.name }}.zip .)
 
+      - name: Get GitHub Pages URL
+        id: get_pages_url
+        run: |
+          # Construct the GitHub Pages URL based on repository and owner
+          # For user/organization pages: https://<owner>.github.io/<repository>/
+          # For project pages: https://<owner>.github.io/<repository>/
+          # Assuming project pages for this setup
+          echo "pages_url=https://${{ github.event.repository.owner.login }}.github.io/${{ github.event.repository.name }}/" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: "${{ steps.package_name.outputs.name }}.zip"
           fail_on_unmatched_files: true
+          body: |
+            🎉 Release ${{ github.ref_name }} is now available!
+
+            📦 Download the release package:
+            ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.package_name.outputs.name }}.zip
+
+            🌐 View on GitHub Pages:
+            ${{ steps.get_pages_url.outputs.pages_url }}
+
+            ---
+            _This is an automated release._
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
