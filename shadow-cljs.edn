@@ -15,8 +15,8 @@
         :output-dir "target/public/js"
         :asset-path "js"
         :modules {:main {:init-fn pearl-map.core/init}}
-        :devtools {:after-load pearl-map.core/reload}
-        :dev {:compiler-options {:closure-defines {re-frame.trace.trace-enabled? true}}}
+        :dev {:compiler-options {:closure-defines {re-frame.trace.trace-enabled? true}}
+              :devtools {:after-load pearl-map.core/reload}}
         :release {:compiler-options {}}}
   :test {:target :browser-test
          :test-dir "target/test"
