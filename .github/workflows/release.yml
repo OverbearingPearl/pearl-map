@@ -44,8 +44,9 @@ jobs:
 
       - name: Package for release
         run: |
-          mv target/public ${{ steps.package_name.outputs.name }}
-          zip -r ${{ steps.package_name.outputs.name }}.zip ${{ steps.package_name.outputs.name }}
+          mkdir -p docs
+          mv target/public/* docs/
+          zip -r ${{ steps.package_name.outputs.name }}.zip docs
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -57,4 +58,4 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./target/public
+          publish_dir: ./docs
