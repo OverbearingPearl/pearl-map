@@ -39,19 +39,19 @@
 (defn cleanup-state []
   (reset! layer-state nil))
 
-(defn create-custom-layer [initial-scale initial-rotation-z]
-  (let [model-mercator (.fromLngLat maplibre/MercatorCoordinate
-                                    (clj->js eiffel-tower-coords)
-                                    model-altitude)
-        base-model-scale (.meterInMercatorCoordinateUnits model-mercator)
-        model-transform #js {:translateX (.-x model-mercator)
-                             :translateY (.-y model-mercator)
-                             :translateZ (.-z model-mercator)
-                             :rotateX (nth model-rotate 0)
-                             :rotateY (nth model-rotate 1)
-                             :rotateZ (nth model-rotate 2)
-                             :scale base-model-scale}]
+(defn- make-model-transform [coords altitude model-rotate]
+  (let [model-mercator (.fromLngLat maplibre/MercatorCoordinate (clj->js coords) altitude)
+        base-model-scale (.meterInMercatorCoordinateUnits model-mercator)]
+    #js {:translateX (.-x model-mercator)
+         :translateY (.-y model-mercator)
+         :translateZ (.-z model-mercator)
+         :rotateX (nth model-rotate 0)
+         :rotateY (nth model-rotate 1)
+         :rotateZ (nth model-rotate 2)
+         :scale base-model-scale}))
 
+(defn create-custom-layer [initial-scale initial-rotation-z]
+  (let [model-transform (make-model-transform eiffel-tower-coords model-altitude model-rotate)]
     #js {:id "3d-model-eiffel"
          :type "custom"
          :renderingMode "3d"
@@ -61,27 +61,18 @@
                         ^js scene (three/Scene.)
                         ^js camera (three/Camera.)
                         ^js loader (model-loader/create-gltf-loader)
-                        ^js directional-light (three/DirectionalLight. 0xffffff)
+                        ^js directional-light (doto (three/DirectionalLight. 0xffffff)
+                                                (set! -castShadow true)
+                                                (-> .-shadow .-camera (doto (set! -far 5000) (set! -near 1)))
+                                                (-> .-shadow .-mapSize (doto (set! -width 2048) (set! -height 2048))))
                         ^js ambient-light (three/AmbientLight. 0xffffff 0.4)
-                        ^js renderer (three/WebGLRenderer.
-                                      #js {:canvas canvas
-                                           :context gl
-                                           :antialias true})]
-
-                    ;; Configure light for shadows
-                    (set! (.-castShadow directional-light) true)
-                    (doto (.-shadow directional-light)
-                      (doto (.-camera)
-                        (set! -far 5000)
-                        (set! -near 1))
-                      (doto (.-mapSize)
-                        (set! -width 2048)
-                        (set! -height 2048)))
+                        ^js renderer (doto (three/WebGLRenderer. #js {:canvas canvas :context gl :antialias true})
+                                       (set! -autoClear false)
+                                       (-> .-shadowMap (doto (set! -enabled true) (set! -type three/PCFSoftShadowMap))))]
 
                     (.add scene directional-light)
                     (.add scene ambient-light)
 
-                    ;; Add a ground plane to receive shadows
                     (let [plane-geometry (three/PlaneGeometry. 2000 2000)
                           plane-material (three/ShadowMaterial. #js {:opacity 0.3})
                           plane (doto (three/Mesh. plane-geometry plane-material)
@@ -89,12 +80,6 @@
                                   (set! -receiveShadow true))]
                       (.add scene plane))
 
-                    ;; Configure renderer for shadows
-                    (doto (.-shadowMap renderer)
-                      (set! -enabled true)
-                      (set! -type three/PCFSoftShadowMap))
-
-                    ;; Load the Eiffel Tower model
                     (model-loader/load-model
                      loader
                      model-data/eiffel-tower-model-data
@@ -118,7 +103,6 @@
                                model-scale-factor (if (pos? model-unit-height)
                                                     (/ eiffel-tower-real-height model-unit-height)
                                                     1)]
-                           ;; Enable shadows for all meshes in the model
                            (.traverse model-scene
                                       (fn [^js object]
                                         (when (.-isMesh object)
@@ -129,8 +113,6 @@
                              (set! (.-modelScaleFactor st) model-scale-factor)))))
                      (fn [error]
                        (js/console.error "Failed to load Eiffel Tower model:" error)))
-
-                    (set! (.-autoClear renderer) false)
 
                     ;; Dispatch events to reset sliders to default values.
                     (rf/dispatch [:models-3d/set-eiffel-scale (:models-3d/eiffel-scale app-db/default-db)])
@@ -156,7 +138,7 @@
                                (doto light
                                  (-> .-color (.set (three/Color. (:color light-props))))
                                  (-> .-position (.copy (maplibre-light-pos->three-direction (:position light-props))))
-                                 (aset "intensity" (:intensity light-props))))
+                                 (set! -intensity (:intensity light-props))))
                            user-scale (.-userScale state)
                            scene (.-scene state)
                            camera (.-camera state)
