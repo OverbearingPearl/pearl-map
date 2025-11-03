@@ -68,15 +68,42 @@
                                            :context gl
                                            :antialias true})]
 
+                    ;; Configure light for shadows
+                    (set! (.-castShadow directional-light) true)
+                    (doto (.-shadow directional-light)
+                      (doto (.-camera)
+                        (set! -far 5000)
+                        (set! -near 1)
+                        (set! -left -1000)
+                        (set! -right 1000)
+                        (set! -top 1000)
+                        (set! -bottom -1000))
+                      (doto (.-mapSize)
+                        (set! -width 2048)
+                        (set! -height 2048)))
+
                     (.add scene directional-light)
                     (.add scene ambient-light)
+
+                    ;; Add a ground plane to receive shadows
+                    (let [plane-geometry (three/PlaneGeometry. 2000 2000)
+                          plane-material (three/ShadowMaterial. #js {:opacity 0.3})
+                          plane (doto (three/Mesh. plane-geometry plane-material)
+                                  (as-> p (set! (.-x (.-rotation p)) (* -90 (/ js/Math.PI 180))))
+                                  (set! -receiveShadow true))]
+                      (.add scene plane))
+
+                    ;; Configure renderer for shadows
+                    (doto (.-shadowMap renderer)
+                      (set! -enabled true)
+                      (set! -type three/PCFSoftShadowMap))
 
                     ;; Load the Eiffel Tower model
                     (model-loader/load-model
                      loader
                      model-data/eiffel-tower-model-data
                      (fn [gltf]
-                       (let [model-scene (.-scene gltf)
+                       (let [^three/Object3D model-scene (.-scene gltf)
                              box (three/Box3.)
                              size (three/Vector3.)]
                          (.setFromObject box model-scene)
@@ -85,6 +112,12 @@
                                model-scale-factor (if (pos? model-unit-height)
                                                     (/ eiffel-tower-real-height model-unit-height)
                                                     1)]
+                           ;; Enable shadows for all meshes in the model
+                           (.traverse model-scene
+                                      (fn [^js object]
+                                        (when (.-isMesh object)
+                                          (set! (.-castShadow object) true)
+                                          (set! (.-receiveShadow object) true))))
                            (.add scene model-scene)
                            (when-let [^js st @layer-state]
                              (set! (.-modelScaleFactor st) model-scale-factor)))))

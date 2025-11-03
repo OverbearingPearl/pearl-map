@@ -1,6 +1,7 @@
 (ns pearl-map.features.map-view.events
   (:require [re-frame.core :as re-frame]
-            [pearl-map.services.map-engine :as map-engine]))
+            [pearl-map.services.map-engine :as map-engine]
+            [re-frame.db :as db]))
 
 (re-frame/reg-fx
  :set-map-light
@@ -11,7 +12,11 @@
 (defn init-map []
   (let [map-obj (map-engine/init-map)]
     (when map-obj
-      (map-engine/on-map-load (fn [_]))
+      (map-engine/on-map-load
+       (fn [^js map-instance]
+         (let [light-props (:map/light-properties @db/app-db)]
+           (when light-props
+             (.setLight map-instance (clj->js light-props))))))
       (map-engine/on-map-error
        (fn [e]
          (js/console.error "Map loading error:" e))))))

@@ -135,6 +135,27 @@
   (when-let [^js map-obj (get-map-instance)]
     (.on map-obj "error" #(callback %))))
 
+(defn set-paint-property [layer-id property-name value]
+  (when-let [^js map-obj (get-map-instance)]
+    (when (and (.getLayer map-obj layer-id) (some? value))
+      (let [js-value (cond
+                       (map? value) (clj->js value)
+                       (#{"fill-extrusion-color" "fill-color" "fill-outline-color"} property-name)
+                       (cond
+                         (= value "transparent") "transparent"
+                         (string? value) (if (or (.startsWith value "#")
+                                                 (.startsWith value "rgb")
+                                                 (.startsWith value "hsl"))
+                                           value
+                                           (str "#" value))
+                         :else (str "#" (.toString (js/parseInt (str value)) 16)))
+                       :else value)
+            layer-type (.-type (.getLayer map-obj layer-id))]
+        (when (or (not= "fill-extrusion-color" property-name)
+                  (= "fill-extrusion" layer-type))
+          (.setPaintProperty map-obj layer-id property-name js-value))))))
+
+
 (defn- create-extruded-layer-spec [layer-id initial-color]
   (let [is-top-layer? (= layer-id "extruded-building-top")
         height-expr ["coalesce" ["get" "height"] ["get" "render_height"] 10]
@@ -263,26 +284,6 @@
   (when-let [^js map-obj (get-map-instance)]
     (.getLayer map-obj layer-id)))
 
-(defn set-paint-property [layer-id property-name value]
-  (when-let [^js map-obj (get-map-instance)]
-    (when (and (.getLayer map-obj layer-id) (some? value))
-      (let [js-value (cond
-                       (map? value) (clj->js value)
-                       (#{"fill-extrusion-color" "fill-color" "fill-outline-color"} property-name)
-                       (cond
-                         (= value "transparent") "transparent"
-                         (string? value) (if (or (.startsWith value "#")
-                                                 (.startsWith value "rgb")
-                                                 (.startsWith value "hsl"))
-                                           value
-                                           (str "#" value))
-                         :else (str "#" (.toString (js/parseInt (str value)) 16)))
-                       :else value)
-            layer-type (.-type (.getLayer map-obj layer-id))]
-        (when (or (not= "fill-extrusion-color" property-name)
-                  (= "fill-extrusion" layer-type))
-          (.setPaintProperty map-obj layer-id property-name js-value))))))
-
 (defn get-current-zoom []
   (when-let [^js map-obj (get-map-instance)]
     (.getZoom map-obj)))
@@ -302,8 +303,6 @@
 (defn set-bearing [bearing-angle]
   (when-let [^js map-obj (get-map-instance)]
     (.setBearing map-obj bearing-angle)))
-
-
 
 (defn parse-color-expression [color-value current-zoom]
   (when color-value
