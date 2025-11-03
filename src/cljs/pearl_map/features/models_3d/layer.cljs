@@ -73,11 +73,7 @@
                     (doto (.-shadow directional-light)
                       (doto (.-camera)
                         (set! -far 5000)
-                        (set! -near 1)
-                        (set! -left -1000)
-                        (set! -right 1000)
-                        (set! -top 1000)
-                        (set! -bottom -1000))
+                        (set! -near 1))
                       (doto (.-mapSize)
                         (set! -width 2048)
                         (set! -height 2048)))
@@ -108,6 +104,16 @@
                              size (three/Vector3.)]
                          (.setFromObject box model-scene)
                          (.getSize box size)
+
+                         (let [shadow-camera (.-camera (.-shadow directional-light))
+                               max-dimension (max (.-x size) (.-y size) (.-z size))
+                               frustum-half-size (* max-dimension 0.6)]
+                           (set! (.-left shadow-camera) (- frustum-half-size))
+                           (set! (.-right shadow-camera) frustum-half-size)
+                           (set! (.-top shadow-camera) frustum-half-size)
+                           (set! (.-bottom shadow-camera) (- frustum-half-size))
+                           (.updateProjectionMatrix shadow-camera))
+
                          (let [model-unit-height (.-y size)
                                model-scale-factor (if (pos? model-unit-height)
                                                     (/ eiffel-tower-real-height model-unit-height)
