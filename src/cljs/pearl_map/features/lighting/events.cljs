@@ -7,4 +7,5 @@
    (let [new-db (assoc-in db (into [:map/light-properties] path) value)
          light-props (:map/light-properties new-db)]
      {:db new-db
-      :fx [[:set-map-light light-props]]})))
+      :fx [[:set-map-light light-props]
+           [:dispatch [:buildings/update-shadow light-props]]]})))

@@ -7,3 +7,9 @@
  (fn [_ _]
    (buildings-layer/add-extruded-buildings-layer)
    {}))
+
+(re-frame/reg-event-fx
+ :buildings/update-shadow
+ (fn [_ [_ light-props]]
+   (buildings-layer/update-extrusion-shadow-by-light light-props)
+   {}))
