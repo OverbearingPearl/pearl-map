@@ -8,7 +8,8 @@
             [pearl-map.features.style-editor.events :as style-editor-events]
             [pearl-map.features.style-editor.subs :as style-editor-subs]
             [pearl-map.features.models-3d.events :as models-3d-events]
-            [pearl-map.features.models-3d.subs :as models-3d-subs]))
+            [pearl-map.features.models-3d.subs :as models-3d-subs]
+            [pearl-map.features.buildings.events :as buildings-events]))
 
 (defonce react-root
   (delay
