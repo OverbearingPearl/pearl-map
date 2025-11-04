@@ -59,9 +59,9 @@
 (def eiffel-tower-coords [2.2945 48.8584])
 
 (def style-urls
-  {:basic "raster-style"
-   :dark "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-   :light "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"})
+  {:raster-style "raster-style"
+   :dark-style "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+   :light-style "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"})
 
 (defn get-map-instance []
   (:map-instance @db/app-db))
@@ -99,7 +99,9 @@
 
 (defn init-map []
   (when (.getElementById js/document "map-container")
-    (let [map-config (create-config "raster-style")
+    (let [initial-style-key (:current-style-key @db/app-db)
+          initial-style-url (get style-urls initial-style-key)
+          map-config (create-config initial-style-url)
           map-obj (maplibre/Map. map-config)]
       (set-map-instance! map-obj)
       (doto map-obj

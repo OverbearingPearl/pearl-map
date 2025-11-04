@@ -97,9 +97,8 @@
 (defn add-extruded-buildings-layer []
   (when-let [^js map-obj (map-engine/get-map-instance)]
     (when (.getSource map-obj "carto")
-      (let [{:keys [current-style lighting]} @db/app-db
-            dark-style-url "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-            initial-color (if (= current-style dark-style-url)
+      (let [{:keys [current-style-key lighting]} @db/app-db
+            initial-color (if (= current-style-key :dark-style)
                             "#2d3748"
                             "#f0f0f0")]
         (doseq [bucket shadow-buckets]

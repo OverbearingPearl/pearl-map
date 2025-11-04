@@ -14,12 +14,12 @@
    (assoc db :map-instance map-instance)))
 
 (re-frame/reg-event-fx
- :set-current-style
- (fn [{:keys [db]} [_ style-url]]
+ :set-current-style-key
+ (fn [{:keys [db]} [_ style-key]]
    (let [default-light-props (:map/light-properties db/default-db)
          default-building-style (:style-editor/editing-style db/default-db)
          new-db (-> db
-                    (assoc :current-style style-url)
+                    (assoc :current-style-key style-key)
                     (assoc :map/light-properties default-light-props)
                     (assoc :style-editor/editing-style default-building-style))]
      {:db new-db

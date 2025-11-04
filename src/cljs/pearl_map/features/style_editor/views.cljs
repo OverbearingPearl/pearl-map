@@ -289,7 +289,7 @@
     (fn []
       (let [editing-style @(re-frame/subscribe [:style-editor/editing-style])
             target-layer @(re-frame/subscribe [:style-editor/target-layer])
-            current-style @(re-frame/subscribe [:current-style])
+            current-style-key @(re-frame/subscribe [:current-style-key])
             map-instance (map-engine/get-map-instance)
             layer-exists? (and map-instance (map-engine/layer-exists? target-layer))]
         [:div {:style {:background "rgba(255,255,255,0.98)"
@@ -300,7 +300,7 @@
                        :box-shadow "0 4px 15px rgba(0,0,0,0.15)"}}
          [:h3 {:style {:margin "0 0 15px 0" :color "#333"}} "Building Style Editor"]
 
-         (if (= current-style raster-style)
+         (if (= current-style-key :raster-style)
            [render-unsupported-message]
            [:div
             (when-not layer-exists?

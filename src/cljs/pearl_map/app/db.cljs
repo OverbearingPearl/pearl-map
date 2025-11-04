@@ -2,7 +2,7 @@
 
 (def default-db
   {:map-instance nil
-   :current-style "raster-style"
+   :current-style-key :raster-style
    :custom-layers {}
    :style-editor/editing-style {:fill-color "#f0f0f0"
                                 :fill-opacity 1.0

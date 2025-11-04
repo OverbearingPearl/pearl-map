@@ -1,5 +1,6 @@
 (ns pearl-map.app.subs
-  (:require [re-frame.core :as re-frame]))
+  (:require [re-frame.core :as re-frame]
+            [pearl-map.services.map-engine :as map-engine]))
 
 (re-frame/reg-sub
  :map-instance
@@ -7,9 +8,15 @@
    (:map-instance db)))
 
 (re-frame/reg-sub
- :current-style
+ :current-style-key
  (fn [db]
-   (:current-style db)))
+   (:current-style-key db)))
+
+(re-frame/reg-sub
+ :current-style-url
+ :<- [:current-style-key]
+ (fn [style-key _]
+   (get map-engine/style-urls style-key)))
 
 (re-frame/reg-sub
  :custom-layers

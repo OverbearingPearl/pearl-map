@@ -21,6 +21,3 @@
        (fn [e]
          (js/console.error "Map loading error:" e))))))
 
-(defn change-map-style [style-url]
-  (re-frame/dispatch [:set-current-style style-url])
-  (map-engine/change-map-style style-url))
