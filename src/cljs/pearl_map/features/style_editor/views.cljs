@@ -276,7 +276,7 @@
                 :default-value 1
                 :label display-label}]))]))]))
 
-(defn building-style-editor []
+(defn style-editor []
   (reagent/create-class
    {:component-did-mount
     (fn []
@@ -298,7 +298,7 @@
                        :font-family "Arial, sans-serif"
                        :width "280px"
                        :box-shadow "0 4px 15px rgba(0,0,0,0.15)"}}
-         [:h3 {:style {:margin "0 0 15px 0" :color "#333"}} "Building Style Editor"]
+         [:h3 {:style {:margin "0 0 15px 0" :color "#333"}} "Style Editor"]
 
          (if (= current-style-key :raster-style)
            [render-unsupported-message]

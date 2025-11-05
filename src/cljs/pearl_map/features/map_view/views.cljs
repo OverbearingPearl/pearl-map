@@ -1,7 +1,7 @@
 (ns pearl-map.features.map-view.views
   (:require [re-frame.core :as re-frame]
             [pearl-map.components.map.controls :refer [style-controls]]
-            [pearl-map.features.style-editor.views :refer [building-style-editor]]
+            [pearl-map.features.style-editor.views :refer [style-editor]]
             [pearl-map.features.models-3d.views :refer [model-controls]]
             [pearl-map.features.lighting.views :as lighting]))
 
@@ -31,7 +31,7 @@
                        :right "20px"
                        :transform "translateY(-50%)"
                        :pointer-events "auto"}}
-         [building-style-editor]]
+         [style-editor]]
 
         ;; Bottom center - 3D model controls
         [:div {:style {:position "absolute"
