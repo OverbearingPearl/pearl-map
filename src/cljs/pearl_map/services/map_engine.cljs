@@ -70,6 +70,7 @@
   (:custom-layers @db/app-db))
 
 (defn set-map-instance! [instance]
+  (js/console.log "map-engine: Setting map instance.")
   (re-frame/dispatch [:set-map-instance instance])
   (set! (.-pearlMapInstance js/window) instance))
 
@@ -98,19 +99,54 @@
       (clj->js (assoc base-config :style style-url)))))
 
 (defn init-map []
+  (js/console.log "map-engine: init-map called.")
   (when (.getElementById js/document "map-container")
     (let [initial-style-key (:current-style-key @db/app-db)
           initial-style-url (get style-urls initial-style-key)
           map-config (create-config initial-style-url)
           map-obj (maplibre/Map. map-config)]
-      (set-map-instance! map-obj)
+      (.once map-obj "load"
+             (fn []
+               (js/console.log "map-engine: Map 'load' event triggered. Dispatching :map-engine/map-loaded.")
+               (re-frame/dispatch [:map-engine/map-loaded map-obj])))
       (doto map-obj
         (.addControl (maplibre/NavigationControl.))
         (.addControl (maplibre/ScaleControl.))))))
 
+(re-frame/reg-event-fx
+ :map-engine/map-loaded
+ (fn [{:keys [db]} [_ map-obj]]
+   (js/console.log "map-engine: :map-engine/map-loaded event received.")
+   (set-map-instance! map-obj)
+   {:dispatch-n (mapv (fn [callback] [:map-engine/on-map-loaded callback map-obj])
+                      (get db :map-engine/on-load-callbacks []))
+    :db         (assoc db :map-engine/on-load-callbacks [])}))
+
+(re-frame/reg-event-fx
+ :map-engine/on-map-loaded
+ (fn [_ [_ callback map-obj]]
+   (js/console.log "map-engine: Executing on-map-loaded callback.")
+   (callback map-obj)
+   {}))
+
+(re-frame/reg-event-db
+ :map-engine/register-on-load-callback
+ (fn [db [_ callback]]
+   (update db :map-engine/on-load-callbacks conj callback)))
+
 (defn on-map-load [callback]
-  (when-let [^js map-obj (get-map-instance)]
-    (.on map-obj "load" #(callback map-obj))))
+  (js/console.log "map-engine: on-map-load called with a callback.")
+  (if-let [^js map-obj (get-map-instance)]
+    (if (.-loaded map-obj)
+      (do
+        (js/console.log "map-engine: Map already loaded. Executing callback immediately.")
+        (re-frame/dispatch [:map-engine/on-map-loaded callback map-obj]))
+      (do
+        (js/console.log "map-engine: Map not yet loaded. Registering callback for :map-engine/map-loaded event.")
+        (re-frame/dispatch [:map-engine/register-on-load-callback callback])))
+    (do
+      (js/console.log "map-engine: map-instance is nil when on-map-load is called. Registering callback for :map-engine/map-loaded event.")
+      (re-frame/dispatch [:map-engine/register-on-load-callback callback]))))
 
 (defn on-map-error [callback]
   (when-let [^js map-obj (get-map-instance)]
@@ -157,32 +193,33 @@
        :bearing (.getBearing map-obj)
        :layers (get-custom-layers)})))
 
-(defn- apply-map-state! [state]
-  (when-let [^js map-obj (get-map-instance)]
+(defn- apply-map-state! [^js map-obj state]
+  (when map-obj
     (doto map-obj
       (.setCenter (:center state))
       (.setZoom (:zoom state))
       (.setPitch (:pitch state))
       (.setBearing (:bearing state)))))
 
-(defn- clear-custom-layers []
-  (let [^js map-obj (get-map-instance)
-        layers (get-custom-layers)]
+(defn- clear-custom-layers [^js map-obj]
+  (let [layers (get-custom-layers)]
     (doseq [[layer-id _] layers]
       (when (.getLayer map-obj layer-id)
         (.removeLayer map-obj layer-id)))
     (re-frame/dispatch [:clear-custom-layers])))
 
-(defn add-custom-layer [layer-id layer-impl before-id]
-  (let [^js map-obj (get-map-instance)]
-    (when-not (.getLayer map-obj layer-id)
-      (.addLayer map-obj layer-impl before-id)
-      (register-custom-layer layer-id layer-impl))))
+(defn add-custom-layer
+  ([layer-id layer-impl before-id]
+   (add-custom-layer (get-map-instance) layer-id layer-impl before-id))
+  ([^js map-obj layer-id layer-impl before-id]
+   (when-not (.getLayer map-obj layer-id)
+     (.addLayer map-obj layer-impl before-id)
+     (register-custom-layer layer-id layer-impl))))
 
-(defn- reapply-custom-layers! [layers]
-  (clear-custom-layers)
+(defn- reapply-custom-layers! [^js map-obj layers]
+  (clear-custom-layers map-obj)
   (doseq [[layer-id layer-impl] layers]
-    (add-custom-layer layer-id layer-impl nil)))
+    (add-custom-layer map-obj layer-id layer-impl nil)))
 
 (defn- switch-to-raster-style [current-state]
   (let [^js map-obj (get-map-instance)]
@@ -192,24 +229,22 @@
     (reagent/next-tick
      (fn []
        (init-map)
-       (reagent/next-tick
-        (fn []
-          (let [new-map-obj (get-map-instance)]
-            (.once new-map-obj "load"
-                   (fn []
-                     (apply-map-state! current-state)
-                     (reapply-custom-layers! (:layers current-state))
-                     (re-frame/dispatch [:style-editor/reset-styles-immediately]))))))))))
+       (on-map-load
+        (fn [new-map-obj]
+          (js/console.log "map-engine: switch-to-raster-style: New map loaded, applying state and layers.")
+          (apply-map-state! new-map-obj current-state)
+          (reapply-custom-layers! new-map-obj (:layers current-state))
+          (re-frame/dispatch [:style-editor/reset-styles-immediately])))))))
 
 (defn- switch-to-vector-style [current-state style-url]
   (let [^js map-obj (get-map-instance)]
-    (clear-custom-layers)
+    (clear-custom-layers map-obj)
     (.setStyle map-obj style-url)
     (.once map-obj "idle"
            (fn []
              (re-frame/dispatch [:buildings/add-layers])
-             (reapply-custom-layers! (:layers current-state))
-             (apply-map-state! current-state)))))
+             (reapply-custom-layers! map-obj (:layers current-state))
+             (apply-map-state! map-obj current-state)))))
 
 (defn change-map-style [style-url]
   (let [^js map-obj (get-map-instance)

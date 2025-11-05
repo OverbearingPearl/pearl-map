@@ -142,13 +142,11 @@
          :renderingMode "3d"
          :onAdd (fn [map gl]
                   (let [^js map-obj map
-                        ^js canvas (.getCanvas map-obj)
                         ^js scene (three/Scene.)
                         ^js camera (three/Camera.)
                         ^js loader (model-loader/create-gltf-loader)
                         lights (init-lights)
-                        directional-light (:directional lights)
-                        ^js renderer (init-renderer canvas gl)]
+                        directional-light (:directional lights)]
 
                     (.add scene directional-light)
                     (.add scene (:ambient lights))
@@ -176,7 +174,6 @@
                     (reset! layer-state
                             #js {:scene scene
                                  :camera camera
-                                 :renderer renderer
                                  :light directional-light
                                  :map map-obj
                                  :modelTransform model-transform
@@ -189,7 +186,10 @@
                      (update-light-from-props (.-light state) (:map/light-properties @rf-db/app-db))
                      (let [scene (.-scene state)
                            camera (.-camera state)
-                           renderer (.-renderer state)
+                           renderer (or (.-renderer state)
+                                        (let [new-renderer (init-renderer (.getCanvas (.-map state)) gl)]
+                                          (set! (.-renderer state) new-renderer)
+                                          new-renderer))
                            map-instance (.-map state)
                            {:keys [final-scale user-rotation-z model-transform]} (get-render-params state)
                            m (.fromArray (three/Matrix4.) (-> matrix-data .-defaultProjectionData .-mainMatrix))

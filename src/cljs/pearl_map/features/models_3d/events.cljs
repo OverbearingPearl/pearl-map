@@ -23,6 +23,7 @@
 (re-frame/reg-event-fx
  :models-3d/add-eiffel-tower
  (fn [{:keys [db]} _]
+   (js/console.log "models-3d/add-eiffel-tower event dispatched.")
    (let [initial-scale (:models-3d/eiffel-scale db)
          initial-rotation-z (:models-3d/eiffel-rotation-z db)
          custom-layer (model-layer/create-custom-layer initial-scale initial-rotation-z)]
