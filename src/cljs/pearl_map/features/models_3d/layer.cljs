@@ -192,10 +192,12 @@
                                           (set! (.-renderer state) new-renderer)
                                           new-renderer))
                            map-instance (.-map state)
+                           canvas (.getCanvas map-instance)
                            {:keys [final-scale user-rotation-z model-transform]} (get-render-params state)
                            m (.fromArray (three/Matrix4.) (-> matrix-data .-defaultProjectionData .-mainMatrix))
                            l (calculate-local-transform-matrix model-transform final-scale user-rotation-z)]
                        (set! (.-projectionMatrix camera) (.multiply m l))
+                       (.setSize renderer (.-width canvas) (.-height canvas) false)
                        (.resetState renderer)
                        (.render renderer scene camera)
                        (.triggerRepaint map-instance))))}))
