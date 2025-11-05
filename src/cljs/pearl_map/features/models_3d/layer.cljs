@@ -180,7 +180,8 @@
                                  :userScale (:models-3d/eiffel-scale app-db/default-db)
                                  :userRotationZ (* (:models-3d/eiffel-rotation-z app-db/default-db) (/ js/Math.PI 180))
                                  :modelScaleFactor 1})))
-
+         :onRemove (fn [_ _]
+                     (cleanup-state))
          :render (fn [gl matrix-data]
                    (when-let [^js state @layer-state]
                      (update-light-from-props (.-light state) (:map/light-properties @rf-db/app-db))

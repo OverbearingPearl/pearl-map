@@ -224,8 +224,10 @@
 (defn- switch-to-raster-style [current-state]
   (let [^js map-obj (get-map-instance)]
     (.remove map-obj)
-    (set-map-instance! nil)
-    (re-frame/dispatch [:clear-custom-layers])
+    (re-frame/dispatch-sync [:set-current-style-key :raster-style])
+    (re-frame/dispatch-sync [:set-map-instance nil])
+    (set! (.-pearlMapInstance js/window) nil)
+    (re-frame/dispatch-sync [:clear-custom-layers])
     (reagent/next-tick
      (fn []
        (init-map)
