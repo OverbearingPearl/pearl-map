@@ -11,7 +11,8 @@
 
 (defn style-controls []
   (let [current-style-url @(re-frame/subscribe [:current-style-url])
-        show-other-components? @(re-frame/subscribe [:show-other-components?])]
+        show-other-components? @(re-frame/subscribe [:show-other-components?])
+        map-instance @(re-frame/subscribe [:map-instance])]
     [ui-layout/card
      {:width "280px"}
      ;; Title and style controls in horizontal layout
@@ -29,9 +30,9 @@
       [:div {:key "style-section" :style {:flex "0 0 auto"}}
        [:h3 {:key "style-title" :style {:margin "0 0 10px 0" :font-size "1.1em"}} "Map Style"]
        [ui-layout/flex-container {:key "button-row" :gap "5px" :wrap "wrap" :align "center"}
-        [ui-buttons/primary-button {:key "basic-style" :on-click #(change-map-style :raster-style)} "Basic"]
-        [ui-buttons/dark-button {:key "dark-style" :on-click #(change-map-style :dark-style)} "Dark"]
-        [ui-buttons/light-button {:key "light-style" :on-click #(change-map-style :light-style)} "Light"]
+        [ui-buttons/primary-button {:key "basic-style" :on-click #(change-map-style :raster-style) :disabled? (nil? map-instance)} "Basic"]
+        [ui-buttons/dark-button {:key "dark-style" :on-click #(change-map-style :dark-style) :disabled? (nil? map-instance)} "Dark"]
+        [ui-buttons/light-button {:key "light-style" :on-click #(change-map-style :light-style) :disabled? (nil? map-instance)} "Light"]
         ;; Toggle button now in the same row as style buttons
         [ui-buttons/danger-button {:key "toggle-button"
                                    :on-click #(re-frame/dispatch [:toggle-other-components])
