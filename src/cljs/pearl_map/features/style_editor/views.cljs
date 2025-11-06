@@ -4,10 +4,6 @@
             [clojure.string :as str]
             [pearl-map.services.map-engine :as map-engine]))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Constants
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (def ^:private style-keys
   [:fill-color :fill-opacity :fill-outline-color :fill-extrusion-color :fill-extrusion-opacity])
 
@@ -43,11 +39,6 @@
    {:label "Labels"
     :layers ["label-water-line" "label-water-point" "label-place-city-major" "label-place-city-minor"
              "label-place-town-village" "label-road" "label-housenum"]}})
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Helper Functions
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- get-current-zoom []
   (map-engine/get-current-zoom))
@@ -116,11 +107,6 @@
       (.off "idle")
       (.on "load" #(re-frame/dispatch [:style-editor/on-map-load]))
       (.on "idle" #(re-frame/dispatch [:style-editor/reset-styles-immediately])))))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Reagent Components
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- render-control-group [label & children]
   (into [:div {:style {:margin-bottom "10px"}}
@@ -239,75 +225,91 @@
                            (update :fill-extrusion-color #(or % "NOT SET"))
                            (update :fill-extrusion-opacity #(or % "NOT SET"))))]])
 
-(defn- render-style-controls [{:keys [target-layer editing-style]}]
+(defn- render-fill-color-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
   (let [current-zoom (get-current-zoom)
-        on-style-change (fn [style-key]
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-color" current-zoom)]
+    [render-control-group "Fill Color"
+     (if (> (count zoom-pairs) 1)
+       [render-multi-zoom-color-controls
+        {:zoom-pairs zoom-pairs
+         :on-change-fn (on-zoom-style-change :fill-color)}]
+       [render-color-input-with-overlay
+        {:value (:fill-color editing-style)
+         :on-change #((on-style-change :fill-color) (-> % .-target .-value))}])]))
+
+(defn- render-fill-opacity-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
+  (let [current-zoom (get-current-zoom)
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-opacity" current-zoom)]
+    [render-control-group "Opacity"
+     (if (> (count zoom-pairs) 1)
+       [render-multi-zoom-opacity-controls
+        {:zoom-pairs zoom-pairs
+         :on-change-fn (on-zoom-style-change :fill-opacity)}]
+       (let [opacity (:fill-opacity editing-style)
+             color-transparent? (= (:fill-color editing-style) "transparent")
+             display-value (if color-transparent? 0 opacity)
+             display-label (cond
+                             color-transparent? "0% (transparent)"
+                             (number? opacity) (str (-> opacity (* 100) js/Math.round) "%")
+                             :else "100% (default)")]
+         [render-single-opacity-control
+          {:value display-value
+           :on-change #((on-style-change :fill-opacity) (-> % .-target .-value js/parseFloat))
+           :default-value 1
+           :label display-label}]))]))
+
+(defn- render-outline-color-control [{:keys [editing-style on-style-change]}]
+  [render-control-group "Outline Color"
+   [render-color-input-with-overlay
+    {:value (:fill-outline-color editing-style)
+     :on-change #((on-style-change :fill-outline-color) (-> % .-target .-value))}]])
+
+(defn- render-extrusion-color-control [{:keys [editing-style on-style-change]}]
+  [render-control-group "Extrusion Color"
+   [render-color-input-with-overlay
+    {:value (:fill-extrusion-color editing-style)
+     :on-change #((on-style-change :fill-extrusion-color) (-> % .-target .-value))}]])
+
+(defn- render-extrusion-opacity-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
+  (let [current-zoom (get-current-zoom)
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-extrusion-opacity" current-zoom)]
+    [render-control-group "Extrusion Opacity"
+     (if (> (count zoom-pairs) 1)
+       [render-multi-zoom-opacity-controls
+        {:zoom-pairs zoom-pairs
+         :on-change-fn (on-zoom-style-change :fill-extrusion-opacity)}]
+       (let [opacity (:fill-extrusion-opacity editing-style)
+             display-label (str (-> (or opacity 1) (* 100) js/Math.round) "%")]
+         [render-single-opacity-control
+          {:value opacity
+           :on-change #((on-style-change :fill-extrusion-opacity) (-> % .-target .-value js/parseFloat))
+           :default-value 1
+           :label display-label}]))]))
+
+(defn- render-style-controls [{:keys [target-layer editing-style]}]
+  (let [on-style-change (fn [style-key]
                           (fn [value] (update-building-style target-layer style-key value)))
         on-zoom-style-change (fn [style-key]
-                               (fn [zoom value] (update-building-style target-layer style-key value zoom)))]
+                               (fn [zoom value] (update-building-style target-layer style-key value zoom)))
+        control-props {:target-layer target-layer
+                       :editing-style editing-style
+                       :on-style-change on-style-change
+                       :on-zoom-style-change on-zoom-style-change}]
     [:div
-     ;; Fill Color
-     (when (or (= target-layer "building") (= target-layer "building-top"))
-       (let [zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-color" current-zoom)]
-         [render-control-group "Fill Color"
-          (if (> (count zoom-pairs) 1)
-            [render-multi-zoom-color-controls
-             {:zoom-pairs zoom-pairs
-              :on-change-fn (on-zoom-style-change :fill-color)}]
-            [render-color-input-with-overlay
-             {:value (:fill-color editing-style)
-              :on-change #((on-style-change :fill-color) (-> % .-target .-value))}])]))
+     (when (contains? #{"building" "building-top"} target-layer)
+       [render-fill-color-control control-props])
 
-     ;; Opacity
-     (when (or (= target-layer "building") (= target-layer "building-top"))
-       (let [zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-opacity" current-zoom)]
-         [render-control-group "Opacity"
-          (if (> (count zoom-pairs) 1)
-            [render-multi-zoom-opacity-controls
-             {:zoom-pairs zoom-pairs
-              :on-change-fn (on-zoom-style-change :fill-opacity)}]
-            (let [opacity (:fill-opacity editing-style)
-                  color-transparent? (= (:fill-color editing-style) "transparent")
-                  display-value (if color-transparent? 0 opacity)
-                  display-label (cond
-                                  color-transparent? "0% (transparent)"
-                                  (number? opacity) (str (-> opacity (* 100) js/Math.round) "%")
-                                  :else "100% (default)")]
-              [render-single-opacity-control
-               {:value display-value
-                :on-change #((on-style-change :fill-opacity) (-> % .-target .-value js/parseFloat))
-                :default-value 1
-                :label display-label}]))]))
+     (when (contains? #{"building" "building-top"} target-layer)
+       [render-fill-opacity-control control-props])
 
-     ;; Outline Color
      (when (= target-layer building-layer)
-       [render-control-group "Outline Color"
-        [render-color-input-with-overlay
-         {:value (:fill-outline-color editing-style)
-          :on-change #((on-style-change :fill-outline-color) (-> % .-target .-value))}]])
+       [render-outline-color-control control-props])
 
-     ;; Extrusion Color
-     (when (or (= target-layer "extruded-building") (= target-layer "extruded-building-top"))
-       [render-control-group "Extrusion Color"
-        [render-color-input-with-overlay
-         {:value (:fill-extrusion-color editing-style)
-          :on-change #((on-style-change :fill-extrusion-color) (-> % .-target .-value))}]])
+     (when (contains? #{"extruded-building" "extruded-building-top"} target-layer)
+       [render-extrusion-color-control control-props])
 
-     ;; Extrusion Opacity
-     (when (or (= target-layer "extruded-building") (= target-layer "extruded-building-top"))
-       (let [zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-extrusion-opacity" current-zoom)]
-         [render-control-group "Extrusion Opacity"
-          (if (> (count zoom-pairs) 1)
-            [render-multi-zoom-opacity-controls
-             {:zoom-pairs zoom-pairs
-              :on-change-fn (on-zoom-style-change :fill-extrusion-opacity)}]
-            (let [opacity (:fill-extrusion-opacity editing-style)
-                  display-label (str (-> (or opacity 1) (* 100) js/Math.round) "%")]
-              [render-single-opacity-control
-               {:value opacity
-                :on-change #((on-style-change :fill-extrusion-opacity) (-> % .-target .-value js/parseFloat))
-                :default-value 1
-                :label display-label}]))]))]))
+     (when (contains? #{"extruded-building" "extruded-building-top"} target-layer)
+       [render-extrusion-opacity-control control-props])]))
 
 (defn style-editor []
   (reagent/create-class
