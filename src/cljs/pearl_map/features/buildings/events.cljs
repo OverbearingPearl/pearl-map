@@ -5,7 +5,7 @@
 (re-frame/reg-event-fx
  :buildings/add-layers
  (fn [_ _]
-   (buildings-layer/add-extruded-buildings-layer)
+   (buildings-layer/add-extruded-building-layers)
    {}))
 
 (re-frame/reg-event-fx

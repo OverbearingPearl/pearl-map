@@ -94,7 +94,7 @@
        :filter filter
        :paint paint-spec}))))
 
-(defn add-extruded-buildings-layer []
+(defn add-extruded-building-layers []
   (when-let [^js map-obj (map-engine/get-map-instance)]
     (when (.getSource map-obj "carto")
       (let [{:keys [current-style-key lighting]} @db/app-db
