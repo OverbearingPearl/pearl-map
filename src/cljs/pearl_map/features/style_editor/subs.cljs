@@ -18,3 +18,8 @@
  :style-editor/editing-style-value
  (fn [db [_ key]]
    (get-in db [:style-editor/editing-style key])))
+
+(re-frame/reg-sub
+ :style-editor/selected-category
+ (fn [db]
+   (get db :style-editor/selected-category :buildings)))

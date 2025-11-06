@@ -23,11 +23,26 @@
 (def ^:private extruded-building-layer "extruded-building")
 (def ^:private extruded-building-top-layer "extruded-building-top")
 
-(def ^:private flat-building-layers
-  #{building-layer building-top-layer})
-
-(def ^:private extruded-building-layers
-  #{extruded-building-layer extruded-building-top-layer})
+(def ^:private layer-categories
+  {:transportation
+   {:label "Transportation"
+    :layers ["road-motorway-trunk" "road-primary" "road-secondary-tertiary" "road-street"
+             "road-minor" "road-path" "road-rail" "road-bridge-case" "road-bridge-surface"
+             "road-tunnel-case" "road-tunnel-surface"]}
+   :boundaries
+   {:label "Background & Boundaries"
+    :layers ["background" "boundary-country" "boundary-state"]}
+   :natural
+   {:label "Natural Features"
+    :layers ["landcover-glacier" "landcover-ice-shelf" "landuse-park" "landuse-wood"
+             "water-area" "water-line" "water-point"]}
+   :buildings
+   {:label "Buildings"
+    :layers ["building" "building-top" "extruded-building" "extruded-building-top"]}
+   :labels
+   {:label "Labels"
+    :layers ["label-water-line" "label-water-point" "label-place-city-major" "label-place-city-minor"
+             "label-place-town-village" "label-road" "label-housenum"]}})
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -36,6 +51,9 @@
 
 (defn- get-current-zoom []
   (map-engine/get-current-zoom))
+
+(defn get-layers-for-category [category-key]
+  (get-in layer-categories [category-key :layers]))
 
 (defn- parse-style-value [style-key current-value current-zoom]
   (cond
@@ -109,6 +127,23 @@
          [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} label]]
         children))
 
+(defn- render-category-selector [{:keys [selected-category]}]
+  [:div {:style {:margin-bottom "15px"}}
+   [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Layer Category"]
+   [:div {:style {:display "flex" :flex-direction "column" :gap "5px"}}
+    (for [[category-key {:keys [label]}] layer-categories]
+      [:label {:key category-key
+               :style {:display "flex" :align-items "center" :cursor "pointer"
+                       :background (if (= selected-category category-key) "#e0e0e0" "#f5f5f5")
+                       :padding "4px 8px" :border-radius "4px" :font-size "11px"}}
+       [:input {:type "radio"
+                :name "layer-category"
+                :value (name category-key)
+                :checked (= selected-category category-key)
+                :on-change #(re-frame/dispatch [:style-editor/set-selected-category category-key])
+                :style {:margin-right "5px"}}]
+       label])]])
+
 (defn- render-color-input-with-overlay [{:keys [value on-change not-set-label]}]
   (let [is-transparent? (= value "transparent")
         is-not-set? (nil? value)
@@ -178,18 +213,16 @@
    [:p {:style {:margin "5px 0 0 0" :color "#721c24" :font-size "11px"}}
     "Style editing will not work for this layer. Please make sure you are using a vector style (Dark or Light)."]])
 
-(defn- render-layer-selector [{:keys [target-layer]}]
-  [:div {:style {:margin-bottom "15px"}}
-   [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Target Layer"]
-   [:select {:value target-layer
-             :on-change #(let [new-layer (-> % .-target .-value)]
-                           (re-frame/dispatch [:style-editor/set-target-layer new-layer])
-                           (re-frame/dispatch [:style-editor/reset-styles-immediately]))
-             :style {:width "100%" :padding "5px" :border "1px solid #ddd" :border-radius "4px"}}
-    [:option {:value building-layer} "Building"]
-    [:option {:value building-top-layer} "Building Top"]
-    [:option {:value extruded-building-layer} "Building 3D (Extruded)"]
-    [:option {:value extruded-building-top-layer} "Building 3D Top"]]])
+(defn- render-layer-selector [{:keys [target-layer selected-category]}]
+  (let [available-layers (get-layers-for-category selected-category)]
+    [:div {:style {:margin-bottom "15px"}}
+     [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Target Layer"]
+     [:select {:value target-layer
+               :on-change #(let [new-layer (-> % .-target .-value)]
+                             (re-frame/dispatch [:style-editor/switch-target-layer new-layer]))
+               :style {:width "100%" :padding "5px" :border "1px solid #ddd" :border-radius "4px"}}
+      (for [layer-id available-layers]
+        [:option {:key layer-id :value layer-id} layer-id])]]))
 
 (defn- render-status-info [{:keys [target-layer editing-style]}]
   [:div {:style {:padding-top "15px" :border-top "1px solid #eee"}}
@@ -214,7 +247,7 @@
                                (fn [zoom value] (update-building-style target-layer style-key value zoom)))]
     [:div
      ;; Fill Color
-     (when (contains? flat-building-layers target-layer)
+     (when (or (= target-layer "building") (= target-layer "building-top"))
        (let [zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-color" current-zoom)]
          [render-control-group "Fill Color"
           (if (> (count zoom-pairs) 1)
@@ -226,7 +259,7 @@
               :on-change #((on-style-change :fill-color) (-> % .-target .-value))}])]))
 
      ;; Opacity
-     (when (contains? flat-building-layers target-layer)
+     (when (or (= target-layer "building") (= target-layer "building-top"))
        (let [zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-opacity" current-zoom)]
          [render-control-group "Opacity"
           (if (> (count zoom-pairs) 1)
@@ -254,14 +287,14 @@
           :on-change #((on-style-change :fill-outline-color) (-> % .-target .-value))}]])
 
      ;; Extrusion Color
-     (when (contains? extruded-building-layers target-layer)
+     (when (or (= target-layer "extruded-building") (= target-layer "extruded-building-top"))
        [render-control-group "Extrusion Color"
         [render-color-input-with-overlay
          {:value (:fill-extrusion-color editing-style)
           :on-change #((on-style-change :fill-extrusion-color) (-> % .-target .-value))}]])
 
      ;; Extrusion Opacity
-     (when (contains? extruded-building-layers target-layer)
+     (when (or (= target-layer "extruded-building") (= target-layer "extruded-building-top"))
        (let [zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-extrusion-opacity" current-zoom)]
          [render-control-group "Extrusion Opacity"
           (if (> (count zoom-pairs) 1)
@@ -281,7 +314,7 @@
    {:component-did-mount
     (fn []
       (setup-map-listener)
-      (re-frame/dispatch [:style-editor/set-target-layer building-layer])
+      (re-frame/dispatch [:style-editor/set-selected-category :buildings])
       (let [^js/maplibregl.Map map-inst (map-engine/get-map-instance)]
         (when (and map-inst (.isStyleLoaded map-inst))
           (re-frame/dispatch [:style-editor/reset-styles-immediately]))))
@@ -289,6 +322,7 @@
     (fn []
       (let [editing-style @(re-frame/subscribe [:style-editor/editing-style])
             target-layer @(re-frame/subscribe [:style-editor/target-layer])
+            selected-category @(re-frame/subscribe [:style-editor/selected-category])
             current-style-key @(re-frame/subscribe [:current-style-key])
             map-instance (map-engine/get-map-instance)
             layer-exists? (and map-instance (map-engine/layer-exists? target-layer))]
@@ -306,7 +340,8 @@
             (when-not layer-exists?
               [render-layer-not-exist-warning {:target-layer target-layer}])
 
-            [render-layer-selector {:target-layer target-layer}]
+            [render-category-selector {:selected-category selected-category}]
+            [render-layer-selector {:target-layer target-layer :selected-category selected-category}]
 
             (when layer-exists?
               [:div
