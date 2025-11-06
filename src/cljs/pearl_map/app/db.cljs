@@ -16,5 +16,5 @@
    :models-3d/eiffel-loaded? false
    :models-3d/eiffel-scale 1.0
    :models-3d/eiffel-rotation-z 45.0
-   :show-other-components? true
+   :show-other-components? false
    :map-engine/on-load-callbacks []})
