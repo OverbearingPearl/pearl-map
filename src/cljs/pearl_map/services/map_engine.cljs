@@ -221,10 +221,14 @@
   (doseq [[layer-id layer-impl] layers]
     (add-custom-layer map-obj layer-id layer-impl nil)))
 
-(defn- switch-to-raster-style [current-state]
-  (let [^js map-obj (get-map-instance)]
+(defn change-map-style [style-url]
+  (let [^js map-obj (get-map-instance)
+        current-state (get-current-map-state)
+        style-key (->> style-urls
+                       (filter (fn [[_ v]] (= v style-url)))
+                       ffirst)]
     (.remove map-obj)
-    (re-frame/dispatch-sync [:set-current-style-key :raster-style])
+    (re-frame/dispatch-sync [:set-current-style-key style-key])
     (re-frame/dispatch-sync [:set-map-instance nil])
     (set! (.-pearlMapInstance js/window) nil)
     (re-frame/dispatch-sync [:clear-custom-layers])
@@ -232,28 +236,15 @@
      (fn []
        (init-map)
        (on-map-load
-        (fn [new-map-obj]
-          (js/console.log "map-engine: switch-to-raster-style: New map loaded, applying state and layers.")
+        (fn [^maplibre/Map new-map-obj]
+          (js/console.log "map-engine: New map loaded, applying state and layers.")
+          (let [layers (-> new-map-obj .getStyle .-layers)]
+            (js/console.log "Style loaded. Current layers:" (clj->js layers)))
           (apply-map-state! new-map-obj current-state)
           (reapply-custom-layers! new-map-obj (:layers current-state))
+          (when (not= style-url "raster-style")
+            (re-frame/dispatch [:buildings/add-layers]))
           (re-frame/dispatch [:style-editor/reset-styles-immediately])))))))
-
-(defn- switch-to-vector-style [current-state style-url]
-  (let [^js map-obj (get-map-instance)]
-    (clear-custom-layers map-obj)
-    (.setStyle map-obj style-url)
-    (.once map-obj "idle"
-           (fn []
-             (re-frame/dispatch [:buildings/add-layers])
-             (reapply-custom-layers! map-obj (:layers current-state))
-             (apply-map-state! map-obj current-state)))))
-
-(defn change-map-style [style-url]
-  (let [^js map-obj (get-map-instance)
-        current-state (get-current-map-state)]
-    (if (= style-url "raster-style")
-      (switch-to-raster-style current-state)
-      (switch-to-vector-style current-state style-url))))
 
 (defn get-paint-property [layer-id property-name]
   (when-let [^js map-obj (get-map-instance)]
