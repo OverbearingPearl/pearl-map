@@ -7,13 +7,13 @@
 
 (def ^:private style-keys
   [:fill-color :fill-opacity :fill-outline-color :fill-extrusion-color :fill-extrusion-opacity
-   :line-color :line-opacity :line-width])
+   :line-color :line-opacity :line-width :text-color :text-opacity :background-color :background-opacity])
 
 (def ^:private color-style-keys
-  #{:fill-color :fill-outline-color :fill-extrusion-color :line-color})
+  #{:fill-color :fill-outline-color :fill-extrusion-color :line-color :text-color :background-color})
 
 (def ^:private opacity-style-keys
-  #{:fill-opacity :fill-extrusion-opacity :line-opacity})
+  #{:fill-opacity :fill-extrusion-opacity :line-opacity :text-opacity :background-opacity})
 
 (def ^:private width-style-keys
   #{:line-width})
@@ -112,6 +112,19 @@
 
 (def ^:private transportation-layers
   (-> layer-categories :transportation :layers set))
+
+(def ^:private label-layers
+  (-> layer-categories :labels :layers set))
+
+(def ^:private line-layers
+  (clojure.set/union
+   transportation-layers
+   #{"boundary_county" "boundary_state" "boundary_country_outline" "boundary_country_inner" "waterway"}))
+
+(def ^:private fill-layers
+  (clojure.set/union
+   #{"building" "building-top"}
+   #{"landcover" "park_national_park" "park_nature_reserve" "landuse_residential" "landuse" "water" "water_shadow"}))
 
 (defn- get-current-zoom []
   (map-engine/get-current-zoom))
@@ -389,6 +402,34 @@
            :default-value 1
            :label display-label}]))]))
 
+(defn- render-text-color-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
+  (let [current-zoom (get-current-zoom)
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "text-color" current-zoom)]
+    [render-control-group "Text Color"
+     (if (> (count zoom-pairs) 1)
+       [render-multi-zoom-color-controls
+        {:zoom-pairs zoom-pairs
+         :on-change-fn (on-zoom-style-change :text-color)}]
+       [render-color-input-with-overlay
+        {:value (:text-color editing-style)
+         :on-change #((on-style-change :text-color) (-> % .-target .-value))}])]))
+
+(defn- render-text-opacity-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
+  (let [current-zoom (get-current-zoom)
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "text-opacity" current-zoom)]
+    [render-control-group "Text Opacity"
+     (if (> (count zoom-pairs) 1)
+       [render-multi-zoom-opacity-controls
+        {:zoom-pairs zoom-pairs
+         :on-change-fn (on-zoom-style-change :text-opacity)}]
+       (let [opacity (:text-opacity editing-style)
+             display-label (str (-> (or opacity 1) (* 100) js/Math.round) "%")]
+         [render-single-opacity-control
+          {:value opacity
+           :on-change #((on-style-change :text-opacity) (-> % .-target .-value js/parseFloat))
+           :default-value 1
+           :label display-label}]))]))
+
 (defn- render-fill-color-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
   (let [current-zoom (get-current-zoom)
         zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-color" current-zoom)]
@@ -450,6 +491,34 @@
            :default-value 1
            :label display-label}]))]))
 
+(defn- render-background-color-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
+  (let [current-zoom (get-current-zoom)
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "background-color" current-zoom)]
+    [render-control-group "Background Color"
+     (if (> (count zoom-pairs) 1)
+       [render-multi-zoom-color-controls
+        {:zoom-pairs zoom-pairs
+         :on-change-fn (on-zoom-style-change :background-color)}]
+       [render-color-input-with-overlay
+        {:value (:background-color editing-style)
+         :on-change #((on-style-change :background-color) (-> % .-target .-value))}])]))
+
+(defn- render-background-opacity-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
+  (let [current-zoom (get-current-zoom)
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "background-opacity" current-zoom)]
+    [render-control-group "Background Opacity"
+     (if (> (count zoom-pairs) 1)
+       [render-multi-zoom-opacity-controls
+        {:zoom-pairs zoom-pairs
+         :on-change-fn (on-zoom-style-change :background-opacity)}]
+       (let [opacity (:background-opacity editing-style)
+             display-label (str (-> (or opacity 1) (* 100) js/Math.round) "%")]
+         [render-single-opacity-control
+          {:value opacity
+           :on-change #((on-style-change :background-opacity) (-> % .-target .-value js/parseFloat))
+           :default-value 1
+           :label display-label}]))]))
+
 (defn- render-style-controls [{:keys [target-layer editing-style]}]
   (let [on-style-change (fn [style-key]
                           (fn [value] (update-layer-style target-layer style-key value)))
@@ -460,7 +529,7 @@
                        :on-style-change on-style-change
                        :on-zoom-style-change on-zoom-style-change}]
     [:div
-     (when (contains? #{"building" "building-top"} target-layer)
+     (when (contains? fill-layers target-layer)
        [:<>
         ^{:key "fill-color-control"} [render-fill-color-control control-props]
         ^{:key "fill-opacity-control"} [render-fill-opacity-control control-props]])
@@ -473,11 +542,21 @@
         ^{:key "extrusion-color-control"} [render-extrusion-color-control control-props]
         ^{:key "extrusion-opacity-control"} [render-extrusion-opacity-control control-props]])
 
-     (when (contains? transportation-layers target-layer)
+     (when (contains? line-layers target-layer)
        [:<>
         ^{:key "line-color-control"} [render-line-color-control control-props]
         ^{:key "line-opacity-control"} [render-line-opacity-control control-props]
-        ^{:key "line-width-control"} [render-line-width-control control-props]])]))
+        ^{:key "line-width-control"} [render-line-width-control control-props]])
+
+     (when (contains? label-layers target-layer)
+       [:<>
+        ^{:key "text-color-control"} [render-text-color-control control-props]
+        ^{:key "text-opacity-control"} [render-text-opacity-control control-props]])
+
+     (when (= target-layer "background")
+       [:<>
+        ^{:key "background-color-control"} [render-background-color-control control-props]
+        ^{:key "background-opacity-control"} [render-background-opacity-control control-props]])]))
 
 (defn style-editor []
   (reagent/create-class

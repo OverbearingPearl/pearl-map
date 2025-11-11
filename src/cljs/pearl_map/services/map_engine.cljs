@@ -157,7 +157,7 @@
     (when (and (.getLayer map-obj layer-id) (some? value))
       (let [js-value (cond
                        (map? value) (clj->js value)
-                       (#{"fill-extrusion-color" "fill-color" "fill-outline-color"} property-name)
+                       (#{"fill-extrusion-color" "fill-color" "fill-outline-color" "line-color" "text-color" "background-color"} property-name)
                        (cond
                          (= value "transparent") "transparent"
                          (string? value) (if (or (.startsWith value "#")
@@ -344,7 +344,7 @@
   (let [value (get-paint-property layer-id property-name)]
     (when value
       (let [clj-value (js->clj value :keywordize-keys true)
-            parse-fn (if (#{"fill-color" "fill-outline-color" "fill-extrusion-color" "line-color"} property-name)
+            parse-fn (if (#{"fill-color" "fill-outline-color" "fill-extrusion-color" "line-color" "text-color" "background-color"} property-name)
                        parse-color-expression
                        parse-numeric-expression)]
         (cond
