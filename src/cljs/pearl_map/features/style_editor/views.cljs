@@ -2,16 +2,21 @@
   (:require [reagent.core :as reagent]
             [re-frame.core :as re-frame]
             [clojure.string :as str]
-            [pearl-map.services.map-engine :as map-engine]))
+            [pearl-map.services.map-engine :as map-engine]
+            [pearl-map.utils.colors :as colors]))
 
 (def ^:private style-keys
-  [:fill-color :fill-opacity :fill-outline-color :fill-extrusion-color :fill-extrusion-opacity])
+  [:fill-color :fill-opacity :fill-outline-color :fill-extrusion-color :fill-extrusion-opacity
+   :line-color :line-opacity :line-width])
 
 (def ^:private color-style-keys
-  #{:fill-color :fill-outline-color :fill-extrusion-color})
+  #{:fill-color :fill-outline-color :fill-extrusion-color :line-color})
 
 (def ^:private opacity-style-keys
-  #{:fill-opacity :fill-extrusion-opacity})
+  #{:fill-opacity :fill-extrusion-opacity :line-opacity})
+
+(def ^:private width-style-keys
+  #{:line-width})
 
 (def ^:private raster-style "raster-style")
 (def ^:private building-layer "building")
@@ -105,6 +110,9 @@
              ;; House numbers
              "housenumber"]}})
 
+(def ^:private transportation-layers
+  (-> layer-categories :transportation :layers set))
+
 (defn- get-current-zoom []
   (map-engine/get-current-zoom))
 
@@ -113,7 +121,8 @@
 
 (defn- parse-style-value [style-key current-value current-zoom]
   (cond
-    (contains? opacity-style-keys style-key)
+    (or (contains? opacity-style-keys style-key)
+        (contains? width-style-keys style-key))
     (map-engine/parse-numeric-expression current-value current-zoom)
 
     (contains? color-style-keys style-key)
@@ -139,26 +148,37 @@
   (cond
     (nil? value) nil
     (= value "transparent") "transparent"
-    (string? value) (if (str/starts-with? value "#")
-                      value
-                      (str "#" value))
-    :else (str "#" (.toString (js/parseInt (str value)) 16))))
+    (string? value)
+    (cond
+      (str/starts-with? value "#")
+      (let [hex-val (str/replace value "#" "")]
+        (cond
+          (= (count hex-val) 3) (str "#" (apply str (mapcat #(repeat 2 %) hex-val))) ;; #ddd -> #dddddd
+          (= (count hex-val) 6) (str "#" hex-val)
+          :else nil)) ;; Invalid hex length
+      (str/starts-with? value "rgb")
+      (if-let [rgba (colors/parse-rgba-string value)]
+        (colors/rgba-to-hex rgba)
+        nil)
+      :else nil) ;; Other invalid string
+    :else nil)) ;; Non-string values
 
-(defn- format-opacity-input [value]
+(defn- format-numeric-input [value]
   (when (some? value)
     (if (string? value)
       (let [parsed (js/parseFloat value)]
         (when-not (js/isNaN parsed) parsed))
       (when (number? value) value))))
 
-(defn update-building-style
+(defn update-layer-style
   ([target-layer style-key value]
-   (update-building-style target-layer style-key value nil))
+   (update-layer-style target-layer style-key value nil))
   ([target-layer style-key value zoom]
    (let [current-zoom (or zoom (get-current-zoom))
          processed-value (cond
                            (contains? color-style-keys style-key) (format-color-input value)
-                           (contains? opacity-style-keys style-key) (format-opacity-input value)
+                           (or (contains? opacity-style-keys style-key)
+                               (contains? width-style-keys style-key)) (format-numeric-input value)
                            :else value)]
      (when (some? processed-value)
        (let [updated-value (map-engine/update-zoom-value-pair target-layer (name style-key) current-zoom processed-value)]
@@ -196,12 +216,13 @@
        label])]])
 
 (defn- render-color-input-with-overlay [{:keys [value on-change not-set-label]}]
-  (let [is-transparent? (= value "transparent")
-        is-not-set? (nil? value)
-        display-value (if (or is-transparent? is-not-set?) "#f0f0f0" value)]
+  (let [formatted-value (format-color-input value)
+        is-transparent? (= formatted-value "transparent")
+        is-not-set? (nil? formatted-value)
+        input-value (if (or is-transparent? is-not-set?) "#f0f0f0" formatted-value)]
     [:div {:style {:position "relative"}}
      [:input {:type "color"
-              :value display-value
+              :value input-value
               :on-change on-change
               :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
                       :opacity (if (or is-transparent? is-not-set?) 0.3 1.0)
@@ -288,7 +309,78 @@
                            (update :fill-opacity #(or % "NOT SET"))
                            (update :fill-outline-color #(or % "NOT SET"))
                            (update :fill-extrusion-color #(or % "NOT SET"))
-                           (update :fill-extrusion-opacity #(or % "NOT SET"))))]])
+                           (update :fill-extrusion-opacity #(or % "NOT SET"))
+                           (update :line-color #(or % "NOT SET"))
+                           (update :line-opacity #(or % "NOT SET"))
+                           (update :line-width #(or % "NOT SET"))))]])
+
+(defn- render-multi-zoom-width-controls [{:keys [zoom-pairs on-change-fn]}]
+  [:div
+   (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
+     [:div {:key (str "width-" zoom "-" index) :style {:margin-bottom "10px"}}
+      [:div {:style {:display "flex" :justify-content "space-between" :align-items "center" :margin-bottom "5px"}}
+       [:span {:style {:font-size "11px" :color "#666"}} (str "z" zoom)]
+       [:span {:style {:font-size "11px" :color "#666"}}
+        (str (.toFixed (or value 0) 1) "px")]]
+      [:input {:type "range"
+               :min "0" :max "20" :step "0.5"
+               :value (or value 0)
+               :on-change #(on-change-fn zoom (-> % .-target .-value js/parseFloat))
+               :style {:width "100%"}}]])])
+
+(defn- render-single-width-control [{:keys [value on-change default-value label]}]
+  [:div
+   [:input {:type "range"
+            :min "0" :max "20" :step "0.5"
+            :value (or value default-value)
+            :on-change on-change
+            :style {:width "100%"}}]
+   [:span {:style {:font-size "12px" :color "#666"}}
+    (str "Current: " label)]])
+
+(defn- render-line-color-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
+  (let [current-zoom (get-current-zoom)
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "line-color" current-zoom)]
+    [render-control-group "Line Color"
+     (if (> (count zoom-pairs) 1)
+       [render-multi-zoom-color-controls
+        {:zoom-pairs zoom-pairs
+         :on-change-fn (on-zoom-style-change :line-color)}]
+       [render-color-input-with-overlay
+        {:value (:line-color editing-style)
+         :on-change #((on-style-change :line-color) (-> % .-target .-value))}])]))
+
+(defn- render-line-opacity-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
+  (let [current-zoom (get-current-zoom)
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "line-opacity" current-zoom)]
+    [render-control-group "Line Opacity"
+     (if (> (count zoom-pairs) 1)
+       [render-multi-zoom-opacity-controls
+        {:zoom-pairs zoom-pairs
+         :on-change-fn (on-zoom-style-change :line-opacity)}]
+       (let [opacity (:line-opacity editing-style)
+             display-label (str (-> (or opacity 1) (* 100) js/Math.round) "%")]
+         [render-single-opacity-control
+          {:value opacity
+           :on-change #((on-style-change :line-opacity) (-> % .-target .-value js/parseFloat))
+           :default-value 1
+           :label display-label}]))]))
+
+(defn- render-line-width-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
+  (let [current-zoom (get-current-zoom)
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "line-width" current-zoom)]
+    [render-control-group "Line Width"
+     (if (> (count zoom-pairs) 1)
+       [render-multi-zoom-width-controls
+        {:zoom-pairs zoom-pairs
+         :on-change-fn (on-zoom-style-change :line-width)}]
+       (let [width (:line-width editing-style)
+             display-label (if (number? width) (str (.toFixed width 1) "px") "default")]
+         [render-single-width-control
+          {:value width
+           :on-change #((on-style-change :line-width) (-> % .-target .-value js/parseFloat))
+           :default-value 1
+           :label display-label}]))]))
 
 (defn- render-fill-color-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
   (let [current-zoom (get-current-zoom)
@@ -353,28 +445,32 @@
 
 (defn- render-style-controls [{:keys [target-layer editing-style]}]
   (let [on-style-change (fn [style-key]
-                          (fn [value] (update-building-style target-layer style-key value)))
+                          (fn [value] (update-layer-style target-layer style-key value)))
         on-zoom-style-change (fn [style-key]
-                               (fn [zoom value] (update-building-style target-layer style-key value zoom)))
+                               (fn [zoom value] (update-layer-style target-layer style-key value zoom)))
         control-props {:target-layer target-layer
                        :editing-style editing-style
                        :on-style-change on-style-change
                        :on-zoom-style-change on-zoom-style-change}]
     [:div
      (when (contains? #{"building" "building-top"} target-layer)
-       [render-fill-color-control control-props])
-
-     (when (contains? #{"building" "building-top"} target-layer)
-       [render-fill-opacity-control control-props])
+       [:<>
+        ^{:key "fill-color-control"} [render-fill-color-control control-props]
+        ^{:key "fill-opacity-control"} [render-fill-opacity-control control-props]])
 
      (when (= target-layer building-layer)
        [render-outline-color-control control-props])
 
      (when (contains? #{"extruded-building" "extruded-building-top"} target-layer)
-       [render-extrusion-color-control control-props])
+       [:<>
+        ^{:key "extrusion-color-control"} [render-extrusion-color-control control-props]
+        ^{:key "extrusion-opacity-control"} [render-extrusion-opacity-control control-props]])
 
-     (when (contains? #{"extruded-building" "extruded-building-top"} target-layer)
-       [render-extrusion-opacity-control control-props])]))
+     (when (contains? transportation-layers target-layer)
+       [:<>
+        ^{:key "line-color-control"} [render-line-color-control control-props]
+        ^{:key "line-opacity-control"} [render-line-opacity-control control-props]
+        ^{:key "line-width-control"} [render-line-width-control control-props]])]))
 
 (defn style-editor []
   (reagent/create-class
