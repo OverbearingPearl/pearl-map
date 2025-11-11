@@ -236,9 +236,15 @@
         (if is-not-set? (or not-set-label "NOT SET") "TRANSPARENT")])]))
 
 (defn- render-multi-zoom-color-controls [{:keys [zoom-pairs on-change-fn]}]
-  [:div {:style {:display "flex" :gap "5px" :flex-wrap "wrap"}}
+  [:div {:style {:display "flex"
+                 :gap "8px"
+                 :overflow-x "auto"
+                 :padding-bottom "8px"
+                 :scrollbar-width "thin"
+                 :scrollbar-color "#ddd transparent"}}
    (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
-     [:div {:key (str "color-" zoom "-" index) :style {:position "relative" :flex "1" :min-width "60px"}}
+     [:div {:key (str "color-" zoom "-" index)
+            :style {:flex "0 0 120px" :position "relative"}}
       [render-color-input-with-overlay
        {:value value
         :on-change #(on-change-fn zoom (-> % .-target .-value))}]
@@ -246,9 +252,15 @@
        (str "z" zoom)]])])
 
 (defn- render-multi-zoom-opacity-controls [{:keys [zoom-pairs on-change-fn]}]
-  [:div
+  [:div {:style {:display "flex"
+                 :gap "8px"
+                 :overflow-x "auto"
+                 :padding-bottom "8px"
+                 :scrollbar-width "thin"
+                 :scrollbar-color "#ddd transparent"}}
    (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
-     [:div {:key (str "opacity-" zoom "-" index) :style {:margin-bottom "10px"}}
+     [:div {:key (str "opacity-" zoom "-" index)
+            :style {:flex "0 0 120px" :margin-bottom "10px"}}
       [:div {:style {:display "flex" :justify-content "space-between" :align-items "center" :margin-bottom "5px"}}
        [:span {:style {:font-size "11px" :color "#666"}} (str "z" zoom)]
        [:span {:style {:font-size "11px" :color "#666"}}
@@ -315,9 +327,15 @@
                            (update :line-width #(or % "NOT SET"))))]])
 
 (defn- render-multi-zoom-width-controls [{:keys [zoom-pairs on-change-fn]}]
-  [:div
+  [:div {:style {:display "flex"
+                 :gap "8px"
+                 :overflow-x "auto"
+                 :padding-bottom "8px"
+                 :scrollbar-width "thin"
+                 :scrollbar-color "#ddd transparent"}}
    (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
-     [:div {:key (str "width-" zoom "-" index) :style {:margin-bottom "10px"}}
+     [:div {:key (str "width-" zoom "-" index)
+            :style {:flex "0 0 120px" :margin-bottom "10px"}}
       [:div {:style {:display "flex" :justify-content "space-between" :align-items "center" :margin-bottom "5px"}}
        [:span {:style {:font-size "11px" :color "#666"}} (str "z" zoom)]
        [:span {:style {:font-size "11px" :color "#666"}}
@@ -480,7 +498,19 @@
       (re-frame/dispatch [:style-editor/set-selected-category :buildings])
       (let [^js/maplibregl.Map map-inst (map-engine/get-map-instance)]
         (when (and map-inst (.isStyleLoaded map-inst))
-          (re-frame/dispatch [:style-editor/reset-styles-immediately]))))
+          (re-frame/dispatch [:style-editor/reset-styles-immediately])))
+      ;; Dynamically inject Webkit scrollbar styles
+      (let [style-el (.createElement js/document "style")]
+        (set! (.-textContent style-el)
+              ".style-editor-scrollable::-webkit-scrollbar { width: 6px; height: 6px; }
+               .style-editor-scrollable::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }")
+        (.appendChild js/document.head style-el)))
+    :component-will-unmount
+    (fn []
+      ;; Remove dynamically injected styles
+      (doseq [style-el (js/document.querySelectorAll "style")]
+        (when (str/includes? (.-textContent style-el) ".style-editor-scrollable::-webkit-scrollbar")
+          (.remove style-el))))
     :reagent-render
     (fn []
       (let [editing-style @(re-frame/subscribe [:style-editor/editing-style])
@@ -489,12 +519,17 @@
             current-style-key @(re-frame/subscribe [:current-style-key])
             map-instance (map-engine/get-map-instance)
             layer-exists? (and map-instance (map-engine/layer-exists? target-layer))]
-        [:div {:style {:background "rgba(255,255,255,0.98)"
+        [:div {:class "style-editor-scrollable"
+               :style {:background "rgba(255,255,255,0.98)"
                        :padding "18px"
                        :border-radius "10px"
                        :font-family "Arial, sans-serif"
                        :width "280px"
-                       :box-shadow "0 4px 15px rgba(0,0,0,0.15)"}}
+                       :box-shadow "0 4px 15px rgba(0,0,0,0.15)"
+                       :max-height "70vh"
+                       :overflow-y "auto"
+                       :scrollbar-width "thin"
+                       :scrollbar-color "#ddd transparent"}}
          [:h3 {:style {:margin "0 0 15px 0" :color "#333"}} "Style Editor"]
 
          (if (= current-style-key :raster-style)
