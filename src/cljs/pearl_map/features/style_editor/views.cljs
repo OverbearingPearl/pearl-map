@@ -27,7 +27,18 @@
 (def ^:private layer-categories
   {:transportation
    {:label "Transportation"
-    :layers [;; Roads
+    :layers [;; Aeroway
+             "aeroway-runway" "aeroway-taxiway"
+             ;; Tunnels
+             "tunnel_path"
+             "tunnel_service_case" "tunnel_service_fill"
+             "tunnel_minor_case" "tunnel_minor_fill"
+             "tunnel_sec_case" "tunnel_sec_fill"
+             "tunnel_pri_case" "tunnel_pri_fill"
+             "tunnel_trunk_case" "tunnel_trunk_fill"
+             "tunnel_mot_case" "tunnel_mot_fill"
+             "tunnel_rail" "tunnel_rail_dash"
+             ;; Roads
              "road_path"
              "road_service_case" "road_service_fill"
              "road_minor_case" "road_minor_fill"
@@ -38,6 +49,8 @@
              "road_trunk_case_ramp" "road_trunk_fill_ramp"
              "road_mot_case_noramp" "road_mot_fill_noramp"
              "road_mot_case_ramp" "road_mot_fill_ramp"
+             ;; Railways
+             "rail" "rail_dash"
              ;; Bridges
              "bridge_path"
              "bridge_service_case" "bridge_service_fill"
@@ -45,33 +58,20 @@
              "bridge_sec_case" "bridge_sec_fill"
              "bridge_pri_case" "bridge_pri_fill"
              "bridge_trunk_case" "bridge_trunk_fill"
-             "bridge_mot_case" "bridge_mot_fill"
-             ;; Tunnels
-             "tunnel_path"
-             "tunnel_service_case" "tunnel_service_fill"
-             "tunnel_minor_case" "tunnel_minor_fill"
-             "tunnel_sec_case" "tunnel_sec_fill"
-             "tunnel_pri_case" "tunnel_pri_fill"
-             "tunnel_trunk_case" "tunnel_trunk_fill"
-             "tunnel_mot_case" "tunnel_mot_fill"
-             ;; Railways
-             "rail" "rail_dash"
-             "tunnel_rail" "tunnel_rail_dash"
-             ;; Aeroway
-             "aeroway-runway" "aeroway-taxiway"]}
+             "bridge_mot_case" "bridge_mot_fill"]}
    :boundaries
    {:label "Background & Boundaries"
     :layers ["background" "boundary_county" "boundary_state" "boundary_country_outline" "boundary_country_inner"]}
    :natural
    {:label "Natural Features"
     :layers ["landcover"
-             "landuse"
-             "landuse_residential"
              "park_national_park"
              "park_nature_reserve"
+             "landuse_residential"
+             "landuse"
+             "waterway"
              "water"
-             "water_shadow"
-             "waterway"]}
+             "water_shadow"]}
    :buildings
    {:label "Buildings"
     :layers ["building" "building-top" "extruded-building" "extruded-building-top"]}
@@ -88,6 +88,10 @@
              "place_suburbs"
              "place_villages"
              "place_town"
+             "place_country_2"
+             "place_country_1"
+             "place_state"
+             "place_continent"
              "place_city_r6"
              "place_city_r5"
              "place_city_dot_r7"
@@ -95,10 +99,6 @@
              "place_city_dot_r2"
              "place_city_dot_z7"
              "place_capital_dot_z7"
-             "place_state"
-             "place_country_2"
-             "place_country_1"
-             "place_continent"
              ;; POI labels
              "poi_stadium"
              "poi_park"
