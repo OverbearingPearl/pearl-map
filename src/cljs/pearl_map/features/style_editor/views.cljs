@@ -145,23 +145,21 @@
         (zipmap style-keys (repeat nil))))))
 
 (defn- format-color-input [value]
-  (cond
-    (nil? value) nil
-    (= value "transparent") "transparent"
-    (string? value)
+  (let [s-val (when (some? value) (-> value str str/trim))]
     (cond
-      (str/starts-with? value "#")
-      (let [hex-val (str/replace value "#" "")]
+      (str/blank? s-val) nil
+      (= s-val "transparent") "transparent"
+      (str/starts-with? s-val "#")
+      (let [hex-val (str/replace s-val "#" "")]
         (cond
           (= (count hex-val) 3) (str "#" (apply str (mapcat #(repeat 2 %) hex-val))) ;; #ddd -> #dddddd
           (= (count hex-val) 6) (str "#" hex-val)
           :else nil)) ;; Invalid hex length
-      (str/starts-with? value "rgb")
-      (if-let [rgba (colors/parse-rgba-string value)]
+      (str/starts-with? s-val "rgb")
+      (if-let [rgba (colors/parse-rgba-string s-val)]
         (colors/rgba-to-hex rgba)
         nil)
-      :else nil) ;; Other invalid string
-    :else nil)) ;; Non-string values
+      :else nil)))
 
 (defn- format-numeric-input [value]
   (when (some? value)
@@ -315,16 +313,7 @@
    [:p {:style {:color "#666" :font-size "11px" :margin "0" :font-style "italic"}}
     "Only works with Dark or Light vector styles"]
    [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
-    "Styles: " (pr-str (-> editing-style
-                           (select-keys style-keys)
-                           (update :fill-color #(or % "NOT SET"))
-                           (update :fill-opacity #(or % "NOT SET"))
-                           (update :fill-outline-color #(or % "NOT SET"))
-                           (update :fill-extrusion-color #(or % "NOT SET"))
-                           (update :fill-extrusion-opacity #(or % "NOT SET"))
-                           (update :line-color #(or % "NOT SET"))
-                           (update :line-opacity #(or % "NOT SET"))
-                           (update :line-width #(or % "NOT SET"))))]])
+    "Styles: " (pr-str (select-keys editing-style style-keys))]])
 
 (defn- render-multi-zoom-width-controls [{:keys [zoom-pairs on-change-fn]}]
   [:div {:style {:display "flex"

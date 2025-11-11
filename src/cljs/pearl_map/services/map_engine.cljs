@@ -344,7 +344,7 @@
   (let [value (get-paint-property layer-id property-name)]
     (when value
       (let [clj-value (js->clj value :keywordize-keys true)
-            parse-fn (if (#{"fill-color" "fill-outline-color" "fill-extrusion-color"} property-name)
+            parse-fn (if (#{"fill-color" "fill-outline-color" "fill-extrusion-color" "line-color"} property-name)
                        parse-color-expression
                        parse-numeric-expression)]
         (cond
