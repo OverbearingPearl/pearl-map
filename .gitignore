@@ -60,6 +60,10 @@ Thumbs.db
 # Aider
 .aider*
 .aidermacs.prompting.md
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v4/
+.aider.tags.cache.v7/
 
 # Node.js
 node_modules/

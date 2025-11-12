@@ -17,6 +17,10 @@
         :modules {:main {:init-fn pearl-map.core/init}}
         :dev {:compiler-options {:closure-defines {re-frame.trace.trace-enabled? true}}
               :devtools {:after-load pearl-map.core/reload}}
+        :compiler-options {:ignore-source-regex [".*~$" ".*#$" ".*\\.swp$" ".*\\.swo$" ".*\\.DS_Store$"
+                                                  "src/cljs/pearl_map/features/models_3d/model_data\\.cljs"
+                                                  ".*\\.iml$" "\\.idea/.*" "\\.vscode/.*" "\\.calva/.*" "\\.lsp/.*"
+                                                  "\\.aider.*" "\\.cpcache/.*"]}
         :release {:compiler-options {}}}
   :test {:target :browser-test
          :test-dir "target/test"
