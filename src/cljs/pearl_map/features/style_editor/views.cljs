@@ -79,7 +79,7 @@
              "water_shadow"]}
    :buildings
    {:label "Buildings"
-    :layers ["building" "building-top" "extruded-building" "extruded-building-top"]}
+    :layers ["extruded-building" "extruded-building-top" "building" "building-top"]}
    :labels
    {:label "Labels"
     :layers [;; Water labels
