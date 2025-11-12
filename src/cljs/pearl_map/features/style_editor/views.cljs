@@ -32,6 +32,7 @@
 (def ^:private layer-categories
   {:transportation
    {:label "Transportation"
+    :default-layer "road_pri_fill_noramp"
     :layers [;; Aeroway
              "aeroway-runway" "aeroway-taxiway"
              ;; Tunnels
@@ -66,9 +67,11 @@
              "bridge_mot_case" "bridge_mot_fill"]}
    :boundaries
    {:label "Background & Boundaries"
+    :default-layer "background"
     :layers ["background" "boundary_county" "boundary_state" "boundary_country_outline" "boundary_country_inner"]}
    :natural
    {:label "Natural Features"
+    :default-layer "landcover"
     :layers ["landcover"
              "park_national_park"
              "park_nature_reserve"
@@ -79,9 +82,11 @@
              "water_shadow"]}
    :buildings
    {:label "Buildings"
-    :layers ["extruded-building" "extruded-building-top" "building" "building-top"]}
+    :default-layer "extruded-building"
+    :layers ["building" "building-top" "extruded-building" "extruded-building-top"]}
    :labels
    {:label "Labels"
+    :default-layer "poi_park"
     :layers [;; Water labels
              "waterway_label"
              "watername_ocean"
@@ -313,11 +318,11 @@
   (let [available-layers (get-layers-for-category selected-category)]
     [:div {:class "layer-selector"}
      [:label {:class "control-label"} "Target Layer"]
-     [:select {:value target-layer
+     [:select {:value (or target-layer "") ; Use target-layer directly, if nil then use an empty string
                :on-change #(let [new-layer (-> % .-target .-value)]
                              (re-frame/dispatch [:style-editor/switch-target-layer new-layer]))
                :class "styled-select"}
-      (for [layer-id available-layers]
+      (for [layer-id (sort available-layers)] ; Ensure alphabetical sorting
         [:option {:key layer-id :value layer-id} layer-id])]]))
 
 (defn- render-status-info [{:keys [target-layer editing-style]}]
@@ -591,11 +596,27 @@
         ^{:key "background-color-control"} [render-background-color-control control-props]
         ^{:key "background-opacity-control"} [render-background-opacity-control control-props]])]))
 
+(defn- style-editor-watcher []
+  (let [previous-category (reagent/atom nil)]
+    (reagent/create-class
+     {:display-name "StyleEditorWatcher"
+      :reagent-render
+      (fn []
+        (let [selected-category @(re-frame/subscribe [:style-editor/selected-category])]
+          (when (and selected-category (not= @previous-category selected-category))
+            (let [category-info (get layer-categories selected-category)
+                  default-layer (:default-layer category-info)]
+              (when default-layer
+                (re-frame/dispatch [:style-editor/switch-target-layer default-layer])))
+            (reset! previous-category selected-category)))
+        [:span])})))
+
 (defn style-editor []
   (reagent/create-class
    {:component-did-mount
     (fn []
       (setup-map-listener)
+      ;; Initialize category to :buildings
       (re-frame/dispatch [:style-editor/set-selected-category :buildings])
       (let [^js/maplibregl.Map map-inst (map-engine/get-map-instance)]
         (when (and map-inst (.isStyleLoaded map-inst))
@@ -620,7 +641,9 @@
             current-style-key @(re-frame/subscribe [:current-style-key])
             map-instance (map-engine/get-map-instance)
             layer-exists? (and map-instance (map-engine/layer-exists? target-layer))]
+
         [:div {:class "style-editor-scrollable"}
+         [style-editor-watcher]
          [:h3 {:class "style-editor-title"} "Style Editor"]
 
          (if (= current-style-key :raster-style)

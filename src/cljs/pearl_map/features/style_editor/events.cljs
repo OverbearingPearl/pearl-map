@@ -19,12 +19,10 @@
  (fn [db [_ key value]]
    (assoc-in db [:style-editor/editing-style key] value)))
 
-(re-frame/reg-event-fx
+(re-frame/reg-event-db
  :style-editor/set-selected-category
- (fn [{:keys [db]} [_ category]]
-   (let [first-layer-in-category (first (style-editor-views/get-layers-for-category category))]
-     {:db (assoc db :style-editor/selected-category category)
-      :dispatch [:style-editor/switch-target-layer first-layer-in-category]})))
+ (fn [db [_ category]]
+   (assoc db :style-editor/selected-category category)))
 
 (re-frame/reg-event-fx
  :style-editor/switch-target-layer

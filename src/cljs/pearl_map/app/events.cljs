@@ -21,7 +21,8 @@
          new-db (-> db
                     (assoc :current-style-key style-key)
                     (assoc :map/light-properties default-light-props)
-                    (assoc :style-editor/editing-style default-building-style))]
+                    (assoc :style-editor/editing-style default-building-style)
+                    (assoc :style-editor/target-layer nil))]
      {:db new-db
       :fx [[:set-map-light default-light-props]]})))
 
