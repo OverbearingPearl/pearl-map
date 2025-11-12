@@ -226,25 +226,23 @@
       (.on "idle" #(re-frame/dispatch [:style-editor/reset-styles-immediately])))))
 
 (defn- render-control-group [label & children]
-  (into [:div {:style {:margin-bottom "10px"}}
-         [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} label]]
+  (into [:div {:class "control-group"}
+         [:label {:class "control-label"} label]]
         children))
 
 (defn- render-category-selector [{:keys [selected-category]}]
-  [:div {:style {:margin-bottom "15px"}}
-   [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Layer Category"]
-   [:div {:style {:display "flex" :flex-direction "column" :gap "5px"}}
+  [:div {:class "category-selector"}
+   [:label {:class "control-label"} "Layer Category"]
+   [:div {:class "category-selector-items"}
     (for [[category-key {:keys [label]}] layer-categories]
       [:label {:key category-key
-               :style {:display "flex" :align-items "center" :cursor "pointer"
-                       :background (if (= selected-category category-key) "#e0e0e0" "#f5f5f5")
-                       :padding "4px 8px" :border-radius "4px" :font-size "11px"}}
+               :class (str "category-item" (when (= selected-category category-key) " category-item-selected"))}
        [:input {:type "radio"
                 :name "layer-category"
                 :value (name category-key)
                 :checked (= selected-category category-key)
                 :on-change #(re-frame/dispatch [:style-editor/set-selected-category category-key])
-                :style {:margin-right "5px"}}]
+                :class "category-item-radio"}]
        label])]])
 
 (defn- render-color-input-with-overlay [{:keys [value on-change not-set-label]}]
@@ -252,56 +250,40 @@
         is-transparent? (= formatted-value "transparent")
         is-not-set? (nil? formatted-value)
         input-value (if (or is-transparent? is-not-set?) "#f0f0f0" formatted-value)]
-    [:div {:style {:position "relative"}}
+    [:div {:class "color-input-overlay-container"}
      [:input {:type "color"
               :value input-value
               :on-change on-change
-              :style {:width "100%" :height "30px" :border "1px solid #ddd" :border-radius "4px"
-                      :opacity (if (or is-transparent? is-not-set?) 0.3 1.0)
-                      :background "transparent"}}]
+              :class (str "color-input-with-overlay" (when (or is-transparent? is-not-set?) " color-input-with-overlay-hidden"))}]
      (when (or is-transparent? is-not-set?)
-       [:div {:style {:position "absolute" :top "0" :left "0" :right "0" :height "30px"
-                      :display "flex" :align-items "center" :justify-content "center"
-                      :background "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #eee 2px, #eee 4px)"
-                      :border-radius "4px" :color "#666" :font-weight "bold" :pointer-events "none"
-                      :font-size "10px" :line-height "1"}}
+       [:div {:class "color-input-overlay-content"}
         (if is-not-set? (or not-set-label "NOT SET") "TRANSPARENT")])]))
 
 (defn- render-multi-zoom-color-controls [{:keys [zoom-pairs on-change-fn]}]
-  [:div {:style {:display "flex"
-                 :gap "8px"
-                 :overflow-x "auto"
-                 :padding-bottom "8px"
-                 :scrollbar-width "thin"
-                 :scrollbar-color "#ddd transparent"}}
+  [:div {:class "multi-zoom-controls"}
    (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
      [:div {:key (str "color-" zoom "-" index)
-            :style {:flex "0 0 120px" :position "relative"}}
+            :class "multi-zoom-item"}
       [render-color-input-with-overlay
        {:value value
         :on-change #(on-change-fn zoom (-> % .-target .-value))}]
-      [:div {:style {:font-size "10px" :text-align "center" :margin-top "2px" :color "#666"}}
+      [:div {:class "multi-zoom-label"}
        (str "z" zoom)]])])
 
 (defn- render-multi-zoom-opacity-controls [{:keys [zoom-pairs on-change-fn]}]
-  [:div {:style {:display "flex"
-                 :gap "8px"
-                 :overflow-x "auto"
-                 :padding-bottom "8px"
-                 :scrollbar-width "thin"
-                 :scrollbar-color "#ddd transparent"}}
+  [:div {:class "multi-zoom-controls"}
    (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
      [:div {:key (str "opacity-" zoom "-" index)
-            :style {:flex "0 0 120px" :margin-bottom "10px"}}
-      [:div {:style {:display "flex" :justify-content "space-between" :align-items "center" :margin-bottom "5px"}}
-       [:span {:style {:font-size "11px" :color "#666"}} (str "z" zoom)]
-       [:span {:style {:font-size "11px" :color "#666"}}
+            :class "multi-zoom-item-opacity"}
+      [:div {:class "multi-zoom-opacity-header"}
+       [:span {:class "multi-zoom-opacity-label"} (str "z" zoom)]
+       [:span {:class "multi-zoom-opacity-label"}
         (str (-> (or value 0) (* 100) js/Math.round) "%")]]
       [:input {:type "range"
                :min "0" :max "1" :step "0.1"
                :value (or value 0)
                :on-change #(on-change-fn zoom (-> % .-target .-value js/parseFloat))
-               :style {:width "100%"}}]])])
+               :class "slider-input"}]])])
 
 (defn- render-single-opacity-control [{:keys [value on-change default-value label]}]
   [:div
@@ -309,51 +291,49 @@
             :min "0" :max "1" :step "0.1"
             :value (or value default-value)
             :on-change on-change
-            :style {:width "100%"}}]
-   [:span {:style {:font-size "12px" :color "#666"}}
+            :class "slider-input"}]
+   [:span {:class "single-value-label"}
     (str "Current: " label)]])
 
 (defn- render-unsupported-message []
-  [:div {:style {:background "#fff3cd" :border "1px solid #ffeaa7" :padding "10px"
-                 :border-radius "4px" :margin-bottom "15px"}}
-   [:p {:style {:margin "0" :color "#856404" :font-size "12px" :font-weight "bold"}}
+  [:div {:class "unsupported-message"}
+   [:p {:class "unsupported-message-title"}
     "Style editing is not supported in Raster mode."]
-   [:p {:style {:margin "5px 0 0 0" :color "#856404" :font-size "11px"}}
+   [:p {:class "unsupported-message-text"}
     "Switch to Dark or Light vector styles to edit building styles."]])
 
 (defn- render-layer-not-exist-warning [{:keys [target-layer]}]
-  [:div {:style {:background "#f8d7da" :border "1px solid #f5c6cb" :padding "10px"
-                 :border-radius "4px" :margin-bottom "15px"}}
-   [:p {:style {:margin "0" :color "#721c24" :font-size "12px" :font-weight "bold"}}
+  [:div {:class "layer-warning"}
+   [:p {:class "layer-warning-title"}
     (str "Layer '" target-layer "' does not exist in current style.")]
-   [:p {:style {:margin "5px 0 0 0" :color "#721c24" :font-size "11px"}}
+   [:p {:class "layer-warning-text"}
     "Style editing will not work for this layer. Please make sure you are using a vector style (Dark or Light)."]])
 
 (defn- render-layer-selector [{:keys [target-layer selected-category]}]
   (let [available-layers (get-layers-for-category selected-category)]
-    [:div {:style {:margin-bottom "15px"}}
-     [:label {:style {:display "block" :margin-bottom "5px" :font-weight "bold"}} "Target Layer"]
+    [:div {:class "layer-selector"}
+     [:label {:class "control-label"} "Target Layer"]
      [:select {:value target-layer
                :on-change #(let [new-layer (-> % .-target .-value)]
                              (re-frame/dispatch [:style-editor/switch-target-layer new-layer]))
-               :style {:width "100%" :padding "5px" :border "1px solid #ddd" :border-radius "4px"}}
+               :class "styled-select"}
       (for [layer-id available-layers]
         [:option {:key layer-id :value layer-id} layer-id])]]))
 
 (defn- render-status-info [{:keys [target-layer editing-style]}]
-  [:div {:style {:padding-top "15px" :border-top "1px solid #eee"}}
-   [:p {:style {:color "#666" :font-size "12px" :margin "0 0 10px 0" :font-weight "bold"}}
+  [:div {:class "status-info"}
+   [:p {:class "status-info-layer"}
     (str "Current Layer: " target-layer)]
-   [:p {:style {:color "#666" :font-size "11px" :margin "0" :font-style "italic"}}
+   [:p {:class "status-info-note"}
     "Only works with Dark or Light vector styles"]
-   [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
+   [:p {:class "status-info-styles"}
     "Styles: " (pr-str (select-keys editing-style all-style-keys))]])
 
 (defn- render-enum-control [{:keys [label value options on-change]}]
   [render-control-group label
    [:select {:value (or value "")
              :on-change on-change
-             :style {:width "100%" :padding "5px" :border "1px solid #ddd" :border-radius "4px"}}
+             :class "styled-select"}
     (for [option options]
       [:option {:key option :value option} option])]])
 
@@ -362,27 +342,22 @@
    [:input {:type "text"
             :value (or value "")
             :on-change on-change
-            :style {:width "100%" :padding "5px" :border "1px solid #ddd" :border-radius "4px"}}]])
+            :class "styled-select"}]])
 
 (defn- render-multi-zoom-width-controls [{:keys [zoom-pairs on-change-fn]}]
-  [:div {:style {:display "flex"
-                 :gap "8px"
-                 :overflow-x "auto"
-                 :padding-bottom "8px"
-                 :scrollbar-width "thin"
-                 :scrollbar-color "#ddd transparent"}}
+  [:div {:class "multi-zoom-controls"}
    (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
      [:div {:key (str "width-" zoom "-" index)
-            :style {:flex "0 0 120px" :margin-bottom "10px"}}
-      [:div {:style {:display "flex" :justify-content "space-between" :align-items "center" :margin-bottom "5px"}}
-       [:span {:style {:font-size "11px" :color "#666"}} (str "z" zoom)]
-       [:span {:style {:font-size "11px" :color "#666"}}
+            :class "multi-zoom-item-opacity"}
+      [:div {:class "multi-zoom-opacity-header"}
+       [:span {:class "multi-zoom-opacity-label"} (str "z" zoom)]
+       [:span {:class "multi-zoom-opacity-label"}
         (str (.toFixed (or value 0) 1) "px")]]
       [:input {:type "range"
                :min "0" :max "20" :step "0.5"
                :value (or value 0)
                :on-change #(on-change-fn zoom (-> % .-target .-value js/parseFloat))
-               :style {:width "100%"}}]])])
+               :class "slider-input"}]])])
 
 (defn- render-single-width-control [{:keys [value on-change default-value label]}]
   [:div
@@ -390,8 +365,8 @@
             :min "0" :max "20" :step "0.5"
             :value (or value default-value)
             :on-change on-change
-            :style {:width "100%"}}]
-   [:span {:style {:font-size "12px" :color "#666"}}
+            :class "slider-input"}]
+   [:span {:class "single-value-label"}
     (str "Current: " label)]])
 
 (defn- render-line-color-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
@@ -607,7 +582,7 @@
           [:input {:type "number" :min 0 :step 1
                    :value (or (:text-size editing-style) 12)
                    :on-change (on-change-event :text-size)
-                   :style {:width "100%"}}]]]
+                   :class "styled-select"}]]]
         ^{:key "text-color-control"} [render-text-color-control control-props]
         ^{:key "text-opacity-control"} [render-text-opacity-control control-props]])
 
@@ -645,18 +620,8 @@
             current-style-key @(re-frame/subscribe [:current-style-key])
             map-instance (map-engine/get-map-instance)
             layer-exists? (and map-instance (map-engine/layer-exists? target-layer))]
-        [:div {:class "style-editor-scrollable"
-               :style {:background "rgba(255,255,255,0.98)"
-                       :padding "18px"
-                       :border-radius "10px"
-                       :font-family "Arial, sans-serif"
-                       :width "280px"
-                       :box-shadow "0 4px 15px rgba(0,0,0,0.15)"
-                       :max-height "70vh"
-                       :overflow-y "auto"
-                       :scrollbar-width "thin"
-                       :scrollbar-color "#ddd transparent"}}
-         [:h3 {:style {:margin "0 0 15px 0" :color "#333"}} "Style Editor"]
+        [:div {:class "style-editor-scrollable"}
+         [:h3 {:class "style-editor-title"} "Style Editor"]
 
          (if (= current-style-key :raster-style)
            [render-unsupported-message]
@@ -671,7 +636,7 @@
               (let [on-style-change (fn [style-key]
                                       (fn [value] (update-layer-style target-layer style-key value)))]
                 [:div
-                 [:div {:style {:margin-bottom "15px" :display "flex" :align-items "center"}}
+                 [:div {:class "visibility-toggle"}
                   [:input {:type "checkbox"
                            :id "layer-visibility-checkbox"
                            :checked (= (:visibility editing-style) "visible")
@@ -679,9 +644,9 @@
                                         (let [is-checked (-> e .-target .-checked)
                                               new-visibility (if is-checked "visible" "none")]
                                           ((on-style-change :visibility) new-visibility)))
-                           :style {:margin-right "8px" :transform "scale(1.1)"}}]
+                           :class "visibility-checkbox"}]
                   [:label {:for "layer-visibility-checkbox"
-                           :style {:font-size "12px" :font-weight "normal" :cursor "pointer" :color "#333"}}
+                           :class "visibility-label"}
                    "Visible"]]
                  [render-style-controls {:target-layer target-layer
                                          :editing-style editing-style

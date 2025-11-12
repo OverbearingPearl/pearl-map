@@ -9,7 +9,7 @@
         eiffel-rotation-z @(re-frame/subscribe [:models-3d/eiffel-rotation-z])]
     [ui-controls/control-panel
      {:width "240px"}
-     [:h3 {:key "title" :style {:margin "0 0 12px 0" :font-size "1.1em" :color "#333"}} "3D Models"]
+     [:h3 {:key "title" :class "model-controls-title"} "3D Models"]
      (if eiffel-loaded?
        [:<> {:key "eiffel-controls"}
         [ui-controls/slider {:key "scale-slider"
@@ -20,10 +20,7 @@
                              :value eiffel-scale
                              :on-change #(re-frame/dispatch [:models-3d/set-eiffel-scale (js/parseFloat (-> % .-target .-value))])}]
         [:div {:key "scale-value"
-               :style {:text-align "right"
-                       :font-size "0.9em"
-                       :color "#666"
-                       :margin-top "4px"}}
+               :class "model-controls-value"}
          (str "x " (-> eiffel-scale js/Number (.toFixed 1)))]
 
         [ui-controls/slider {:key "rotation-slider"
@@ -34,15 +31,12 @@
                              :value eiffel-rotation-z
                              :on-change #(re-frame/dispatch [:models-3d/set-eiffel-rotation-z (js/parseFloat (-> % .-target .-value))])}]
         [:div {:key "rotation-value"
-               :style {:text-align "right"
-                       :font-size "0.9em"
-                       :color "#666"
-                       :margin-top "4px"}}
+               :class "model-controls-value"}
          (str (-> eiffel-rotation-z js/Number (.toFixed 0)) "°")]
 
         [ui-buttons/secondary-button
          {:key "remove-button"
-          :style {:margin-top "12px"}
+          :class "model-controls-remove-button"
           :on-click #(re-frame/dispatch [:models-3d/remove-eiffel-tower])}
          "Remove Eiffel Tower"]]
        [ui-buttons/primary-button

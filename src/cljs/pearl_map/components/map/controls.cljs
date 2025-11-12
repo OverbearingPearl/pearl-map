@@ -14,21 +14,21 @@
         show-other-components? @(re-frame/subscribe [:show-other-components?])
         map-instance @(re-frame/subscribe [:map-instance])]
     [ui-layout/card
-     {:width "280px"}
+     {:class "style-controls-card"}
      ;; Title and style controls in horizontal layout
-     [:div {:key "header-section" :style {:display "flex" :justify-content "space-between" :align-items "flex-start" :margin-bottom "15px"}}
+     [:div {:key "header-section" :class "style-controls-header"}
       ;; Title content on the left
-      [:div {:key "title-section" :style {:flex "1" :margin-right "15px"}}
-       [:h1 {:key "title" :style {:margin "0 0 8px 0" :font-size "1.4em" :color "#333" :line-height "1.2"}}
+      [:div {:key "title-section" :class "style-controls-title-section"}
+       [:h1 {:key "title" :class "style-controls-title"}
         "Pearl Map - Paris 3D"]
-       [:p {:key "subtitle" :style {:margin "0 0 4px 0" :font-size "0.85em" :color "#666" :line-height "1.3"}}
+       [:p {:key "subtitle" :class "style-controls-subtitle"}
         "Centered at Eiffel Tower"]
-       [:p {:key "coordinates" :style {:margin "0" :font-size "0.75em" :color "#999" :line-height "1.2"}}
+       [:p {:key "coordinates" :class "style-controls-coords"}
         "(2.2945°E, 48.8584°N)"]]
 
       ;; Style controls on the right
-      [:div {:key "style-section" :style {:flex "0 0 auto"}}
-       [:h3 {:key "style-title" :style {:margin "0 0 10px 0" :font-size "1.1em"}} "Map Style"]
+      [:div {:key "style-section" :class "style-controls-style-section"}
+       [:h3 {:key "style-title" :class "style-controls-style-title"} "Map Style"]
        [ui-layout/flex-container {:key "button-row" :gap "5px" :wrap "wrap" :align "center"}
         [ui-buttons/primary-button {:key "basic-style" :on-click #(change-map-style :raster-style) :disabled? (nil? map-instance)} "Basic"]
         [ui-buttons/dark-button {:key "dark-style" :on-click #(change-map-style :dark-style) :disabled? (nil? map-instance)} "Dark"]
@@ -36,10 +36,10 @@
         ;; Toggle button now in the same row as style buttons
         [ui-buttons/danger-button {:key "toggle-button"
                                    :on-click #(re-frame/dispatch [:toggle-other-components])
-                                   :style {:margin-left "5px"}}
+                                   :class "style-controls-toggle-button"}
          (if show-other-components? "Hide" "Show")]]]]
 
      ;; Current style indicator below
-     [ui-layout/flex-container {:key "current-style" :align "flex-start" :style {:margin-top "10px"}}
-      [:span {:key "current-style-text" :style {:font-size "12px" :color "#666"}}
+     [ui-layout/flex-container {:key "current-style" :class "style-controls-current-style"}
+      [:span {:key "current-style-text" :class "style-controls-current-style-text"}
        "Current: " (str current-style-url)]]]))
