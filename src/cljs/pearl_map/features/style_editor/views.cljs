@@ -596,21 +596,6 @@
         ^{:key "background-color-control"} [render-background-color-control control-props]
         ^{:key "background-opacity-control"} [render-background-opacity-control control-props]])]))
 
-(defn- style-editor-watcher []
-  (let [previous-category (reagent/atom nil)]
-    (reagent/create-class
-     {:display-name "StyleEditorWatcher"
-      :reagent-render
-      (fn []
-        (let [selected-category @(re-frame/subscribe [:style-editor/selected-category])]
-          (when (and selected-category (not= @previous-category selected-category))
-            (let [category-info (get layer-categories selected-category)
-                  default-layer (:default-layer category-info)]
-              (when default-layer
-                (re-frame/dispatch [:style-editor/switch-target-layer default-layer])))
-            (reset! previous-category selected-category)))
-        [:span])})))
-
 (defn style-editor []
   (reagent/create-class
    {:component-did-mount
@@ -640,22 +625,28 @@
             selected-category @(re-frame/subscribe [:style-editor/selected-category])
             current-style-key @(re-frame/subscribe [:current-style-key])
             map-instance (map-engine/get-map-instance)
-            layer-exists? (and map-instance (map-engine/layer-exists? target-layer))]
+            layer-exists? (and map-instance target-layer (map-engine/layer-exists? target-layer))]
 
         [:div {:class "style-editor-scrollable"}
-         [style-editor-watcher]
          [:h3 {:class "style-editor-title"} "Style Editor"]
 
          (if (= current-style-key :raster-style)
            [render-unsupported-message]
            [:div
-            (when-not layer-exists?
-              [render-layer-not-exist-warning {:target-layer target-layer}])
-
             [render-category-selector {:selected-category selected-category}]
             [render-layer-selector {:target-layer target-layer :selected-category selected-category}]
 
-            (when layer-exists?
+            (when (nil? target-layer)
+              [:div {:class "layer-warning"}
+               [:p {:class "layer-warning-title"}
+                "No layer selected or available for editing."]
+               [:p {:class "layer-warning-text"}
+                "Please select a layer from the dropdown above."]])
+
+            (when (and target-layer (not layer-exists?))
+              [render-layer-not-exist-warning {:target-layer target-layer}])
+
+            (when (and target-layer layer-exists?)
               (let [on-style-change (fn [style-key]
                                       (fn [value] (update-layer-style target-layer style-key value)))]
                 [:div

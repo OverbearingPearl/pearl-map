@@ -70,15 +70,35 @@
 (re-frame/reg-event-fx
  :style-editor/reset-styles-immediately
  (fn [{:keys [db]} _]
-   (let [target-layer (get db :style-editor/target-layer)
-         current-style (:current-style db)
-         current-styles (style-editor-views/get-layer-styles target-layer current-style)]
-     {:db (assoc db :style-editor/editing-style current-styles)})))
+   (let [current-style-key (:current-style-key db)
+         map-obj (map-engine/get-map-instance)
+         default-target-layer "extruded-building"]
+     (if (or (not map-obj) (= current-style-key :raster-style))
+       {:db (-> db
+                (assoc :style-editor/target-layer nil)
+                (assoc :style-editor/editing-style nil))}
+       (let [current-styles (style-editor-views/get-layer-styles default-target-layer (get map-engine/style-urls current-style-key))]
+         {:db (-> db
+                  (assoc :style-editor/target-layer default-target-layer)
+                  (assoc :style-editor/editing-style current-styles)
+                  (assoc :style-editor/selected-category :buildings))})))))
 
 (re-frame/reg-event-fx
  :style-editor/on-map-load
  (fn [{:keys [db]} _]
    (let [target-layer (get db :style-editor/target-layer)
-         current-style (:current-style db)
-         current-styles (style-editor-views/get-layer-styles target-layer current-style)]
-     {:db (assoc db :style-editor/editing-style current-styles)})))
+         current-style-key (:current-style-key db)
+         map-obj (map-engine/get-map-instance)
+         default-target-layer "extruded-building"]
+     (if (or (not map-obj) (= current-style-key :raster-style))
+       {:db (-> db
+                (assoc :style-editor/target-layer nil)
+                (assoc :style-editor/editing-style nil))}
+       (let [effective-target-layer (if (and target-layer (map-engine/layer-exists? target-layer))
+                                      target-layer
+                                      default-target-layer)
+             current-styles (style-editor-views/get-layer-styles effective-target-layer (get map-engine/style-urls current-style-key))]
+         {:db (-> db
+                  (assoc :style-editor/target-layer effective-target-layer)
+                  (assoc :style-editor/editing-style current-styles)
+                  (assoc :style-editor/selected-category :buildings))})))))
