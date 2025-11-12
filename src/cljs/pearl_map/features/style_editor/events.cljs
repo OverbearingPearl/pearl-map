@@ -38,17 +38,32 @@
 (re-frame/reg-event-fx
  :style-editor/update-and-apply-style
  (fn [{:keys [db]} [_ style-key value]]
-   (let [updated-style (assoc (:style-editor/editing-style db) style-key value)]
-     {:db (assoc db :style-editor/editing-style updated-style)
-      :fx [[:dispatch [:style-editor/apply-single-style style-key value]]]})))
+   (let [updated-db (assoc-in db [:style-editor/editing-style style-key] value)]
+     (if (and (= style-key :visibility) (= value "visible"))
+       {:db updated-db
+        :dispatch [:style-editor/re-apply-all-styles]}
+       {:db updated-db}))))
+
+(re-frame/reg-event-fx
+ :style-editor/re-apply-all-styles
+ (fn [{:keys [db]} _]
+   (let [target-layer (get-in db [:style-editor/target-layer])
+         editing-style (get-in db [:style-editor/editing-style])]
+     (doseq [[style-key style-value] editing-style]
+       (when (and (some? style-value)
+                  (contains? (set style-editor-views/paint-style-keys) style-key))
+         (map-engine/set-paint-property target-layer (name style-key) style-value))))
+   {}))
 
 (re-frame/reg-event-fx
  :style-editor/apply-single-style
  (fn [{:keys [db]} [_ style-key value]]
    (try
      (let [target-layer (get db :style-editor/target-layer)
-           paint-property (name style-key)]
-       (map-engine/set-paint-property target-layer paint-property value))
+           prop-type (if (contains? (set style-editor-views/layout-style-keys) style-key) "layout" "paint")]
+       (if (= prop-type "layout")
+         (map-engine/set-layout-property target-layer (name style-key) value)
+         (map-engine/set-paint-property target-layer (name style-key) value)))
      {:db db}
      (catch js/Error e
        (js/console.error "Failed to apply single style:" e)

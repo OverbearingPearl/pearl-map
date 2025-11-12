@@ -3,6 +3,7 @@
             [re-frame.db :as db]
             [reagent.core :as reagent]
             [pearl-map.utils.geometry :as geom]
+            [clojure.string :as str]
             ["maplibre-gl" :as maplibre]
             ["color" :as color]
             ["@maplibre/maplibre-gl-style-spec" :as style-spec]
@@ -154,24 +155,45 @@
 
 (defn set-paint-property [layer-id property-name value]
   (when-let [^js map-obj (get-map-instance)]
-    (when (and (.getLayer map-obj layer-id) (some? value))
-      (let [js-value (cond
-                       (map? value) (clj->js value)
-                       (#{"fill-extrusion-color" "fill-color" "fill-outline-color" "line-color" "text-color" "background-color"} property-name)
-                       (cond
-                         (= value "transparent") "transparent"
-                         (string? value) (if (or (.startsWith value "#")
-                                                 (.startsWith value "rgb")
-                                                 (.startsWith value "hsl"))
-                                           value
-                                           (str "#" value))
-                         :else (str "#" (.toString (js/parseInt (str value)) 16)))
-                       :else value)
-            layer-type (.-type (.getLayer map-obj layer-id))]
-        (when (or (not= "fill-extrusion-color" property-name)
-                  (= "fill-extrusion" layer-type))
-          (.setPaintProperty map-obj layer-id property-name js-value))))))
+    (when (.getLayer map-obj layer-id)
+      (let [visibility (.getLayoutProperty map-obj layer-id "visibility")]
+        (when (not= visibility "none")
+          (let [;; 将空字符串也视为 nil
+                processed-value (if (and (string? value) (str/blank? value)) nil value)
+                js-value (cond
+                           (nil? processed-value) nil ; 如果是 nil，直接传递 nil
+                           (map? processed-value) (clj->js processed-value)
+                           (#{"fill-extrusion-color" "fill-color" "fill-outline-color" "line-color" "text-color" "background-color"} property-name)
+                           (cond
+                             (= processed-value "transparent") "transparent"
+                             (string? processed-value) (if (or (.startsWith processed-value "#")
+                                                               (.startsWith processed-value "rgb")
+                                                               (.startsWith processed-value "hsl"))
+                                                         processed-value
+                                                         processed-value) ;; 如果是字符串但不是 #rgb/hsl 格式，直接使用
+                             (number? processed-value) (str "#" (.toString (js/parseInt (str processed-value)) 16)) ;; 只有数字才转十六进制
+                             :else processed-value) ;; 如果不是字符串也不是数字，直接使用原始值
+                           :else processed-value) ;; 对于非颜色属性，直接使用原始值
+                layer-type (.-type (.getLayer map-obj layer-id))]
+            (when (or (not= "fill-extrusion-color" property-name)
+                      (= "fill-extrusion" layer-type))
+              (.setPaintProperty map-obj layer-id property-name js-value))))))))
 
+(defn set-layout-property [layer-id property-name value]
+  (when-let [^js map-obj (get-map-instance)]
+    (when (.getLayer map-obj layer-id)
+      (let [;; 将空字符串也视为 nil
+            processed-value (if (and (string? value) (str/blank? value)) nil value)
+            js-value (clj->js processed-value)]
+        (.setLayoutProperty map-obj layer-id property-name js-value)))))
+
+(defn get-layout-property [layer-id property-name]
+  (when-let [^js map-obj (get-map-instance)]
+    (when (.getLayer map-obj layer-id)
+      (try
+        (.getLayoutProperty map-obj layer-id property-name)
+        (catch js/Error e
+          nil)))))
 
 (defn register-custom-layer [layer-id layer-impl]
   (re-frame/dispatch [:register-custom-layer layer-id layer-impl]))
@@ -340,8 +362,10 @@
 
     :else nil))
 
-(defn get-zoom-value-pairs [layer-id property-name current-zoom]
-  (let [value (get-paint-property layer-id property-name)]
+(defn get-zoom-value-pairs [layer-id property-name current-zoom prop-type]
+  (let [value (if (= prop-type "layout")
+                (get-layout-property layer-id property-name)
+                (get-paint-property layer-id property-name))]
     (when value
       (let [clj-value (js->clj value :keywordize-keys true)
             parse-fn (if (#{"fill-color" "fill-outline-color" "fill-extrusion-color" "line-color" "text-color" "background-color"} property-name)
@@ -374,18 +398,28 @@
   "Update a property to a single value (not a stops expression)"
   new-value)
 
-(defn update-zoom-value-pair [layer-id property-name zoom new-value]
-  (let [current-value (get-paint-property layer-id property-name)
-        current-zoom (get-current-zoom)
+(defn update-zoom-value-pair [layer-id property-name zoom new-value prop-type]
+  (let [current-value (if (= prop-type "layout")
+                        (get-layout-property layer-id property-name)
+                        (get-paint-property layer-id property-name))
+        current-map-zoom (get-current-zoom)
         clj-value (if (some? current-value) (js->clj current-value :keywordize-keys true) nil)]
     (cond
-      ;; Not an expression, create one if needed
+      ;; If current-value is not an expression, create one if the zoom levels differ
       (not (expression? current-value))
-      (if (and (not= zoom current-zoom) (some? current-value))
-        ["interpolate" ["linear"] ["zoom"] current-zoom current-value zoom new-value]
-        new-value)
+      (if (and (not= zoom current-map-zoom) (some? current-value))
+        (let [expression ["interpolate" ["linear"] ["zoom"] current-map-zoom current-value zoom new-value]]
+          (if (= prop-type "layout")
+            (set-layout-property layer-id property-name expression)
+            (set-paint-property layer-id property-name expression))
+          expression)
+        (do
+          (if (= prop-type "layout")
+            (set-layout-property layer-id property-name new-value)
+            (set-paint-property layer-id property-name new-value))
+          new-value))
 
-      ;; object-style stops
+      ;; object-style stops (e.g., {:stops [[z1 v1] [z2 v2]]})
       (and (map? clj-value) (:stops clj-value))
       (let [stops (vec (:stops clj-value))
             stop-exists? (some #(= zoom (first %)) stops)
@@ -395,17 +429,21 @@
                                       [stop-zoom new-value]
                                       [stop-zoom stop-value]))
                                   stops)
-                            (sort-by first (conj stops [zoom new-value])))]
-        (assoc clj-value :stops updated-stops))
+                            (sort-by first (conj stops [zoom new-value])))
+            updated-expression (assoc clj-value :stops updated-stops)]
+        (if (= prop-type "layout")
+          (set-layout-property layer-id property-name updated-expression)
+          (set-paint-property layer-id property-name updated-expression))
+        updated-expression)
 
-      ;; array-style interpolate on zoom
+      ;; array-style interpolate on zoom (e.g., ["interpolate", ["linear"], ["zoom"], z1, v1, z2, v2])
       (and (vector? clj-value)
            (>= (count clj-value) 4)
            (= "interpolate" (first clj-value))
            (= ["zoom"] (get clj-value 2)))
       (let [header (subvec clj-value 0 3)
-            stops (subvec clj-value 3)
-            stops-pairs (partition 2 stops)
+            stops-data (subvec clj-value 3)
+            stops-pairs (partition 2 stops-data)
             stop-exists? (some #(= zoom (first %)) stops-pairs)
             updated-stops-pairs (if stop-exists?
                                   (mapv (fn [[stop-zoom stop-value]]
@@ -414,12 +452,20 @@
                                             [stop-zoom stop-value]))
                                         stops-pairs)
                                   (sort-by first (conj stops-pairs [zoom new-value])))
-            updated-stops (reduce into [] updated-stops-pairs)]
-        (vec (concat header updated-stops)))
+            updated-stops (reduce into [] updated-stops-pairs)
+            updated-expression (vec (concat header updated-stops))]
+        (if (= prop-type "layout")
+          (set-layout-property layer-id property-name updated-expression)
+          (set-paint-property layer-id property-name updated-expression))
+        updated-expression)
 
       ;; Default case: Fallback to setting the new value as a constant.
       :else
-      new-value)))
+      (do
+        (if (= prop-type "layout")
+          (set-layout-property layer-id property-name new-value)
+          (set-paint-property layer-id property-name new-value))
+        new-value))))
 
 (defn validate-style [style]
   (and (map? style)

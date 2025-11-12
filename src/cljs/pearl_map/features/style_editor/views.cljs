@@ -5,9 +5,14 @@
             [pearl-map.services.map-engine :as map-engine]
             [pearl-map.utils.colors :as colors]))
 
-(def ^:private style-keys
+(def ^:private paint-style-keys
   [:fill-color :fill-opacity :fill-outline-color :fill-extrusion-color :fill-extrusion-opacity
    :line-color :line-opacity :line-width :text-color :text-opacity :background-color :background-opacity])
+
+(def ^:private layout-style-keys
+  [:visibility :line-cap :line-join :text-field :text-size :text-transform :text-anchor :symbol-placement])
+
+(def ^:private all-style-keys (vec (concat paint-style-keys layout-style-keys)))
 
 (def ^:private color-style-keys
   #{:fill-color :fill-outline-color :fill-extrusion-color :line-color :text-color :background-color})
@@ -46,7 +51,7 @@
              "road_pri_case_noramp" "road_pri_fill_noramp"
              "road_pri_case_ramp" "road_pri_fill_ramp"
              "road_trunk_case_noramp" "road_trunk_fill_noramp"
-             "road_trunk_case_ramp" "road_trunk_fill_ramp"
+             "road_trunk_case_ramp" "road_trunk_fill-ramp"
              "road_mot_case_noramp" "road_mot_fill_noramp"
              "road_mot_case_ramp" "road_mot_fill_ramp"
              ;; Railways
@@ -135,7 +140,8 @@
 (defn- parse-style-value [style-key current-value current-zoom]
   (cond
     (or (contains? opacity-style-keys style-key)
-        (contains? width-style-keys style-key))
+        (contains? width-style-keys style-key)
+        (= style-key :text-size))
     (map-engine/parse-numeric-expression current-value current-zoom)
 
     (contains? color-style-keys style-key)
@@ -145,17 +151,24 @@
 
 (defn get-layer-styles [layer-id current-style]
   (if (= current-style raster-style)
-    (zipmap style-keys (repeat :unsupported))
+    (zipmap all-style-keys (repeat :unsupported))
     (let [current-zoom (get-current-zoom)
           map-instance (map-engine/get-map-instance)]
       (if (and map-instance (map-engine/layer-exists? layer-id))
-        (->> style-keys
+        (->> all-style-keys
              (map (fn [style-key]
-                    (let [current-value (map-engine/get-paint-property layer-id (name style-key))]
-                      [style-key (when (some? current-value)
-                                   (parse-style-value style-key current-value current-zoom))])))
+                    (let [prop-type (if (contains? (set layout-style-keys) style-key) "layout" "paint")
+                          get-fn (if (= prop-type "layout")
+                                   map-engine/get-layout-property
+                                   map-engine/get-paint-property)
+                          current-value (get-fn layer-id (name style-key))
+                          parsed-value (when (some? current-value)
+                                         (parse-style-value style-key current-value current-zoom))]
+                      [style-key (if (and (= style-key :visibility) (nil? parsed-value))
+                                   "visible"
+                                   parsed-value)])))
              (into {}))
-        (zipmap style-keys (repeat nil))))))
+        (zipmap all-style-keys (repeat nil))))))
 
 (defn- format-color-input [value]
   (let [s-val (when (some? value) (-> value str str/trim))]
@@ -181,18 +194,26 @@
         (when-not (js/isNaN parsed) parsed))
       (when (number? value) value))))
 
+(defn- format-enum-input [value]
+  (when (some? value)
+    (-> value str str/trim)))
+
 (defn update-layer-style
   ([target-layer style-key value]
    (update-layer-style target-layer style-key value nil))
   ([target-layer style-key value zoom]
    (let [current-zoom (or zoom (get-current-zoom))
+         is-layout? (contains? (set layout-style-keys) style-key)
+         prop-type (if is-layout? "layout" "paint")
          processed-value (cond
                            (contains? color-style-keys style-key) (format-color-input value)
                            (or (contains? opacity-style-keys style-key)
-                               (contains? width-style-keys style-key)) (format-numeric-input value)
+                               (contains? width-style-keys style-key)
+                               (= style-key :text-size)) (format-numeric-input value)
+                           (contains? #{:visibility :line-cap :line-join :text-transform :text-anchor :symbol-placement} style-key) (format-enum-input value)
                            :else value)]
      (when (some? processed-value)
-       (let [updated-value (map-engine/update-zoom-value-pair target-layer (name style-key) current-zoom processed-value)]
+       (let [updated-value (map-engine/update-zoom-value-pair target-layer (name style-key) current-zoom processed-value prop-type)]
          (re-frame/dispatch [:style-editor/update-and-apply-style style-key updated-value]))))))
 
 (defn setup-map-listener []
@@ -326,7 +347,22 @@
    [:p {:style {:color "#666" :font-size "11px" :margin "0" :font-style "italic"}}
     "Only works with Dark or Light vector styles"]
    [:p {:style {:color "#666" :font-size "11px" :margin "10px 0 0 0"}}
-    "Styles: " (pr-str (select-keys editing-style style-keys))]])
+    "Styles: " (pr-str (select-keys editing-style all-style-keys))]])
+
+(defn- render-enum-control [{:keys [label value options on-change]}]
+  [render-control-group label
+   [:select {:value (or value "")
+             :on-change on-change
+             :style {:width "100%" :padding "5px" :border "1px solid #ddd" :border-radius "4px"}}
+    (for [option options]
+      [:option {:key option :value option} option])]])
+
+(defn- render-text-input-control [{:keys [label value on-change]}]
+  [render-control-group label
+   [:input {:type "text"
+            :value (or value "")
+            :on-change on-change
+            :style {:width "100%" :padding "5px" :border "1px solid #ddd" :border-radius "4px"}}]])
 
 (defn- render-multi-zoom-width-controls [{:keys [zoom-pairs on-change-fn]}]
   [:div {:style {:display "flex"
@@ -360,7 +396,7 @@
 
 (defn- render-line-color-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
   (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "line-color" current-zoom)]
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "line-color" current-zoom "paint")]
     [render-control-group "Line Color"
      (if (> (count zoom-pairs) 1)
        [render-multi-zoom-color-controls
@@ -372,7 +408,7 @@
 
 (defn- render-line-opacity-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
   (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "line-opacity" current-zoom)]
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "line-opacity" current-zoom "paint")]
     [render-control-group "Line Opacity"
      (if (> (count zoom-pairs) 1)
        [render-multi-zoom-opacity-controls
@@ -388,7 +424,7 @@
 
 (defn- render-line-width-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
   (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "line-width" current-zoom)]
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "line-width" current-zoom "paint")]
     [render-control-group "Line Width"
      (if (> (count zoom-pairs) 1)
        [render-multi-zoom-width-controls
@@ -404,7 +440,7 @@
 
 (defn- render-text-color-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
   (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "text-color" current-zoom)]
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "text-color" current-zoom "paint")]
     [render-control-group "Text Color"
      (if (> (count zoom-pairs) 1)
        [render-multi-zoom-color-controls
@@ -416,7 +452,7 @@
 
 (defn- render-text-opacity-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
   (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "text-opacity" current-zoom)]
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "text-opacity" current-zoom "paint")]
     [render-control-group "Text Opacity"
      (if (> (count zoom-pairs) 1)
        [render-multi-zoom-opacity-controls
@@ -432,7 +468,7 @@
 
 (defn- render-fill-color-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
   (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-color" current-zoom)]
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-color" current-zoom "paint")]
     [render-control-group "Fill Color"
      (if (> (count zoom-pairs) 1)
        [render-multi-zoom-color-controls
@@ -444,7 +480,7 @@
 
 (defn- render-fill-opacity-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
   (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-opacity" current-zoom)]
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-opacity" current-zoom "paint")]
     [render-control-group "Opacity"
      (if (> (count zoom-pairs) 1)
        [render-multi-zoom-opacity-controls
@@ -477,7 +513,7 @@
 
 (defn- render-extrusion-opacity-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
   (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-extrusion-opacity" current-zoom)]
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-extrusion-opacity" current-zoom "paint")]
     [render-control-group "Extrusion Opacity"
      (if (> (count zoom-pairs) 1)
        [render-multi-zoom-opacity-controls
@@ -493,7 +529,7 @@
 
 (defn- render-background-color-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
   (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "background-color" current-zoom)]
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "background-color" current-zoom "paint")]
     [render-control-group "Background Color"
      (if (> (count zoom-pairs) 1)
        [render-multi-zoom-color-controls
@@ -505,7 +541,7 @@
 
 (defn- render-background-opacity-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
   (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "background-opacity" current-zoom)]
+        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "background-opacity" current-zoom "paint")]
     [render-control-group "Background Opacity"
      (if (> (count zoom-pairs) 1)
        [render-multi-zoom-opacity-controls
@@ -519,9 +555,9 @@
            :default-value 1
            :label display-label}]))]))
 
-(defn- render-style-controls [{:keys [target-layer editing-style]}]
-  (let [on-style-change (fn [style-key]
-                          (fn [value] (update-layer-style target-layer style-key value)))
+(defn- render-style-controls [{:keys [target-layer editing-style on-style-change]}]
+  (let [on-change-event (fn [style-key]
+                          (fn [event] (update-layer-style target-layer style-key (-> event .-target .-value))))
         on-zoom-style-change (fn [style-key]
                                (fn [zoom value] (update-layer-style target-layer style-key value zoom)))
         control-props {:target-layer target-layer
@@ -544,12 +580,34 @@
 
      (when (contains? line-layers target-layer)
        [:<>
+        ^{:key "line-layout-controls"}
+        [:div
+         [render-enum-control {:label "Line Cap"
+                               :value (:line-cap editing-style)
+                               :options ["butt" "round" "square"]
+                               :on-change (on-change-event :line-cap)}]
+         [render-enum-control {:label "Line Join"
+                               :value (:line-join editing-style)
+                               :options ["bevel" "round" "miter"]
+                               :on-change (on-change-event :line-join)}]]
         ^{:key "line-color-control"} [render-line-color-control control-props]
         ^{:key "line-opacity-control"} [render-line-opacity-control control-props]
         ^{:key "line-width-control"} [render-line-width-control control-props]])
 
      (when (contains? label-layers target-layer)
        [:<>
+        ^{:key "label-layout-controls"}
+        [:div
+         [render-text-input-control {:label "Text Field"
+                                     :value (:text-field editing-style)
+                                     :on-change (on-change-event :text-field)}]
+         ;; NOTE: text-size is numeric and can have zoom stops, so we reuse width/opacity controls logic
+         ;; For simplicity, we'll add a single value editor here. A multi-zoom one would be better.
+         [render-control-group "Text Size"
+          [:input {:type "number" :min 0 :step 1
+                   :value (or (:text-size editing-style) 12)
+                   :on-change (on-change-event :text-size)
+                   :style {:width "100%"}}]]]
         ^{:key "text-color-control"} [render-text-color-control control-props]
         ^{:key "text-opacity-control"} [render-text-opacity-control control-props]])
 
@@ -610,6 +668,22 @@
             [render-layer-selector {:target-layer target-layer :selected-category selected-category}]
 
             (when layer-exists?
-              [:div
-               [render-style-controls {:target-layer target-layer :editing-style editing-style}]
-               [render-status-info {:target-layer target-layer :editing-style editing-style}]])])]))}))
+              (let [on-style-change (fn [style-key]
+                                      (fn [value] (update-layer-style target-layer style-key value)))]
+                [:div
+                 [:div {:style {:margin-bottom "15px" :display "flex" :align-items "center"}}
+                  [:input {:type "checkbox"
+                           :id "layer-visibility-checkbox"
+                           :checked (= (:visibility editing-style) "visible")
+                           :on-change (fn [e]
+                                        (let [is-checked (-> e .-target .-checked)
+                                              new-visibility (if is-checked "visible" "none")]
+                                          ((on-style-change :visibility) new-visibility)))
+                           :style {:margin-right "8px" :transform "scale(1.1)"}}]
+                  [:label {:for "layer-visibility-checkbox"
+                           :style {:font-size "12px" :font-weight "normal" :cursor "pointer" :color "#333"}}
+                   "Visible"]]
+                 [render-style-controls {:target-layer target-layer
+                                         :editing-style editing-style
+                                         :on-style-change on-style-change}]
+                 [render-status-info {:target-layer target-layer :editing-style editing-style}]]))])]))}))
