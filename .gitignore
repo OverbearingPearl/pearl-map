@@ -13,7 +13,7 @@ pom.xml.asc
 .lein-failures
 
 # Boot
-.boot
+.boot/
 
 # Clojure
 .nrepl-port
@@ -58,8 +58,6 @@ Thumbs.db
 .env.production.local
 
 # Aider
-.aider*
-.aidermacs.prompting.md
 .aider.chat.history.md
 .aider.input.history
 .aider.tags.cache.v4/
@@ -74,7 +72,7 @@ lerna-debug.log*
 .pnpm-debug.log*
 
 # Runtime data
-pids
+pids/
 *.pid
 *.seed
 *.pid.lock
@@ -84,19 +82,19 @@ coverage/
 *.lcov
 
 # nyc test coverage
-.nyc_output
+.nyc_output/
 
 # Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
-.grunt
+.grunt/
 
 # Bower dependency directory (https://bower.io/)
-bower_components
+bower_components/
 
 # node-waf configuration
 .lock-wscript
 
 # Compiled binary addons (https://nodejs.org/api/addons.html)
-build/Release
+build/
 
 # Dependency directories
 jspm_packages/
@@ -108,7 +106,7 @@ typings/
 *.tsbuildinfo
 
 # Optional npm cache directory
-.npm
+.npm/
 
 # Optional eslint cache
 .eslintcache
@@ -135,25 +133,23 @@ typings/
 .env.test
 
 # parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
+.cache/
+.parcel-cache/
 
 # Next.js build output
-.next
-out/
+.next/
 
 # Nuxt.js build / generate output
-.nuxt
-dist
+.nuxt/
+dist/
 
 # Gatsby files
-.cache/
 # Comment in the public line in if your project uses Gatsby and *not* Next.js
 # https://nextjs.org/blog/next-9-1#public-directory-support
 # public
 
 # vuepress build output
-.vuepress/dist
+.vuepress/
 
 # Serverless directories
 .serverless/
@@ -168,23 +164,22 @@ dist
 .tern-port
 
 # Stores VSCode versions used for testing VSCode extensions
-.vscode-test
+.vscode-test/
 
 # yarn v2
-.yarn/cache
-.yarn/unplugged
-.yarn/build-state.yml
-.yarn/install-state.gz
 .pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
 
 # Project specific
 resources/public/models/eiffel_tower/scene.glb        # Generated GLB model
 resources/public/js/                                  # Compiled JavaScript from shadow-cljs
 resources/public/css/maplibre-gl.css                  # Copied CSS file (will be generated during build)
 src/cljs/pearl_map/features/models_3d/model_data.cljs # Generated ClojureScript file containing base64 encoded 3D model data
-.shadow-cljs/                                         # Shadow-cljs cache
-.nrepl-port                                           # nREPL port file
 .clj-kondo/                                           # Clj-kondo linting cache
 .lsp/                                                 # LSP configuration and cache
 .calva/                                               # Calva (VS Code extension) configuration
-.cpcache/                                             # Clojure CLI cache
