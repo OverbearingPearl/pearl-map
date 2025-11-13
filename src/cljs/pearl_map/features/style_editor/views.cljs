@@ -219,16 +219,15 @@
                            :else value)]
      (when (some? processed-value)
        (let [updated-value (map-engine/update-zoom-value-pair target-layer (name style-key) current-zoom processed-value prop-type)]
-         (re-frame/dispatch [:style-editor/update-and-apply-style style-key updated-value]))))))
+         (re-frame/dispatch [:style-editor/update-and-apply-style style-key processed-value]))))))
 
 (defn setup-map-listener []
   (when-let [^js/maplibregl.Map map-inst (map-engine/get-map-instance)]
     (doto map-inst
       (.off "load")
-      (.off "styledata")
       (.off "idle")
-      (.on "styledata" #(re-frame/dispatch [:style-editor/on-map-load]))
-      (.on "idle" #(re-frame/dispatch [:style-editor/reset-styles-immediately])))))
+      (.off "styledata") ;; Keep off for safety, though we don't use .on anymore
+      (.on "load" #(re-frame/dispatch [:style-editor/on-map-load])))))
 
 (defn- render-control-group [label & children]
   (into [:div {:class "control-group"}
@@ -413,6 +412,15 @@
      :default-value 1
      :label display-label}))
 
+(defn- single-text-size-props [style-key {:keys [editing-style on-style-change]}]
+  (let [value (get editing-style style-key)
+        on-change (on-style-change style-key)
+        display-label (if (number? value) (str (.toFixed value 0) "px") "default")]
+    {:value value
+     :on-change #(on-change (-> % .-target .-value js/parseFloat))
+     :default-value 12
+     :label display-label}))
+
 (defn- create-simple-control-renderer
   "Factory for single-value controls without zoom-stops."
   [{:keys [style-key label renderer props-fn]}]
@@ -515,6 +523,13 @@
     :single-zoom-renderer render-single-opacity-control
     :single-props-fn single-opacity-props}))
 
+(def ^:private render-text-size-control
+  (create-style-control-renderer
+   {:style-key :text-size, :label "Text Size", :prop-type "layout"
+    :multi-zoom-renderer render-multi-zoom-width-controls ; Reuse width controls for text size
+    :single-zoom-renderer render-single-width-control    ; Reuse width control for text size
+    :single-props-fn single-text-size-props}))
+
 (defn- render-style-controls [{:keys [target-layer editing-style on-style-change]}]
   (let [on-change-event (fn [style-key]
                           (fn [event] (update-layer-style target-layer style-key (-> event .-target .-value))))
@@ -561,13 +576,7 @@
          [render-text-input-control {:label "Text Field"
                                      :value (:text-field editing-style)
                                      :on-change (on-change-event :text-field)}]
-         ;; NOTE: text-size is numeric and can have zoom stops, so we reuse width/opacity controls logic
-         ;; For simplicity, we'll add a single value editor here. A multi-zoom one would be better.
-         [render-control-group "Text Size"
-          [:input {:type "number" :min 0 :step 1
-                   :value (or (:text-size editing-style) 12)
-                   :on-change (on-change-event :text-size)
-                   :class "styled-select"}]]]
+         ^{:key "text-size-control"} [render-text-size-control control-props]]
         ^{:key "text-color-control"} [render-text-color-control control-props]
         ^{:key "text-opacity-control"} [render-text-opacity-control control-props]])
 
