@@ -29,7 +29,7 @@
 (def ^:private extruded-building-layer "extruded-building")
 (def ^:private extruded-building-top-layer "extruded-building-top")
 
-(def ^:private layer-categories
+(def layer-categories
   {:transportation
    {:label "Transportation"
     :default-layer "road_pri_fill_noramp"
@@ -227,7 +227,7 @@
       (.off "load")
       (.off "styledata")
       (.off "idle")
-      (.on "load" #(re-frame/dispatch [:style-editor/on-map-load]))
+      (.on "styledata" #(re-frame/dispatch [:style-editor/on-map-load]))
       (.on "idle" #(re-frame/dispatch [:style-editor/reset-styles-immediately])))))
 
 (defn- render-control-group [label & children]
@@ -318,7 +318,8 @@
   (let [available-layers (get-layers-for-category selected-category)]
     [:div {:class "layer-selector"}
      [:label {:class "control-label"} "Target Layer"]
-     [:select {:value (or target-layer "") ; Use target-layer directly, if nil then use an empty string
+     [:select {:key selected-category
+               :value (or target-layer "") ; Use target-layer directly, if nil then use an empty string
                :on-change #(let [new-layer (-> % .-target .-value)]
                              (re-frame/dispatch [:style-editor/switch-target-layer new-layer]))
                :class "styled-select"}
@@ -600,9 +601,7 @@
   (reagent/create-class
    {:component-did-mount
     (fn []
-      (setup-map-listener)
-      ;; Initialize category to :buildings
-      (re-frame/dispatch [:style-editor/set-selected-category :buildings])
+      (re-frame/dispatch [:style-editor/initialize])
       (let [^js/maplibregl.Map map-inst (map-engine/get-map-instance)]
         (when (and map-inst (.isStyleLoaded map-inst))
           (re-frame/dispatch [:style-editor/reset-styles-immediately])))
@@ -620,49 +619,56 @@
           (.remove style-el))))
     :reagent-render
     (fn []
+      (setup-map-listener)
       (let [editing-style @(re-frame/subscribe [:style-editor/editing-style])
             target-layer @(re-frame/subscribe [:style-editor/target-layer])
             selected-category @(re-frame/subscribe [:style-editor/selected-category])
             current-style-key @(re-frame/subscribe [:current-style-key])
-            map-instance (map-engine/get-map-instance)
-            layer-exists? (and map-instance target-layer (map-engine/layer-exists? target-layer))]
+            ^js/maplibregl.Map map-instance (map-engine/get-map-instance)
+            style-loaded? (and map-instance (.isStyleLoaded map-instance))
+            layer-exists? (and style-loaded? target-layer (map-engine/layer-exists? target-layer))]
 
         [:div {:class "style-editor-scrollable"}
          [:h3 {:class "style-editor-title"} "Style Editor"]
 
          (if (= current-style-key :raster-style)
            [render-unsupported-message]
-           [:div
-            [render-category-selector {:selected-category selected-category}]
-            [render-layer-selector {:target-layer target-layer :selected-category selected-category}]
+           (if-not style-loaded?
+             [:div {:class "layer-warning"}
+              [:p {:class "layer-warning-title"} "Style is loading..."]
+              [:p {:class "layer-warning-text"} "Please wait for the map style to finish loading."]]
+             [:div
+              [render-category-selector {:selected-category selected-category}]
+              [render-layer-selector {:target-layer target-layer :selected-category selected-category}]
 
-            (when (nil? target-layer)
-              [:div {:class "layer-warning"}
-               [:p {:class "layer-warning-title"}
-                "No layer selected or available for editing."]
-               [:p {:class "layer-warning-text"}
-                "Please select a layer from the dropdown above."]])
+              (when (nil? target-layer)
+                [:div {:class "layer-warning"}
+                 [:p {:class "layer-warning-title"}
+                  "No layer selected or available for editing."]
+                 [:p {:class "layer-warning-text"}
+                  "Please select a layer from the dropdown above."]])
 
-            (when (and target-layer (not layer-exists?))
-              [render-layer-not-exist-warning {:target-layer target-layer}])
+              (when (and target-layer (not layer-exists?))
+                [render-layer-not-exist-warning {:target-layer target-layer}])
 
-            (when (and target-layer layer-exists?)
-              (let [on-style-change (fn [style-key]
-                                      (fn [value] (update-layer-style target-layer style-key value)))]
-                [:div
-                 [:div {:class "visibility-toggle"}
-                  [:input {:type "checkbox"
-                           :id "layer-visibility-checkbox"
-                           :checked (= (:visibility editing-style) "visible")
-                           :on-change (fn [e]
-                                        (let [is-checked (-> e .-target .-checked)
-                                              new-visibility (if is-checked "visible" "none")]
-                                          ((on-style-change :visibility) new-visibility)))
-                           :class "visibility-checkbox"}]
-                  [:label {:for "layer-visibility-checkbox"
-                           :class "visibility-label"}
-                   "Visible"]]
-                 [render-style-controls {:target-layer target-layer
-                                         :editing-style editing-style
-                                         :on-style-change on-style-change}]
-                 [render-status-info {:target-layer target-layer :editing-style editing-style}]]))])]))}))
+              (when (and target-layer layer-exists?)
+                (let [on-style-change (fn [style-key]
+                                        (fn [value] (update-layer-style target-layer style-key value)))]
+                  [:div
+                   [:div {:class "visibility-toggle"}
+                    [:input {:type "checkbox"
+                             :id "layer-visibility-checkbox"
+                             :checked (= (:visibility editing-style) "visible")
+                             :on-change (fn [e]
+                                          (let [is-checked (-> e .-target .-checked)
+                                                new-visibility (if is-checked "visible" "none")]
+                                            ((on-style-change :visibility) new-visibility)))
+                             :class "visibility-checkbox"}]
+                    [:label {:for "layer-visibility-checkbox"
+                             :class "visibility-label"}
+                     "Visible"]]
+                   [render-style-controls {:target-layer target-layer
+                                           :editing-style editing-style
+                                           :on-style-change on-style-change}]
+                   [render-status-info {:target-layer target-layer :editing-style editing-style}]]))]
+             ))]))}))

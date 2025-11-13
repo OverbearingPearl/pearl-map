@@ -19,16 +19,42 @@
  (fn [db [_ key value]]
    (assoc-in db [:style-editor/editing-style key] value)))
 
-(re-frame/reg-event-db
+(re-frame/reg-event-fx
  :style-editor/set-selected-category
- (fn [db [_ category]]
-   (assoc db :style-editor/selected-category category)))
+ (fn [{:keys [db]} [_ category]]
+   (let [default-layer (get-in style-editor-views/layer-categories [category :default-layer])
+         current-style-key (:current-style-key db)
+         current-style-url (get map-engine/style-urls current-style-key)
+         current-styles (style-editor-views/get-layer-styles default-layer current-style-url)]
+     {:db (-> db
+              (assoc :style-editor/selected-category category)
+              (assoc :style-editor/target-layer default-layer)
+              (assoc :style-editor/editing-style current-styles))})))
+
+(defn- init-to-default-db [db]
+  (let [category :buildings
+        default-layer (get-in style-editor-views/layer-categories [category :default-layer])
+        current-style-key (:current-style-key db)
+        current-style-url (get map-engine/style-urls current-style-key)
+        current-styles (style-editor-views/get-layer-styles default-layer current-style-url)]
+    (-> db
+        (assoc :style-editor/selected-category category)
+        (assoc :style-editor/target-layer default-layer)
+        (assoc :style-editor/editing-style current-styles))))
+
+(re-frame/reg-event-fx
+ :style-editor/initialize
+ (fn [{:keys [db]} _]
+   (if (get db :style-editor/selected-category)
+     {:db db}
+     {:db (init-to-default-db db)})))
 
 (re-frame/reg-event-fx
  :style-editor/switch-target-layer
  (fn [{:keys [db]} [_ layer-id]]
-   (let [current-style (:current-style db)
-         current-styles (style-editor-views/get-layer-styles layer-id current-style)]
+   (let [current-style-key (:current-style-key db)
+         current-style-url (get map-engine/style-urls current-style-key)
+         current-styles (style-editor-views/get-layer-styles layer-id current-style-url)]
      {:db (-> db
               (assoc :style-editor/target-layer layer-id)
               (assoc :style-editor/editing-style current-styles))})))
@@ -72,33 +98,23 @@
  (fn [{:keys [db]} _]
    (let [current-style-key (:current-style-key db)
          map-obj (map-engine/get-map-instance)
-         default-target-layer "extruded-building"]
-     (if (or (not map-obj) (= current-style-key :raster-style))
-       {:db (-> db
-                (assoc :style-editor/target-layer nil)
-                (assoc :style-editor/editing-style nil))}
-       (let [current-styles (style-editor-views/get-layer-styles default-target-layer (get map-engine/style-urls current-style-key))]
-         {:db (-> db
-                  (assoc :style-editor/target-layer default-target-layer)
-                  (assoc :style-editor/editing-style current-styles)
-                  (assoc :style-editor/selected-category :buildings))})))))
+         target-layer (:style-editor/target-layer db)]
+     (if (or (not map-obj) (= current-style-key :raster-style) (not target-layer))
+       ;; Do nothing if raster style or no layer is selected
+       {:db db}
+       (let [current-styles (style-editor-views/get-layer-styles target-layer (get map-engine/style-urls current-style-key))]
+         {:db (assoc db :style-editor/editing-style current-styles)})))))
 
 (re-frame/reg-event-fx
  :style-editor/on-map-load
  (fn [{:keys [db]} _]
-   (let [target-layer (get db :style-editor/target-layer)
-         current-style-key (:current-style-key db)
-         map-obj (map-engine/get-map-instance)
-         default-target-layer "extruded-building"]
+   (let [current-style-key (:current-style-key db)
+         map-obj (map-engine/get-map-instance)]
      (if (or (not map-obj) (= current-style-key :raster-style))
+       ;; When entering raster mode, clear the editor state.
        {:db (-> db
                 (assoc :style-editor/target-layer nil)
-                (assoc :style-editor/editing-style nil))}
-       (let [effective-target-layer (if (and target-layer (map-engine/layer-exists? target-layer))
-                                      target-layer
-                                      default-target-layer)
-             current-styles (style-editor-views/get-layer-styles effective-target-layer (get map-engine/style-urls current-style-key))]
-         {:db (-> db
-                  (assoc :style-editor/target-layer effective-target-layer)
-                  (assoc :style-editor/editing-style current-styles)
-                  (assoc :style-editor/selected-category :buildings))})))))
+                (assoc :style-editor/editing-style nil)
+                (assoc :style-editor/selected-category nil))}
+       ;; When entering a vector style, always re-initialize to default.
+       {:db (init-to-default-db db)}))))
