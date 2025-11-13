@@ -9,16 +9,6 @@
  (fn [db [_ layer-id]]
    (assoc db :style-editor/target-layer layer-id)))
 
-(re-frame/reg-event-db
- :style-editor/set-editing-style
- (fn [db [_ style]]
-   (assoc db :style-editor/editing-style style)))
-
-(re-frame/reg-event-db
- :style-editor/update-editing-style
- (fn [db [_ key value]]
-   (assoc-in db [:style-editor/editing-style key] value)))
-
 (re-frame/reg-event-fx
  :style-editor/set-selected-category
  (fn [{:keys [db]} [_ category]]
@@ -78,20 +68,6 @@
                   (contains? (set style-editor-views/paint-style-keys) style-key))
          (map-engine/set-paint-property target-layer (name style-key) style-value))))
    {}))
-
-(re-frame/reg-event-fx
- :style-editor/apply-single-style
- (fn [{:keys [db]} [_ style-key value]]
-   (try
-     (let [target-layer (get db :style-editor/target-layer)
-           prop-type (if (contains? (set style-editor-views/layout-style-keys) style-key) "layout" "paint")]
-       (if (= prop-type "layout")
-         (map-engine/set-layout-property target-layer (name style-key) value)
-         (map-engine/set-paint-property target-layer (name style-key) value)))
-     {:db db}
-     (catch js/Error e
-       (js/console.error "Failed to apply single style:" e)
-       {:db db}))))
 
 (re-frame/reg-event-fx
  :style-editor/reset-styles-immediately

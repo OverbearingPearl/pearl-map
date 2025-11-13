@@ -375,166 +375,145 @@
    [:span {:class "single-value-label"}
     (str "Current: " label)]])
 
-(defn- render-line-color-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
-  (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "line-color" current-zoom "paint")]
-    [render-control-group "Line Color"
-     (if (> (count zoom-pairs) 1)
-       [render-multi-zoom-color-controls
-        {:zoom-pairs zoom-pairs
-         :on-change-fn (on-zoom-style-change :line-color)}]
-       [render-color-input-with-overlay
-        {:value (:line-color editing-style)
-         :on-change #((on-style-change :line-color) (-> % .-target .-value))}])]))
+(defn- single-color-props [style-key {:keys [editing-style on-style-change]}]
+  (let [value (get editing-style style-key)
+        on-change (on-style-change style-key)]
+    {:value value
+     :on-change #(on-change (-> % .-target .-value))}))
 
-(defn- render-line-opacity-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
-  (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "line-opacity" current-zoom "paint")]
-    [render-control-group "Line Opacity"
-     (if (> (count zoom-pairs) 1)
-       [render-multi-zoom-opacity-controls
-        {:zoom-pairs zoom-pairs
-         :on-change-fn (on-zoom-style-change :line-opacity)}]
-       (let [opacity (:line-opacity editing-style)
-             display-label (str (-> (or opacity 1) (* 100) js/Math.round) "%")]
-         [render-single-opacity-control
-          {:value opacity
-           :on-change #((on-style-change :line-opacity) (-> % .-target .-value js/parseFloat))
-           :default-value 1
-           :label display-label}]))]))
+(defn- single-opacity-props [style-key {:keys [editing-style on-style-change]}]
+  (let [value (get editing-style style-key)
+        on-change (on-style-change style-key)
+        display-label (str (-> (or value 1) (* 100) js/Math.round) "%")]
+    {:value value
+     :on-change #(on-change (-> % .-target .-value js/parseFloat))
+     :default-value 1
+     :label display-label}))
 
-(defn- render-line-width-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
-  (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "line-width" current-zoom "paint")]
-    [render-control-group "Line Width"
-     (if (> (count zoom-pairs) 1)
-       [render-multi-zoom-width-controls
-        {:zoom-pairs zoom-pairs
-         :on-change-fn (on-zoom-style-change :line-width)}]
-       (let [width (:line-width editing-style)
-             display-label (if (number? width) (str (.toFixed width 1) "px") "default")]
-         [render-single-width-control
-          {:value width
-           :on-change #((on-style-change :line-width) (-> % .-target .-value js/parseFloat))
-           :default-value 1
-           :label display-label}]))]))
+(defn- single-width-props [style-key {:keys [editing-style on-style-change]}]
+  (let [value (get editing-style style-key)
+        on-change (on-style-change style-key)
+        display-label (if (number? value) (str (.toFixed value 1) "px") "default")]
+    {:value value
+     :on-change #(on-change (-> % .-target .-value js/parseFloat))
+     :default-value 1
+     :label display-label}))
 
-(defn- render-text-color-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
-  (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "text-color" current-zoom "paint")]
-    [render-control-group "Text Color"
-     (if (> (count zoom-pairs) 1)
-       [render-multi-zoom-color-controls
-        {:zoom-pairs zoom-pairs
-         :on-change-fn (on-zoom-style-change :text-color)}]
-       [render-color-input-with-overlay
-        {:value (:text-color editing-style)
-         :on-change #((on-style-change :text-color) (-> % .-target .-value))}])]))
+(defn- fill-opacity-props [style-key {:keys [editing-style on-style-change]}]
+  (let [opacity (get editing-style style-key)
+        on-change (on-style-change style-key)
+        color-transparent? (= (:fill-color editing-style) "transparent")
+        display-value (if color-transparent? 0 opacity)
+        display-label (cond
+                        color-transparent? "0% (transparent)"
+                        (number? opacity) (str (-> opacity (* 100) js/Math.round) "%")
+                        :else "100% (default)")]
+    {:value display-value
+     :on-change #(on-change (-> % .-target .-value js/parseFloat))
+     :default-value 1
+     :label display-label}))
 
-(defn- render-text-opacity-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
-  (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "text-opacity" current-zoom "paint")]
-    [render-control-group "Text Opacity"
-     (if (> (count zoom-pairs) 1)
-       [render-multi-zoom-opacity-controls
-        {:zoom-pairs zoom-pairs
-         :on-change-fn (on-zoom-style-change :text-opacity)}]
-       (let [opacity (:text-opacity editing-style)
-             display-label (str (-> (or opacity 1) (* 100) js/Math.round) "%")]
-         [render-single-opacity-control
-          {:value opacity
-           :on-change #((on-style-change :text-opacity) (-> % .-target .-value js/parseFloat))
-           :default-value 1
-           :label display-label}]))]))
+(defn- create-simple-control-renderer
+  "Factory for single-value controls without zoom-stops."
+  [{:keys [style-key label renderer props-fn]}]
+  (fn [control-props]
+    [render-control-group label
+     [renderer (props-fn style-key control-props)]]))
 
-(defn- render-fill-color-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
-  (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-color" current-zoom "paint")]
-    [render-control-group "Fill Color"
-     (if (> (count zoom-pairs) 1)
-       [render-multi-zoom-color-controls
-        {:zoom-pairs zoom-pairs
-         :on-change-fn (on-zoom-style-change :fill-color)}]
-       [render-color-input-with-overlay
-        {:value (:fill-color editing-style)
-         :on-change #((on-style-change :fill-color) (-> % .-target .-value))}])]))
+(defn- create-style-control-renderer
+  "Factory for controls that may have zoom-stops."
+  [{:keys [style-key label prop-type multi-zoom-renderer single-zoom-renderer single-props-fn]}]
+  (fn [{:keys [target-layer on-zoom-style-change] :as control-props}]
+    (let [current-zoom (get-current-zoom)
+          zoom-pairs (map-engine/get-zoom-value-pairs target-layer (name style-key) current-zoom prop-type)]
+      [render-control-group label
+       (if (> (count zoom-pairs) 1)
+         [multi-zoom-renderer
+          {:zoom-pairs zoom-pairs
+           :on-change-fn (on-zoom-style-change style-key)}]
+         [single-zoom-renderer (single-props-fn style-key control-props)])])))
 
-(defn- render-fill-opacity-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
-  (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-opacity" current-zoom "paint")]
-    [render-control-group "Opacity"
-     (if (> (count zoom-pairs) 1)
-       [render-multi-zoom-opacity-controls
-        {:zoom-pairs zoom-pairs
-         :on-change-fn (on-zoom-style-change :fill-opacity)}]
-       (let [opacity (:fill-opacity editing-style)
-             color-transparent? (= (:fill-color editing-style) "transparent")
-             display-value (if color-transparent? 0 opacity)
-             display-label (cond
-                             color-transparent? "0% (transparent)"
-                             (number? opacity) (str (-> opacity (* 100) js/Math.round) "%")
-                             :else "100% (default)")]
-         [render-single-opacity-control
-          {:value display-value
-           :on-change #((on-style-change :fill-opacity) (-> % .-target .-value js/parseFloat))
-           :default-value 1
-           :label display-label}]))]))
+(def ^:private render-line-color-control
+  (create-style-control-renderer
+   {:style-key :line-color, :label "Line Color", :prop-type "paint"
+    :multi-zoom-renderer render-multi-zoom-color-controls
+    :single-zoom-renderer render-color-input-with-overlay
+    :single-props-fn single-color-props}))
 
-(defn- render-outline-color-control [{:keys [editing-style on-style-change]}]
-  [render-control-group "Outline Color"
-   [render-color-input-with-overlay
-    {:value (:fill-outline-color editing-style)
-     :on-change #((on-style-change :fill-outline-color) (-> % .-target .-value))}]])
+(def ^:private render-line-opacity-control
+  (create-style-control-renderer
+   {:style-key :line-opacity, :label "Line Opacity", :prop-type "paint"
+    :multi-zoom-renderer render-multi-zoom-opacity-controls
+    :single-zoom-renderer render-single-opacity-control
+    :single-props-fn single-opacity-props}))
 
-(defn- render-extrusion-color-control [{:keys [editing-style on-style-change]}]
-  [render-control-group "Extrusion Color"
-   [render-color-input-with-overlay
-    {:value (:fill-extrusion-color editing-style)
-     :on-change #((on-style-change :fill-extrusion-color) (-> % .-target .-value))}]])
+(def ^:private render-line-width-control
+  (create-style-control-renderer
+   {:style-key :line-width, :label "Line Width", :prop-type "paint"
+    :multi-zoom-renderer render-multi-zoom-width-controls
+    :single-zoom-renderer render-single-width-control
+    :single-props-fn single-width-props}))
 
-(defn- render-extrusion-opacity-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
-  (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "fill-extrusion-opacity" current-zoom "paint")]
-    [render-control-group "Extrusion Opacity"
-     (if (> (count zoom-pairs) 1)
-       [render-multi-zoom-opacity-controls
-        {:zoom-pairs zoom-pairs
-         :on-change-fn (on-zoom-style-change :fill-extrusion-opacity)}]
-       (let [opacity (:fill-extrusion-opacity editing-style)
-             display-label (str (-> (or opacity 1) (* 100) js/Math.round) "%")]
-         [render-single-opacity-control
-          {:value opacity
-           :on-change #((on-style-change :fill-extrusion-opacity) (-> % .-target .-value js/parseFloat))
-           :default-value 1
-           :label display-label}]))]))
+(def ^:private render-text-color-control
+  (create-style-control-renderer
+   {:style-key :text-color, :label "Text Color", :prop-type "paint"
+    :multi-zoom-renderer render-multi-zoom-color-controls
+    :single-zoom-renderer render-color-input-with-overlay
+    :single-props-fn single-color-props}))
 
-(defn- render-background-color-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
-  (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "background-color" current-zoom "paint")]
-    [render-control-group "Background Color"
-     (if (> (count zoom-pairs) 1)
-       [render-multi-zoom-color-controls
-        {:zoom-pairs zoom-pairs
-         :on-change-fn (on-zoom-style-change :background-color)}]
-       [render-color-input-with-overlay
-        {:value (:background-color editing-style)
-         :on-change #((on-style-change :background-color) (-> % .-target .-value))}])]))
+(def ^:private render-text-opacity-control
+  (create-style-control-renderer
+   {:style-key :text-opacity, :label "Text Opacity", :prop-type "paint"
+    :multi-zoom-renderer render-multi-zoom-opacity-controls
+    :single-zoom-renderer render-single-opacity-control
+    :single-props-fn single-opacity-props}))
 
-(defn- render-background-opacity-control [{:keys [target-layer editing-style on-style-change on-zoom-style-change]}]
-  (let [current-zoom (get-current-zoom)
-        zoom-pairs (map-engine/get-zoom-value-pairs target-layer "background-opacity" current-zoom "paint")]
-    [render-control-group "Background Opacity"
-     (if (> (count zoom-pairs) 1)
-       [render-multi-zoom-opacity-controls
-        {:zoom-pairs zoom-pairs
-         :on-change-fn (on-zoom-style-change :background-opacity)}]
-       (let [opacity (:background-opacity editing-style)
-             display-label (str (-> (or opacity 1) (* 100) js/Math.round) "%")]
-         [render-single-opacity-control
-          {:value opacity
-           :on-change #((on-style-change :background-opacity) (-> % .-target .-value js/parseFloat))
-           :default-value 1
-           :label display-label}]))]))
+(def ^:private render-fill-color-control
+  (create-style-control-renderer
+   {:style-key :fill-color, :label "Fill Color", :prop-type "paint"
+    :multi-zoom-renderer render-multi-zoom-color-controls
+    :single-zoom-renderer render-color-input-with-overlay
+    :single-props-fn single-color-props}))
+
+(def ^:private render-fill-opacity-control
+  (create-style-control-renderer
+   {:style-key :fill-opacity, :label "Opacity", :prop-type "paint"
+    :multi-zoom-renderer render-multi-zoom-opacity-controls
+    :single-zoom-renderer render-single-opacity-control
+    :single-props-fn fill-opacity-props}))
+
+(def ^:private render-outline-color-control
+  (create-simple-control-renderer
+   {:style-key :fill-outline-color, :label "Outline Color"
+    :renderer render-color-input-with-overlay
+    :props-fn single-color-props}))
+
+(def ^:private render-extrusion-color-control
+  (create-simple-control-renderer
+   {:style-key :fill-extrusion-color, :label "Extrusion Color"
+    :renderer render-color-input-with-overlay
+    :props-fn single-color-props}))
+
+(def ^:private render-extrusion-opacity-control
+  (create-style-control-renderer
+   {:style-key :fill-extrusion-opacity, :label "Extrusion Opacity", :prop-type "paint"
+    :multi-zoom-renderer render-multi-zoom-opacity-controls
+    :single-zoom-renderer render-single-opacity-control
+    :single-props-fn single-opacity-props}))
+
+(def ^:private render-background-color-control
+  (create-style-control-renderer
+   {:style-key :background-color, :label "Background Color", :prop-type "paint"
+    :multi-zoom-renderer render-multi-zoom-color-controls
+    :single-zoom-renderer render-color-input-with-overlay
+    :single-props-fn single-color-props}))
+
+(def ^:private render-background-opacity-control
+  (create-style-control-renderer
+   {:style-key :background-opacity, :label "Background Opacity", :prop-type "paint"
+    :multi-zoom-renderer render-multi-zoom-opacity-controls
+    :single-zoom-renderer render-single-opacity-control
+    :single-props-fn single-opacity-props}))
 
 (defn- render-style-controls [{:keys [target-layer editing-style on-style-change]}]
   (let [on-change-event (fn [style-key]
@@ -552,7 +531,7 @@
         ^{:key "fill-opacity-control"} [render-fill-opacity-control control-props]])
 
      (when (= target-layer building-layer)
-       [render-outline-color-control control-props])
+       ^{:key "outline-color-control"} [render-outline-color-control control-props])
 
      (when (contains? #{"extruded-building" "extruded-building-top"} target-layer)
        [:<>
