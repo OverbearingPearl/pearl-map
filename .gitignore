@@ -183,3 +183,5 @@ src/cljs/pearl_map/features/models_3d/model_data.cljs # Generated ClojureScript 
 .clj-kondo/                                           # Clj-kondo linting cache
 .lsp/                                                 # LSP configuration and cache
 .calva/                                               # Calva (VS Code extension) configuration
+
+.aider*
