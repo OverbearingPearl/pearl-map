@@ -10,7 +10,8 @@
     (map-engine/change-map-style style-url)))
 
 (defn style-controls []
-  (let [current-style-url @(re-frame/subscribe [:current-style-url])
+  (let [current-style-key @(re-frame/subscribe [:current-style-key])
+        current-style-url (get map-engine/style-urls current-style-key)
         show-other-components? @(re-frame/subscribe [:show-other-components?])
         map-instance @(re-frame/subscribe [:map-instance])]
     [ui-layout/card

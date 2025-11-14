@@ -13,12 +13,6 @@
    (:current-style-key db)))
 
 (re-frame/reg-sub
- :current-style-url
- :<- [:current-style-key]
- (fn [style-key _]
-   (get map-engine/style-urls style-key)))
-
-(re-frame/reg-sub
  :custom-layers
  (fn [db]
    (:custom-layers db)))
