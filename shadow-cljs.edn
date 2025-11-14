@@ -2,7 +2,8 @@
  :dependencies [[reagent "1.3.0"]
                 [re-frame "1.3.0"]
                 [cljs-ajax "0.8.4"]
-                [cider/cider-nrepl "0.57.0"]]
+                [cider/cider-nrepl "0.57.0"]
+                [day8.re-frame/re-frame-10x "1.10.0"]]
  :nrepl {:port 8777
          :middleware [cider.nrepl/cider-middleware]}
  :maven
@@ -15,8 +16,10 @@
         :output-dir "target/public/js"
         :asset-path "js"
         :modules {:main {:init-fn pearl-map.core/init}}
-        :dev {:compiler-options {:closure-defines {re-frame.trace.trace-enabled? true}}
-              :devtools {:after-load pearl-map.core/reload}}
+        :dev {:compiler-options {:closure-defines {re-frame.trace.trace-enabled? true}
+                                 :external-config {:day8.re-frame-10x/config {:enable-unminified-code? true}}}
+              :devtools {:after-load pearl-map.core/reload
+                         :preloads [day8.re-frame-10x.preload.react-18]}}
         :compiler-options {:ignore-source-regex [".*~$" ".*#$" ".*\\.swp$" ".*\\.swo$" ".*\\.DS_Store$"
                                                   "src/cljs/pearl_map/features/models_3d/model_data\\.cljs"
                                                   ".*\\.iml$" "\\.idea/.*" "\\.vscode/.*" "\\.calva/.*" "\\.lsp/.*"
