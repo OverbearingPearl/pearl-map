@@ -221,14 +221,6 @@
        (let [updated-value (map-engine/update-zoom-value-pair target-layer (name style-key) current-zoom processed-value prop-type)]
          (re-frame/dispatch [:style-editor/update-and-apply-style style-key processed-value]))))))
 
-(defn setup-map-listener []
-  (when-let [^js/maplibregl.Map map-inst (map-engine/get-map-instance)]
-    (doto map-inst
-      (.off "load")
-      (.off "idle")
-      (.off "styledata") ;; Keep off for safety, though we don't use .on anymore
-      (.on "load" #(re-frame/dispatch [:style-editor/on-map-load])))))
-
 (defn- render-control-group [label & children]
   (into [:div {:class "control-group"}
          [:label {:class "control-label"} label]]
@@ -607,7 +599,6 @@
           (.remove style-el))))
     :reagent-render
     (fn []
-      (setup-map-listener)
       (let [editing-style @(re-frame/subscribe [:style-editor/editing-style])
             target-layer @(re-frame/subscribe [:style-editor/target-layer])
             selected-category @(re-frame/subscribe [:style-editor/selected-category])

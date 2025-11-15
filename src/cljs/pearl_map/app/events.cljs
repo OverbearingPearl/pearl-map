@@ -13,6 +13,11 @@
  (fn [db [_ map-instance]]
    (assoc db :map-instance map-instance)))
 
+(re-frame/reg-event-db
+ :set-map-loading?
+ (fn [db [_ loading?]]
+   (assoc db :map-loading? loading?)))
+
 (re-frame/reg-event-fx
  :set-current-style-key
  (fn [{:keys [db]} [_ style-key]]

@@ -8,6 +8,11 @@
    (:map-instance db)))
 
 (re-frame/reg-sub
+ :map-loading?
+ (fn [db]
+   (:map-loading? db)))
+
+(re-frame/reg-sub
  :current-style-key
  (fn [db]
    (:current-style-key db)))

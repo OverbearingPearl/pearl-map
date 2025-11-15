@@ -82,11 +82,10 @@
          {:db (assoc db :style-editor/editing-style current-styles)})))))
 
 (re-frame/reg-event-fx
- :style-editor/on-map-load
+ :style-editor/reset-to-defaults
  (fn [{:keys [db]} _]
-   (let [current-style-key (:current-style-key db)
-         map-obj (map-engine/get-map-instance)]
-     (if (or (not map-obj) (= current-style-key :raster-style))
+   (let [current-style-key (:current-style-key db)]
+     (if (= current-style-key :raster-style)
        ;; When entering raster mode, clear the editor state.
        {:db (-> db
                 (assoc :style-editor/target-layer nil)

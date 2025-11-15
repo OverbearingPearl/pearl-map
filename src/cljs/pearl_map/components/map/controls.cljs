@@ -6,7 +6,6 @@
 
 (defn change-map-style [style-key]
   (let [style-url (get map-engine/style-urls style-key)]
-    (re-frame/dispatch [:set-current-style-key style-key])
     (map-engine/change-map-style style-url)))
 
 (defn style-controls []

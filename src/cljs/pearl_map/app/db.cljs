@@ -2,6 +2,7 @@
 
 (def default-db
   {:map-instance nil
+   :map-loading? false
    :current-style-key :raster-style
    :custom-layers {}
    :style-editor/editing-style {:fill-color "#f0f0f0"

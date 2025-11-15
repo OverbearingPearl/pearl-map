@@ -119,8 +119,9 @@
  (fn [{:keys [db]} [_ map-obj]]
    (js/console.log "map-engine: :map-engine/map-loaded event received.")
    (set-map-instance! map-obj)
-   {:dispatch-n (mapv (fn [callback] [:map-engine/on-map-loaded callback map-obj])
-                      (get db :map-engine/on-load-callbacks []))
+   {:dispatch-n (cons [:set-map-loading? false]
+                      (mapv (fn [callback] [:map-engine/on-map-loaded callback map-obj])
+                            (get db :map-engine/on-load-callbacks [])))
     :db         (assoc db :map-engine/on-load-callbacks [])}))
 
 (re-frame/reg-event-fx
@@ -249,7 +250,8 @@
         style-key (->> style-urls
                        (filter (fn [[_ v]] (= v style-url)))
                        ffirst)]
-    (.remove map-obj)
+    (re-frame/dispatch-sync [:set-map-loading? true])
+    (when map-obj (.remove map-obj))
     (re-frame/dispatch-sync [:set-current-style-key style-key])
     (re-frame/dispatch-sync [:set-map-instance nil])
     (set! (.-pearlMapInstance js/window) nil)
@@ -260,13 +262,14 @@
        (on-map-load
         (fn [^maplibre/Map new-map-obj]
           (js/console.log "map-engine: New map loaded, applying state and layers.")
-          (let [layers (-> new-map-obj .getStyle .-layers)]
-            (js/console.log "Style loaded. Current layers:" (clj->js layers)))
           (apply-map-state! new-map-obj current-state)
           (reapply-custom-layers! new-map-obj (:layers current-state))
           (when (not= style-url "raster-style")
             (re-frame/dispatch [:buildings/add-layers]))
-          (re-frame/dispatch [:style-editor/reset-styles-immediately])))))))
+          (.once new-map-obj "idle"
+                 (fn []
+                   (js/console.log "map-engine: Map is idle after style change, resetting editor.")
+                   (re-frame/dispatch [:style-editor/reset-to-defaults])))))))))
 
 (defn get-paint-property [layer-id property-name]
   (when-let [^js map-obj (get-map-instance)]
