@@ -219,7 +219,7 @@
                            :else value)]
      (when (some? processed-value)
        (let [updated-value (map-engine/update-zoom-value-pair target-layer (name style-key) current-zoom processed-value prop-type)]
-         (re-frame/dispatch [:style-editor/update-and-apply-style style-key processed-value]))))))
+         (re-frame/dispatch [:style-editor/update-and-apply-style style-key updated-value]))))))
 
 (defn- render-control-group [label & children]
   (into [:div {:class "control-group"}
@@ -603,16 +603,14 @@
             target-layer @(re-frame/subscribe [:style-editor/target-layer])
             selected-category @(re-frame/subscribe [:style-editor/selected-category])
             current-style-key @(re-frame/subscribe [:current-style-key])
-            ^js/maplibregl.Map map-instance (map-engine/get-map-instance)
-            style-loaded? (and map-instance (.isStyleLoaded map-instance))
-            layer-exists? (and style-loaded? target-layer (map-engine/layer-exists? target-layer))]
-
+            map-loading? @(re-frame/subscribe [:map-loading?])
+            layer-exists? (and (not map-loading?) target-layer (map-engine/layer-exists? target-layer))]
         [:div {:class "style-editor-scrollable"}
          [:h3 {:class "style-editor-title"} "Style Editor"]
 
          (if (= current-style-key :raster-style)
            [render-unsupported-message]
-           (if-not style-loaded?
+           (if map-loading?
              [:div {:class "layer-warning"}
               [:p {:class "layer-warning-title"} "Style is loading..."]
               [:p {:class "layer-warning-text"} "Please wait for the map style to finish loading."]]

@@ -106,6 +106,8 @@
           initial-style-url (get style-urls initial-style-key)
           map-config (create-config initial-style-url)
           map-obj (maplibre/Map. map-config)]
+      (.on map-obj "styledataloading" (fn [_] (re-frame/dispatch [:set-map-loading? true])))
+      (.on map-obj "styledata" (fn [_] (re-frame/dispatch [:set-map-loading? false])))
       (.once map-obj "load"
              (fn []
                (js/console.log "map-engine: Map 'load' event triggered. Dispatching :map-engine/map-loaded.")
@@ -186,7 +188,10 @@
       (let [;; 将空字符串也视为 nil
             processed-value (if (and (string? value) (str/blank? value)) nil value)
             js-value (clj->js processed-value)]
-        (.setLayoutProperty map-obj layer-id property-name js-value)))))
+        (try
+          (.setLayoutProperty map-obj layer-id property-name js-value)
+          (catch js/Error e
+            (js/console.error (str "map-engine/set-layout-property: Error calling .setLayoutProperty for " layer-id " " property-name) e)))))))
 
 (defn get-layout-property [layer-id property-name]
   (when-let [^js map-obj (get-map-instance)]
@@ -406,69 +411,70 @@
                         (get-layout-property layer-id property-name)
                         (get-paint-property layer-id property-name))
         current-map-zoom (get-current-zoom)
-        clj-value (if (some? current-value) (js->clj current-value :keywordize-keys true) nil)]
-    (cond
-      ;; If current-value is not an expression, create one if the zoom levels differ
-      (not (expression? current-value))
-      (if (and (not= zoom current-map-zoom) (some? current-value))
-        (let [expression ["interpolate" ["linear"] ["zoom"] current-map-zoom current-value zoom new-value]]
-          (if (= prop-type "layout")
-            (set-layout-property layer-id property-name expression)
-            (set-paint-property layer-id property-name expression))
-          expression)
-        (do
-          (if (= prop-type "layout")
-            (set-layout-property layer-id property-name new-value)
-            (set-paint-property layer-id property-name new-value))
-          new-value))
+        clj-value (if (some? current-value) (js->clj current-value :keywordize-keys true) nil)
+        result (cond
+                 ;; If current-value is not an expression, create one if the zoom levels differ
+                 (not (expression? current-value))
+                 (if (and (not= zoom current-map-zoom) (some? current-value))
+                   (let [expression ["interpolate" ["linear"] ["zoom"] current-map-zoom current-value zoom new-value]]
+                     (if (= prop-type "layout")
+                       (set-layout-property layer-id property-name expression)
+                       (set-paint-property layer-id property-name expression))
+                     expression)
+                   (do
+                     (if (= prop-type "layout")
+                       (set-layout-property layer-id property-name new-value)
+                       (set-paint-property layer-id property-name new-value))
+                     new-value))
 
-      ;; object-style stops (e.g., {:stops [[z1 v1] [z2 v2]]})
-      (and (map? clj-value) (:stops clj-value))
-      (let [stops (vec (:stops clj-value))
-            stop-exists? (some #(= zoom (first %)) stops)
-            updated-stops (if stop-exists?
-                            (mapv (fn [[stop-zoom stop-value]]
-                                    (if (= stop-zoom zoom)
-                                      [stop-zoom new-value]
-                                      [stop-zoom stop-value]))
-                                  stops)
-                            (sort-by first (conj stops [zoom new-value])))
-            updated-expression (assoc clj-value :stops updated-stops)]
-        (if (= prop-type "layout")
-          (set-layout-property layer-id property-name updated-expression)
-          (set-paint-property layer-id property-name updated-expression))
-        updated-expression)
+                 ;; object-style stops (e.g., {:stops [[z1 v1] [z2 v2]]})
+                 (and (map? clj-value) (:stops clj-value))
+                 (let [stops (vec (:stops clj-value))
+                       stop-exists? (some #(= zoom (first %)) stops)
+                       updated-stops (if stop-exists?
+                                       (mapv (fn [[stop-zoom stop-value]]
+                                               (if (= stop-zoom zoom)
+                                                 [stop-zoom new-value]
+                                                 [stop-zoom stop-value]))
+                                             stops)
+                                       (sort-by first (conj stops [zoom new-value])))
+                       updated-expression (assoc clj-value :stops updated-stops)]
+                   (if (= prop-type "layout")
+                     (set-layout-property layer-id property-name updated-expression)
+                     (set-paint-property layer-id property-name updated-expression))
+                   updated-expression)
 
-      ;; array-style interpolate on zoom (e.g., ["interpolate", ["linear"], ["zoom"], z1, v1, z2, v2])
-      (and (vector? clj-value)
-           (>= (count clj-value) 4)
-           (= "interpolate" (first clj-value))
-           (= ["zoom"] (get clj-value 2)))
-      (let [header (subvec clj-value 0 3)
-            stops-data (subvec clj-value 3)
-            stops-pairs (partition 2 stops-data)
-            stop-exists? (some #(= zoom (first %)) stops-pairs)
-            updated-stops-pairs (if stop-exists?
-                                  (mapv (fn [[stop-zoom stop-value]]
-                                          (if (= stop-zoom zoom)
-                                            [stop-zoom new-value]
-                                            [stop-zoom stop-value]))
-                                        stops-pairs)
-                                  (sort-by first (conj stops-pairs [zoom new-value])))
-            updated-stops (reduce into [] updated-stops-pairs)
-            updated-expression (vec (concat header updated-stops))]
-        (if (= prop-type "layout")
-          (set-layout-property layer-id property-name updated-expression)
-          (set-paint-property layer-id property-name updated-expression))
-        updated-expression)
+                 ;; array-style interpolate on zoom (e.g., ["interpolate", ["linear"], ["zoom"], z1, v1, z2, v2])
+                 (and (vector? clj-value)
+                      (>= (count clj-value) 4)
+                      (= "interpolate" (first clj-value))
+                      (= ["zoom"] (get clj-value 2)))
+                 (let [header (subvec clj-value 0 3)
+                       stops-data (subvec clj-value 3)
+                       stops-pairs (partition 2 stops-data)
+                       stop-exists? (some #(= zoom (first %)) stops-pairs)
+                       updated-stops-pairs (if stop-exists?
+                                             (mapv (fn [[stop-zoom stop-value]]
+                                                     (if (= stop-zoom zoom)
+                                                       [stop-zoom new-value]
+                                                       [stop-zoom stop-value]))
+                                                   stops-pairs)
+                                             (sort-by first (conj stops-pairs [zoom new-value])))
+                       updated-stops (reduce into [] updated-stops-pairs)
+                       updated-expression (vec (concat header updated-stops))]
+                   (if (= prop-type "layout")
+                     (set-layout-property layer-id property-name updated-expression)
+                     (set-paint-property layer-id property-name updated-expression))
+                   updated-expression)
 
-      ;; Default case: Fallback to setting the new value as a constant.
-      :else
-      (do
-        (if (= prop-type "layout")
-          (set-layout-property layer-id property-name new-value)
-          (set-paint-property layer-id property-name new-value))
-        new-value))))
+                 ;; Default case: Fallback to setting the new value as a constant.
+                 :else
+                 (do
+                   (if (= prop-type "layout")
+                     (set-layout-property layer-id property-name new-value)
+                     (set-paint-property layer-id property-name new-value))
+                   new-value))]
+    result))
 
 (defn validate-style [style]
   (and (map? style)
