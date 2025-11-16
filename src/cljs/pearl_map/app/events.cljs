@@ -1,12 +1,14 @@
 (ns pearl-map.app.events
   (:require [re-frame.core :as re-frame]
-            [pearl-map.app.db :as db]
-            [pearl-map.features.lighting.events]))
+            [pearl-map.app.db :as app-db]
+            [pearl-map.features.lighting.events]
+            [pearl-map.services.map-engine :as map-engine]
+            [re-frame.db :as rf-db]))
 
 (re-frame/reg-event-db
  :initialize-db
  (fn [_ _]
-   db/default-db))
+   app-db/default-db))
 
 (re-frame/reg-event-db
  :set-map-instance
@@ -21,8 +23,8 @@
 (re-frame/reg-event-fx
  :set-current-style-key
  (fn [{:keys [db]} [_ style-key]]
-   (let [default-light-props (:map/light-properties db/default-db)
-         default-building-style (:style-editor/editing-style db/default-db)
+   (let [default-light-props (:map/light-properties app-db/default-db)
+         default-building-style (:style-editor/editing-style app-db/default-db)
          new-db (-> db
                     (assoc :current-style-key style-key)
                     (assoc :map/light-properties default-light-props)
@@ -50,3 +52,21 @@
  :toggle-other-components
  (fn [db _]
    (update db :show-other-components? not)))
+
+(re-frame/reg-fx
+ :set-map-light
+ (fn [light-props]
+   (when-let [^js map-instance (map-engine/get-map-instance)]
+     (.setLight map-instance (clj->js light-props)))))
+
+(defn init-map []
+  (let [map-obj (map-engine/init-map)]
+    (when map-obj
+      (map-engine/on-map-load
+       (fn [^js map-instance]
+         (let [light-props (:map/light-properties @rf-db/app-db)]
+           (when light-props
+             (.setLight map-instance (clj->js light-props))))))
+      (map-engine/on-map-error
+       (fn [e]
+         (js/console.error "Map loading error:" e))))))
