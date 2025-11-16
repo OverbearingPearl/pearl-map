@@ -17,6 +17,10 @@
                     (some? (.-type x)))
     :else false))
 
+(defn- clj-expression? [x]
+  (or (and (vector? x) (string? (first x)) (> (count x) 1))
+      (and (map? x) (or (:stops x) (:property x) (:type x)))))
+
 (defn- evaluate [expr properties]
   (cond
     (and (.-stops expr) (.-zoom properties))
@@ -156,7 +160,7 @@
                 processed-value (if (and (string? value) (str/blank? value)) nil value)
                 js-value (cond
                            (nil? processed-value) nil
-                           (map? processed-value) (clj->js processed-value)
+                           (clj-expression? processed-value) (clj->js processed-value)
                            (#{"fill-extrusion-color" "fill-color" "fill-outline-color" "line-color" "text-color" "background-color"} property-name)
                            (cond
                              (= processed-value "transparent") "transparent"
