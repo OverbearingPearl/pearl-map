@@ -5,6 +5,8 @@
             [pearl-map.services.map-engine :as map-engine]
             [pearl-map.utils.colors :as colors]))
 
+;; --- 1. Constants & Configuration ---
+
 (def ^:private paint-style-keys
   [:fill-color :fill-opacity :fill-outline-color :fill-extrusion-color :fill-extrusion-opacity
    :line-color :line-opacity :line-width :text-color :text-opacity :background-color :background-opacity])
@@ -136,6 +138,9 @@
    #{"building" "building-top"}
    #{"landcover" "park_national_park" "park_nature_reserve" "landuse_residential" "landuse" "water" "water_shadow"}))
 
+
+;; --- 2. Data Access & Formatting Helpers ---
+
 (defn- get-current-zoom []
   (map-engine/get-current-zoom))
 
@@ -203,6 +208,9 @@
   (when (some? value)
     (-> value str str/trim)))
 
+
+;; --- 3. State Update Logic ---
+
 (defn update-layer-style
   ([target-layer style-key value]
    (update-layer-style target-layer style-key value nil))
@@ -221,25 +229,27 @@
        (let [updated-value (map-engine/update-zoom-value-pair target-layer (name style-key) current-zoom processed-value prop-type)]
          (re-frame/dispatch [:style-editor/update-and-apply-style style-key updated-value]))))))
 
+
+;; --- 4. UI Rendering - Generic Components ---
+
 (defn- render-control-group [label & children]
   (into [:div {:class "control-group"}
          [:label {:class "control-label"} label]]
         children))
 
-(defn- render-category-selector [{:keys [selected-category]}]
-  [:div {:class "category-selector"}
-   [:label {:class "control-label"} "Layer Category"]
-   [:div {:class "category-selector-items"}
-    (for [[category-key {:keys [label]}] layer-categories]
-      [:label {:key category-key
-               :class (str "category-item" (when (= selected-category category-key) " category-item-selected"))}
-       [:input {:type "radio"
-                :name "layer-category"
-                :value (name category-key)
-                :checked (= selected-category category-key)
-                :on-change #(re-frame/dispatch [:style-editor/set-selected-category category-key])
-                :class "category-item-radio"}]
-       label])]])
+(defn- render-unsupported-message []
+  [:div {:class "unsupported-message"}
+   [:p {:class "unsupported-message-title"}
+    "Style editing is not supported in Raster mode."]
+   [:p {:class "unsupported-message-text"}
+    "Switch to Dark or Light vector styles to edit building styles."]])
+
+(defn- render-layer-not-exist-warning [{:keys [target-layer]}]
+  [:div {:class "layer-warning"}
+   [:p {:class "layer-warning-title"}
+    (str "Layer '" target-layer "' does not exist in current style.")]
+   [:p {:class "layer-warning-text"}
+    "Style editing will not work for this layer. Please make sure you are using a vector style (Dark or Light)."]])
 
 (defn- render-color-input-with-overlay [{:keys [value on-change not-set-label]}]
   (let [formatted-value (format-color-input value)
@@ -254,6 +264,26 @@
      (when (or is-transparent? is-not-set?)
        [:div {:class "color-input-overlay-content"}
         (if is-not-set? (or not-set-label "NOT SET") "TRANSPARENT")])]))
+
+(defn- render-single-opacity-control [{:keys [value on-change default-value label]}]
+  [:div
+   [:input {:type "range"
+            :min "0" :max "1" :step "0.1"
+            :value (or value default-value)
+            :on-change on-change
+            :class "slider-input"}]
+   [:span {:class "single-value-label"}
+    (str "Current: " label)]])
+
+(defn- render-single-width-control [{:keys [value on-change default-value label]}]
+  [:div
+   [:input {:type "range"
+            :min "0" :max "20" :step "0.5"
+            :value (or value default-value)
+            :on-change on-change
+            :class "slider-input"}]
+   [:span {:class "single-value-label"}
+    (str "Current: " label)]])
 
 (defn- render-multi-zoom-color-controls [{:keys [zoom-pairs on-change-fn]}]
   [:div {:class "multi-zoom-controls"}
@@ -281,50 +311,20 @@
                :on-change #(on-change-fn zoom (-> % .-target .-value js/parseFloat))
                :class "slider-input"}]])])
 
-(defn- render-single-opacity-control [{:keys [value on-change default-value label]}]
-  [:div
-   [:input {:type "range"
-            :min "0" :max "1" :step "0.1"
-            :value (or value default-value)
-            :on-change on-change
-            :class "slider-input"}]
-   [:span {:class "single-value-label"}
-    (str "Current: " label)]])
-
-(defn- render-unsupported-message []
-  [:div {:class "unsupported-message"}
-   [:p {:class "unsupported-message-title"}
-    "Style editing is not supported in Raster mode."]
-   [:p {:class "unsupported-message-text"}
-    "Switch to Dark or Light vector styles to edit building styles."]])
-
-(defn- render-layer-not-exist-warning [{:keys [target-layer]}]
-  [:div {:class "layer-warning"}
-   [:p {:class "layer-warning-title"}
-    (str "Layer '" target-layer "' does not exist in current style.")]
-   [:p {:class "layer-warning-text"}
-    "Style editing will not work for this layer. Please make sure you are using a vector style (Dark or Light)."]])
-
-(defn- render-layer-selector [{:keys [target-layer selected-category]}]
-  (let [available-layers (get-layers-for-category selected-category)]
-    [:div {:class "layer-selector"}
-     [:label {:class "control-label"} "Target Layer"]
-     [:select {:key selected-category
-               :value (or target-layer "") ; Use target-layer directly, if nil then use an empty string
-               :on-change #(let [new-layer (-> % .-target .-value)]
-                             (re-frame/dispatch [:style-editor/switch-target-layer new-layer]))
-               :class "styled-select"}
-      (for [layer-id (sort available-layers)] ; Ensure alphabetical sorting
-        [:option {:key layer-id :value layer-id} layer-id])]]))
-
-(defn- render-status-info [{:keys [target-layer editing-style]}]
-  [:div {:class "status-info"}
-   [:p {:class "status-info-layer"}
-    (str "Current Layer: " target-layer)]
-   [:p {:class "status-info-note"}
-    "Only works with Dark or Light vector styles"]
-   [:p {:class "status-info-styles"}
-    "Styles: " (pr-str (select-keys editing-style all-style-keys))]])
+(defn- render-multi-zoom-width-controls [{:keys [zoom-pairs on-change-fn]}]
+  [:div {:class "multi-zoom-controls"}
+   (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
+     [:div {:key (str "width-" zoom "-" index)
+            :class "multi-zoom-item-opacity"}
+      [:div {:class "multi-zoom-opacity-header"}
+       [:span {:class "multi-zoom-opacity-label"} (str "z" zoom)]
+       [:span {:class "multi-zoom-opacity-label"}
+        (str (.toFixed (or value 0) 1) "px")]]
+      [:input {:type "range"
+               :min "0" :max "20" :step "0.5"
+               :value (or value 0)
+               :on-change #(on-change-fn zoom (-> % .-target .-value js/parseFloat))
+               :class "slider-input"}]])])
 
 (defn- render-enum-control [{:keys [label value options on-change]}]
   [render-control-group label
@@ -341,30 +341,8 @@
             :on-change on-change
             :class "styled-select"}]])
 
-(defn- render-multi-zoom-width-controls [{:keys [zoom-pairs on-change-fn]}]
-  [:div {:class "multi-zoom-controls"}
-   (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
-     [:div {:key (str "width-" zoom "-" index)
-            :class "multi-zoom-item-opacity"}
-      [:div {:class "multi-zoom-opacity-header"}
-       [:span {:class "multi-zoom-opacity-label"} (str "z" zoom)]
-       [:span {:class "multi-zoom-opacity-label"}
-        (str (.toFixed (or value 0) 1) "px")]]
-      [:input {:type "range"
-               :min "0" :max "20" :step "0.5"
-               :value (or value 0)
-               :on-change #(on-change-fn zoom (-> % .-target .-value js/parseFloat))
-               :class "slider-input"}]])])
 
-(defn- render-single-width-control [{:keys [value on-change default-value label]}]
-  [:div
-   [:input {:type "range"
-            :min "0" :max "20" :step "0.5"
-            :value (or value default-value)
-            :on-change on-change
-            :class "slider-input"}]
-   [:span {:class "single-value-label"}
-    (str "Current: " label)]])
+;; --- 5. UI Rendering - Control Factories & Props Helpers ---
 
 (defn- single-color-props [style-key {:keys [editing-style on-style-change]}]
   (let [value (get editing-style style-key)
@@ -432,6 +410,9 @@
           {:zoom-pairs zoom-pairs
            :on-change-fn (on-zoom-style-change style-key)}]
          [single-zoom-renderer (single-props-fn style-key control-props)])])))
+
+
+;; --- 6. UI Rendering - Specific Style Controls ---
 
 (def ^:private render-line-color-control
   (create-style-control-renderer
@@ -521,6 +502,45 @@
     :multi-zoom-renderer render-multi-zoom-width-controls ; Reuse width controls for text size
     :single-zoom-renderer render-single-width-control    ; Reuse width control for text size
     :single-props-fn single-text-size-props}))
+
+
+;; --- 7. UI Rendering - Composite Components & Main View ---
+
+(defn- render-category-selector [{:keys [selected-category]}]
+  [:div {:class "category-selector"}
+   [:label {:class "control-label"} "Layer Category"]
+   [:div {:class "category-selector-items"}
+    (for [[category-key {:keys [label]}] layer-categories]
+      [:label {:key category-key
+               :class (str "category-item" (when (= selected-category category-key) " category-item-selected"))}
+       [:input {:type "radio"
+                :name "layer-category"
+                :value (name category-key)
+                :checked (= selected-category category-key)
+                :on-change #(re-frame/dispatch [:style-editor/set-selected-category category-key])
+                :class "category-item-radio"}]
+       label])]])
+
+(defn- render-layer-selector [{:keys [target-layer selected-category]}]
+  (let [available-layers (get-layers-for-category selected-category)]
+    [:div {:class "layer-selector"}
+     [:label {:class "control-label"} "Target Layer"]
+     [:select {:key selected-category
+               :value (or target-layer "") ; Use target-layer directly, if nil then use an empty string
+               :on-change #(let [new-layer (-> % .-target .-value)]
+                             (re-frame/dispatch [:style-editor/switch-target-layer new-layer]))
+               :class "styled-select"}
+      (for [layer-id (sort available-layers)] ; Ensure alphabetical sorting
+        [:option {:key layer-id :value layer-id} layer-id])]]))
+
+(defn- render-status-info [{:keys [target-layer editing-style]}]
+  [:div {:class "status-info"}
+   [:p {:class "status-info-layer"}
+    (str "Current Layer: " target-layer)]
+   [:p {:class "status-info-note"}
+    "Only works with Dark or Light vector styles"]
+   [:p {:class "status-info-styles"}
+    "Styles: " (pr-str (select-keys editing-style all-style-keys))]])
 
 (defn- render-style-controls [{:keys [target-layer editing-style on-style-change]}]
   (let [on-change-event (fn [style-key]
