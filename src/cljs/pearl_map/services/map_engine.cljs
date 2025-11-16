@@ -276,40 +276,56 @@
                     (some? (.-type x)))
     :else false))
 
+(defn- interpolate-stops [stops zoom base]
+  (let [stop-count (count stops)]
+    (when-not (zero? stop-count)
+      (loop [i 0]
+        (cond
+          (>= i stop-count)
+          (second (nth stops (dec stop-count)))
+
+          :else
+          (let [[current-zoom current-value] (nth stops i)]
+            (if (<= zoom current-zoom)
+              (if (zero? i)
+                current-value
+                (let [[prev-zoom prev-value] (nth stops (dec i))
+                      t (/ (- zoom prev-zoom) (- current-zoom prev-zoom))
+                      interpolated-t (if (= base 1)
+                                       t
+                                       (/ (- (js/Math.pow base t) 1)
+                                          (- base 1)))]
+                  (cond
+                    (and (number? prev-value) (number? current-value))
+                    (+ prev-value (* (- current-value prev-value) interpolated-t))
+
+                    (and (string? prev-value) (string? current-value))
+                    (-> (color prev-value) (.mix (color current-value) interpolated-t) .rgb)
+
+                    :else
+                    current-value)))
+              (recur (inc i)))))))))
+
 (defn- evaluate [expr properties]
   (cond
-    (and (.-stops expr) (.-zoom properties))
-    (let [stops-array (.-stops expr)
-          stops (vec (js->clj stops-array))
+    ;; array-style interpolate on zoom
+    (and (array? expr)
+         (>= (count expr) 3)
+         (= "interpolate" (aget expr 0))
+         (array? (aget expr 2))
+         (= "zoom" (aget (aget expr 2) 0)))
+    (let [clj-expr (js->clj expr)
+          stops-data (subvec clj-expr 3)
+          stops (partition 2 stops-data)
           zoom (.-zoom properties)
-          base (or (.-base expr) 1)
-          stop-count (count stops)]
+          base 1] ;; NOTE: Assuming linear interpolation for now
+      (interpolate-stops stops zoom base))
 
-      (if (zero? stop-count)
-        nil
-        (loop [i 0]
-          (cond
-            (>= i stop-count)
-            (second (nth stops (dec stop-count)))
-
-            :else
-            (let [[current-zoom current-value] (nth stops i)]
-              (if (<= zoom current-zoom)
-                (if (zero? i)
-                  current-value
-                  (let [[prev-zoom prev-value] (nth stops (dec i))
-                        t (/ (- zoom prev-zoom) (- current-zoom prev-zoom))
-                        interpolated-t (if (= base 1)
-                                         t
-                                         (/ (- (js/Math.pow base t) 1)
-                                            (- base 1)))]
-                    (cond
-                      (and (number? prev-value) (number? current-value))
-                      (+ prev-value (* (- current-value prev-value) interpolated-t))
-
-                      :else
-                      current-value)))
-                (recur (inc i))))))))
+    (and (.-stops expr) (.-zoom properties))
+    (let [stops (vec (js->clj (.-stops expr)))
+          zoom (.-zoom properties)
+          base (or (.-base expr) 1)]
+      (interpolate-stops stops zoom base))
 
     (.-value expr) (.-value expr)
     (.-default expr) (.-default expr)
@@ -330,8 +346,14 @@
 
       (expression? color-value)
       (let [result (evaluate color-value #js {:zoom current-zoom})]
-        (if (or (string? result) (= result "transparent"))
+        (cond
+          (string? result)
           result
+
+          (and (object? result) (fn? (.-toString result)))
+          (.toString result)
+
+          :else
           (throw (js/Error. (str "Expression evaluated to non-string color: " result)))))
 
       (number? color-value)
