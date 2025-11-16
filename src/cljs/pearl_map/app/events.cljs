@@ -3,7 +3,8 @@
             [pearl-map.app.db :as app-db]
             [pearl-map.features.lighting.events]
             [pearl-map.services.map-engine :as map-engine]
-            [re-frame.db :as rf-db]))
+            [re-frame.db :as rf-db]
+            ["maplibre-gl" :as maplibre]))
 
 (re-frame/reg-event-db
  :initialize-db
@@ -30,8 +31,7 @@
                     (assoc :map/light-properties default-light-props)
                     (assoc :style-editor/editing-style default-building-style)
                     (assoc :style-editor/target-layer nil))]
-     {:db new-db
-      :fx [[:set-map-light default-light-props]]})))
+     {:db new-db})))
 
 (re-frame/reg-event-db
  :register-custom-layer
@@ -53,17 +53,11 @@
  (fn [db _]
    (update db :show-other-components? not)))
 
-(re-frame/reg-fx
- :set-map-light
- (fn [light-props]
-   (when-let [^js map-instance (map-engine/get-map-instance)]
-     (.setLight map-instance (clj->js light-props)))))
-
 (defn init-map []
   (let [map-obj (map-engine/init-map)]
     (when map-obj
       (map-engine/on-map-load
-       (fn [^js map-instance]
+       (fn [^maplibre/Map map-instance]
          (let [light-props (:map/light-properties @rf-db/app-db)]
            (when light-props
              (.setLight map-instance (clj->js light-props))))))
