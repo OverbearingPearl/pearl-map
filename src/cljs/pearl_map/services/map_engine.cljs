@@ -9,57 +9,7 @@
             ["@maplibre/maplibre-gl-style-spec" :as style-spec]
             ["three" :as three]))
 
-(defn expression? [x]
-  (cond
-    (array? x) (and (string? (first x)) (> (count x) 1))
-    (object? x) (or (some? (.-stops x))
-                    (some? (.-property x))
-                    (some? (.-type x)))
-    :else false))
-
-(defn- clj-expression? [x]
-  (or (and (vector? x) (string? (first x)) (> (count x) 1))
-      (and (map? x) (or (:stops x) (:property x) (:type x)))))
-
-(defn- evaluate [expr properties]
-  (cond
-    (and (.-stops expr) (.-zoom properties))
-    (let [stops-array (.-stops expr)
-          stops (vec (js->clj stops-array))
-          zoom (.-zoom properties)
-          base (or (.-base expr) 1)
-          stop-count (count stops)]
-
-      (if (zero? stop-count)
-        nil
-        (loop [i 0]
-          (cond
-            (>= i stop-count)
-            (second (nth stops (dec stop-count)))
-
-            :else
-            (let [[current-zoom current-value] (nth stops i)]
-              (if (<= zoom current-zoom)
-                (if (zero? i)
-                  current-value
-                  (let [[prev-zoom prev-value] (nth stops (dec i))
-                        t (/ (- zoom prev-zoom) (- current-zoom prev-zoom))
-                        interpolated-t (if (= base 1)
-                                         t
-                                         (/ (- (js/Math.pow base t) 1)
-                                            (- base 1)))]
-                    (cond
-                      (and (number? prev-value) (number? current-value))
-                      (+ prev-value (* (- current-value prev-value) interpolated-t))
-
-                      :else
-                      current-value)))
-                (recur (inc i))))))))
-
-    (.-value expr) (.-value expr)
-    (.-default expr) (.-default expr)
-
-    :else expr))
+;; --- Constants & Configuration ---
 
 (def eiffel-tower-coords [2.2945 48.8584])
 
@@ -68,17 +18,27 @@
    :dark-style "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
    :light-style "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"})
 
+
+;; --- State Accessors ---
+
 (defn get-map-instance []
   (:map-instance @db/app-db))
 
 (defn get-custom-layers []
   (:custom-layers @db/app-db))
 
+(defn get-current-zoom []
+  (when-let [^js map-obj (get-map-instance)]
+    (.getZoom map-obj)))
+
+
+;; --- Map Initialization & Lifecycle ---
+
 (defn set-map-instance! [instance]
   (re-frame/dispatch [:set-map-instance instance])
   (set! (.-pearlMapInstance js/window) instance))
 
-(defn create-config [style-url]
+(defn- create-config [style-url]
   (let [base-config {:container "map-container"
                      :center (clj->js eiffel-tower-coords)
                      :zoom 15
@@ -140,72 +100,35 @@
 (defn on-map-load [callback]
   (if-let [^js map-obj (get-map-instance)]
     (if (.-loaded map-obj)
-      (do
-        (re-frame/dispatch [:map-engine/on-map-loaded callback map-obj]))
-      (do
-        (re-frame/dispatch [:map-engine/register-on-load-callback callback])))
-    (do
-      (re-frame/dispatch [:map-engine/register-on-load-callback callback]))))
+      (re-frame/dispatch [:map-engine/on-map-loaded callback map-obj])
+      (re-frame/dispatch [:map-engine/register-on-load-callback callback]))
+    (re-frame/dispatch [:map-engine/register-on-load-callback callback])))
 
 (defn on-map-error [callback]
   (when-let [^js map-obj (get-map-instance)]
     (.on map-obj "error" #(callback %))))
 
-(defn set-paint-property [layer-id property-name value]
+
+;; --- Map View Control ---
+
+(defn set-center [coords]
   (when-let [^js map-obj (get-map-instance)]
-    (when (.getLayer map-obj layer-id)
-      (let [visibility (.getLayoutProperty map-obj layer-id "visibility")]
-        (when (not= visibility "none")
-          (let [
-                processed-value (if (and (string? value) (str/blank? value)) nil value)
-                js-value (cond
-                           (nil? processed-value) nil
-                           (clj-expression? processed-value) (clj->js processed-value)
-                           (#{"fill-extrusion-color" "fill-color" "fill-outline-color" "line-color" "text-color" "background-color"} property-name)
-                           (cond
-                             (= processed-value "transparent") "transparent"
-                             (string? processed-value) (if (or (.startsWith processed-value "#")
-                                                               (.startsWith processed-value "rgb")
-                                                               (.startsWith processed-value "hsl"))
-                                                         processed-value
-                                                         processed-value)
-                             (number? processed-value) (str "#" (.toString (js/parseInt (str processed-value)) 16))
-                             :else processed-value)
-                           :else processed-value)
-                layer-type (.-type (.getLayer map-obj layer-id))]
-            (when (or (not= "fill-extrusion-color" property-name)
-                      (= "fill-extrusion" layer-type))
-              (.setPaintProperty map-obj layer-id property-name js-value))))))))
+    (.setCenter map-obj (clj->js coords))))
 
-(defn set-layout-property [layer-id property-name value]
+(defn set-zoom [zoom-level]
   (when-let [^js map-obj (get-map-instance)]
-    (when (.getLayer map-obj layer-id)
-      (let [
-            processed-value (if (and (string? value) (str/blank? value)) nil value)
-            js-value (clj->js processed-value)]
-        (try
-          (.setLayoutProperty map-obj layer-id property-name js-value)
-          (catch js/Error e
-            (js/console.error (str "map-engine/set-layout-property: Error calling .setLayoutProperty for " layer-id " " property-name) e)))))))
+    (.setZoom map-obj zoom-level)))
 
-(defn get-layout-property [layer-id property-name]
+(defn set-pitch [pitch-angle]
   (when-let [^js map-obj (get-map-instance)]
-    (when (.getLayer map-obj layer-id)
-      (try
-        (.getLayoutProperty map-obj layer-id property-name)
-        (catch js/Error e
-          nil)))))
+    (.setPitch map-obj pitch-angle)))
 
-(defn register-custom-layer [layer-id layer-impl]
-  (re-frame/dispatch [:register-custom-layer layer-id layer-impl]))
+(defn set-bearing [bearing-angle]
+  (when-let [^js map-obj (get-map-instance)]
+    (.setBearing map-obj bearing-angle)))
 
-(defn unregister-custom-layer [layer-id]
-  (re-frame/dispatch [:unregister-custom-layer layer-id]))
 
-(defn remove-custom-layer [layer-id]
-  (let [^js map-obj (get-map-instance)]
-    (.removeLayer map-obj layer-id)
-    (unregister-custom-layer layer-id)))
+;; --- Style & Layer Management ---
 
 (defn- get-current-map-state []
   (let [^js map-obj (get-map-instance)]
@@ -230,6 +153,12 @@
       (when (.getLayer map-obj layer-id)
         (.removeLayer map-obj layer-id)))
     (re-frame/dispatch [:clear-custom-layers])))
+
+(defn register-custom-layer [layer-id layer-impl]
+  (re-frame/dispatch [:register-custom-layer layer-id layer-impl]))
+
+(defn unregister-custom-layer [layer-id]
+  (re-frame/dispatch [:unregister-custom-layer layer-id]))
 
 (defn add-custom-layer
   ([layer-id layer-impl before-id]
@@ -269,6 +198,15 @@
                  (fn []
                    (re-frame/dispatch [:style-editor/reset-to-defaults])))))))))
 
+(defn remove-custom-layer [layer-id]
+  (let [^js map-obj (get-map-instance)]
+    (.removeLayer map-obj layer-id)
+    (unregister-custom-layer layer-id)))
+
+(defn layer-exists? [layer-id]
+  (when-let [^js map-obj (get-map-instance)]
+    (.getLayer map-obj layer-id)))
+
 (defn get-paint-property [layer-id property-name]
   (when-let [^js map-obj (get-map-instance)]
     (when (.getLayer map-obj layer-id)
@@ -280,29 +218,103 @@
           ;; We can safely ignore it and return nil.
           nil)))))
 
-(defn layer-exists? [layer-id]
+(defn get-layout-property [layer-id property-name]
   (when-let [^js map-obj (get-map-instance)]
-    (.getLayer map-obj layer-id)))
+    (when (.getLayer map-obj layer-id)
+      (try
+        (.getLayoutProperty map-obj layer-id property-name)
+        (catch js/Error e
+          nil)))))
 
-(defn get-current-zoom []
-  (when-let [^js map-obj (get-map-instance)]
-    (.getZoom map-obj)))
+(defn- clj-expression? [x]
+  (or (and (vector? x) (string? (first x)) (> (count x) 1))
+      (and (map? x) (or (:stops x) (:property x) (:type x)))))
 
-(defn set-center [coords]
+(defn set-paint-property [layer-id property-name value]
   (when-let [^js map-obj (get-map-instance)]
-    (.setCenter map-obj (clj->js coords))))
+    (when (.getLayer map-obj layer-id)
+      (let [visibility (.getLayoutProperty map-obj layer-id "visibility")]
+        (when (not= visibility "none")
+          (let [processed-value (if (and (string? value) (str/blank? value)) nil value)
+                js-value (cond
+                           (nil? processed-value) nil
+                           (clj-expression? processed-value) (clj->js processed-value)
+                           (#{"fill-extrusion-color" "fill-color" "fill-outline-color" "line-color" "text-color" "background-color"} property-name)
+                           (cond
+                             (= processed-value "transparent") "transparent"
+                             (string? processed-value) (if (or (.startsWith processed-value "#")
+                                                               (.startsWith processed-value "rgb")
+                                                               (.startsWith processed-value "hsl"))
+                                                         processed-value
+                                                         processed-value)
+                             (number? processed-value) (str "#" (.toString (js/parseInt (str processed-value)) 16))
+                             :else processed-value)
+                           :else processed-value)
+                layer-type (.-type (.getLayer map-obj layer-id))]
+            (when (or (not= "fill-extrusion-color" property-name)
+                      (= "fill-extrusion" layer-type))
+              (.setPaintProperty map-obj layer-id property-name js-value))))))))
 
-(defn set-zoom [zoom-level]
+(defn set-layout-property [layer-id property-name value]
   (when-let [^js map-obj (get-map-instance)]
-    (.setZoom map-obj zoom-level)))
+    (when (.getLayer map-obj layer-id)
+      (let [processed-value (if (and (string? value) (str/blank? value)) nil value)
+            js-value (clj->js processed-value)]
+        (try
+          (.setLayoutProperty map-obj layer-id property-name js-value)
+          (catch js/Error e
+            (js/console.error (str "map-engine/set-layout-property: Error calling .setLayoutProperty for " layer-id " " property-name) e)))))))
 
-(defn set-pitch [pitch-angle]
-  (when-let [^js map-obj (get-map-instance)]
-    (.setPitch map-obj pitch-angle)))
 
-(defn set-bearing [bearing-angle]
-  (when-let [^js map-obj (get-map-instance)]
-    (.setBearing map-obj bearing-angle)))
+;; --- Style Expression Handling ---
+
+(defn expression? [x]
+  (cond
+    (array? x) (and (string? (first x)) (> (count x) 1))
+    (object? x) (or (some? (.-stops x))
+                    (some? (.-property x))
+                    (some? (.-type x)))
+    :else false))
+
+(defn- evaluate [expr properties]
+  (cond
+    (and (.-stops expr) (.-zoom properties))
+    (let [stops-array (.-stops expr)
+          stops (vec (js->clj stops-array))
+          zoom (.-zoom properties)
+          base (or (.-base expr) 1)
+          stop-count (count stops)]
+
+      (if (zero? stop-count)
+        nil
+        (loop [i 0]
+          (cond
+            (>= i stop-count)
+            (second (nth stops (dec stop-count)))
+
+            :else
+            (let [[current-zoom current-value] (nth stops i)]
+              (if (<= zoom current-zoom)
+                (if (zero? i)
+                  current-value
+                  (let [[prev-zoom prev-value] (nth stops (dec i))
+                        t (/ (- zoom prev-zoom) (- current-zoom prev-zoom))
+                        interpolated-t (if (= base 1)
+                                         t
+                                         (/ (- (js/Math.pow base t) 1)
+                                            (- base 1)))]
+                    (cond
+                      (and (number? prev-value) (number? current-value))
+                      (+ prev-value (* (- current-value prev-value) interpolated-t))
+
+                      :else
+                      current-value)))
+                (recur (inc i))))))))
+
+    (.-value expr) (.-value expr)
+    (.-default expr) (.-default expr)
+
+    :else expr))
 
 (defn parse-color-expression [color-value current-zoom]
   (when color-value
@@ -471,6 +483,9 @@
                        (set-paint-property layer-id property-name new-value))
                      new-value))]
       result)))
+
+
+;; --- Validation ---
 
 (defn validate-style [style]
   (and (map? style)
