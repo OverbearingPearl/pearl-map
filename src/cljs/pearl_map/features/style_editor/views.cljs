@@ -5,6 +5,7 @@
             [pearl-map.services.map-engine :as map-engine]
             [pearl-map.utils.colors :as colors]))
 
+
 ;; --- 1. Constants & Configuration ---
 
 (def ^:private paint-style-keys
@@ -260,6 +261,41 @@
 
 ;; --- 4. UI Rendering - Generic Components ---
 
+(defn- debounce [f delay]
+  (let [timer (atom nil)]
+    (fn [& args]
+      (when @timer (js/clearTimeout @timer))
+      (reset! timer (js/setTimeout #(apply f args) delay)))))
+
+(defn- stateful-slider
+  "A slider that uses local state for immediate feedback and debounces the on-commit callback."
+  [{:keys [value on-commit default-value min max step prop-type label-fn]}]
+  (reagent/with-let [local-value (reagent/atom value)
+                     debounced-commit (reagent/atom nil)
+                     ;; When props change from outside, update local state.
+                     _ (reagent/track! (fn [] (reset! local-value value)))]
+
+    (let [is-layout? (= prop-type "layout")
+          commit-fn (fn [val] (on-commit val))
+          debounced-fn (or @debounced-commit
+                           (let [dfn (debounce commit-fn 300)]
+                             (reset! debounced-commit dfn)
+                             dfn))
+          handle-change (fn [e]
+                          (let [new-val (-> e .-target .-value js/parseFloat)]
+                            (reset! local-value new-val)
+                            (if is-layout?
+                              (debounced-fn new-val)
+                              (commit-fn new-val))))]
+      [:div
+       [:input {:type "range"
+                :min min :max max :step step
+                :value (or @local-value default-value)
+                :on-change handle-change
+                :class "slider-input"}]
+       [:span {:class "single-value-label"}
+        (label-fn (or @local-value default-value))]])))
+
 (defn- render-control-group [label & children]
   (into [:div {:class "control-group"}
          [:label {:class "control-label"} label]]
@@ -303,15 +339,13 @@
    [:span {:class "single-value-label"}
     (str "Current: " label)]])
 
-(defn- render-single-width-control [{:keys [value on-change default-value label]}]
-  [:div
-   [:input {:type "range"
-            :min "0" :max "20" :step "0.5"
-            :value (or value default-value)
-            :on-change on-change
-            :class "slider-input"}]
-   [:span {:class "single-value-label"}
-    (str "Current: " label)]])
+(defn- render-single-width-control [{:keys [value on-change default-value label prop-type]}]
+  [stateful-slider {:value value
+                    :on-commit on-change
+                    :default-value default-value
+                    :min "0" :max "20" :step "0.5"
+                    :prop-type prop-type
+                    :label-fn (fn [v] (str "Current: " label))}])
 
 (defn- render-multi-zoom-color-controls [{:keys [zoom-pairs on-change-fn active-indices]}]
   [:div {:class "multi-zoom-controls"}
@@ -337,18 +371,17 @@
       [:div {:class "multi-zoom-label"}
        (str "z" zoom " (" (-> (or value 0) (* 100) js/Math.round) "%)")]])])
 
-(defn- render-multi-zoom-width-controls [{:keys [zoom-pairs on-change-fn active-indices]}]
+(defn- render-multi-zoom-width-controls [{:keys [zoom-pairs on-change-fn active-indices prop-type]}]
   [:div {:class "multi-zoom-controls"}
    (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
      [:div {:key (str "width-" zoom "-" index)
             :class (str "multi-zoom-item" (when (contains? active-indices index) " multi-zoom-item-active"))}
-      [:input {:type "range"
-               :min "0" :max "20" :step "0.5"
-               :value (or value 0)
-               :on-change #(on-change-fn zoom (-> % .-target .-value js/parseFloat))
-               :class "slider-input"}]
-      [:div {:class "multi-zoom-label"}
-       (str "z" zoom " (" (.toFixed (or value 0) 1) "px)")]])])
+      [stateful-slider {:value value
+                        :on-commit #(on-change-fn zoom %)
+                        :default-value 0
+                        :min "0" :max "20" :step "0.5"
+                        :prop-type prop-type
+                        :label-fn #(str "z" zoom " (" (.toFixed % 1) "px)")}]])])
 
 (defn- render-enum-control [{:keys [label value options on-change]}]
   [render-control-group label
@@ -434,8 +467,10 @@
          [multi-zoom-renderer
           {:zoom-pairs zoom-pairs
            :active-indices active-indices
-           :on-change-fn (on-zoom-style-change style-key)}]
-         [single-zoom-renderer (single-props-fn style-key control-props)])])))
+           :on-change-fn (on-zoom-style-change style-key)
+           :prop-type prop-type}]
+         [single-zoom-renderer (assoc (single-props-fn style-key control-props)
+                                      :prop-type prop-type)])])))
 
 
 ;; --- 6. UI Rendering - Specific Style Controls ---

@@ -153,7 +153,12 @@ body {
     /* The padding/margin trick is no longer needed and has been removed. */
 }
 
-.single-value-label { font-size: 12px; color: #666; }
+.single-value-label {
+    font-size: 12px;
+    color: #666;
+    display: block;
+    text-align: center;
+}
 
 .unsupported-message { background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 4px; margin-bottom: 15px; }
 .unsupported-message-title { margin: 0; color: #856404; font-size: 12px; font-weight: bold; }
