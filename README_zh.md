@@ -10,7 +10,7 @@
 
 - **3D 地图渲染**: 集成 MapLibre GL 进行 2D/3D 地图渲染，并使用 Three.js 渲染自定义 3D 模型（例如埃菲尔铁塔）。
 - **多种地图样式**: 支持在栅格（OpenStreetMap）和矢量（CartoDB Positron & Dark Matter）样式之间切换。
-- **实时样式编辑器**: 在矢量地图上动态编辑建筑图层的样式（填充颜色、轮廓颜色、不透明度）。
+- **实时样式编辑器**: 功能强大的动态样式编辑器，适用于矢量地图。可实时定制多种图层类别（包括土地、水系、交通、建筑和标签）的各种属性，如颜色、不透明度、宽度、文本字体等。
 - **3D 模型控制**: 调整 3D 模型的缩放和旋转。
 - **光照与阴影控制**: 操作环境光和方向光，以控制场景光照和模型阴影。
 - **组件化 UI**: 基于 Reagent 和 re-frame 构建，拥有简洁、响应式的用户界面。
@@ -52,8 +52,9 @@ pearl-map/
 ├── src/cljs/pearl_map/          # ClojureScript 源代码
 │   ├── app/                     # 核心 re-frame 应用 (db, events, subs, views)
 │   ├── components/              # 可复用 UI 组件
-│   ├── features/                # 功能模块 (地图、样式编辑器、3D 模型)
-│   ├── services/                # 外部服务集成 (地图引擎)
+│   ├── features/                # 功能模块 (建筑, 光照, 3D模型, 样式编辑器)
+│   ├── services/                # 外部服务集成 (地图引擎, 模型加载器)
+│   ├── utils/                   # 辅助函数 (颜色, 几何计算)
 │   └── core.cljs                # 应用入口点
 ├── resources/public/            # 静态资源 (HTML, CSS, 3D 模型)
 ├── deps.edn                     # Clojure 依赖

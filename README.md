@@ -10,7 +10,7 @@ A high-performance, customizable 3D web mapping application built with ClojureSc
 
 - **3D Map Rendering**: Integrates MapLibre GL for 2D/3D map rendering and Three.js for custom 3D model rendering (e.g., the Eiffel Tower).
 - **Multiple Map Styles**: Supports switching between Raster (OpenStreetMap) and Vector (CartoDB Positron & Dark Matter) styles.
-- **Real-time Style Editor**: Dynamically edit building layer styles (fill color, outline color, opacity) on vector maps.
+- **Real-time Style Editor**: A powerful, dynamic style editor for vector maps. Customize a wide range of properties across various layer categories, including land, water, transportation, buildings, and labels. Adjust colors, opacity, widths, text fonts, and more in real-time.
 - **3D Model Controls**: Adjust 3D model scale and rotation.
 - **Lighting and Shadow Control**: Manipulate ambient and directional light to control scene lighting and model shadows.
 - **Component-based UI**: Built with Reagent and re-frame, featuring a clean, responsive UI.
@@ -52,8 +52,9 @@ pearl-map/
 ├── src/cljs/pearl_map/          # ClojureScript source code
 │   ├── app/                     # Core re-frame app (db, events, subs, views)
 │   ├── components/              # Reusable UI components
-│   ├── features/                # Feature modules (map, style editor, 3D models)
-│   ├── services/                # External service integrations (map engine)
+│   ├── features/                # Feature modules (buildings, lighting, 3D models, style editor)
+│   ├── services/                # External service integrations (map engine, model loader)
+│   ├── utils/                   # Utility functions (colors, geometry)
 │   └── core.cljs                # Application entry point
 ├── resources/public/            # Static assets (HTML, CSS, 3D models)
 ├── deps.edn                     # Clojure dependencies
