@@ -12,7 +12,7 @@
    :line-color :line-opacity :line-width :text-color :text-opacity :background-color :background-opacity])
 
 (def ^:private layout-style-keys
-  [:visibility :line-cap :line-join :text-field :text-size :text-transform :text-anchor :symbol-placement])
+  [:visibility :line-cap :line-join :text-field :text-font :text-size :text-transform :text-anchor :symbol-placement])
 
 (def ^:private all-style-keys (vec (concat paint-style-keys layout-style-keys)))
 
@@ -149,6 +149,13 @@
 
 (defn- parse-style-value [style-key current-value current-zoom]
   (cond
+    (= style-key :text-font)
+    (let [cv (js->clj current-value)]
+      (cond
+        (vector? cv) cv
+        (string? cv) [cv]
+        :else cv))
+
     (or (contains? opacity-style-keys style-key)
         (contains? width-style-keys style-key)
         (= style-key :text-size))
@@ -219,6 +226,7 @@
          is-layout? (contains? (set layout-style-keys) style-key)
          prop-type (if is-layout? "layout" "paint")
          processed-value (cond
+                           (= style-key :text-font) value
                            (contains? color-style-keys style-key) (format-color-input value)
                            (or (contains? opacity-style-keys style-key)
                                (contains? width-style-keys style-key)
@@ -496,6 +504,21 @@
     :single-zoom-renderer render-single-opacity-control
     :single-props-fn single-opacity-props}))
 
+(defn- render-text-font-control [control-props]
+  (let [{:keys [editing-style on-style-change]} control-props
+        font-stack (let [fs (get editing-style :text-font)]
+                     (if (coll? fs) fs []))]
+    (let [on-change (on-style-change :text-font)
+          on-change-event (fn [e]
+                            (let [selected-font (-> e .-target .-value)
+                                  other-fonts (remove #(= % selected-font) font-stack)
+                                  new-font-stack (vec (cons selected-font other-fonts))]
+                              (on-change new-font-stack)))]
+      [render-enum-control {:label "Text Font"
+                            :value (first font-stack)
+                            :options (sort font-stack)
+                            :on-change on-change-event}])))
+
 (def ^:private render-text-size-control
   (create-style-control-renderer
    {:style-key :text-size, :label "Text Size", :prop-type "layout"
@@ -588,6 +611,7 @@
          [render-text-input-control {:label "Text Field"
                                      :value (:text-field editing-style)
                                      :on-change (on-change-event :text-field)}]
+         ^{:key "text-font-control"} [render-text-font-control control-props]
          ^{:key "text-size-control"} [render-text-size-control control-props]]
         ^{:key "text-color-control"} [render-text-color-control control-props]
         ^{:key "text-opacity-control"} [render-text-opacity-control control-props]])
