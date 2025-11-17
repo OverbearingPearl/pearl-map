@@ -654,20 +654,7 @@
       (re-frame/dispatch [:style-editor/initialize])
       (let [^js/maplibregl.Map map-inst (map-engine/get-map-instance)]
         (when (and map-inst (.isStyleLoaded map-inst))
-          (re-frame/dispatch [:style-editor/reset-styles-immediately])))
-      ;; Dynamically inject Webkit scrollbar styles
-      (let [style-el (.createElement js/document "style")]
-        (set! (.-textContent style-el)
-              ".style-editor-scrollable::-webkit-scrollbar { width: 6px; height: 6px; }
-               .style-editor-scrollable::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
-         .multi-zoom-item-active { border: 2px solid #007bff; border-radius: 5px; padding: 3px; margin: -3px; }")
-        (.appendChild js/document.head style-el)))
-    :component-will-unmount
-    (fn []
-      ;; Remove dynamically injected styles
-      (doseq [style-el (js/document.querySelectorAll "style")]
-        (when (str/includes? (.-textContent style-el) ".style-editor-scrollable::-webkit-scrollbar")
-          (.remove style-el))))
+          (re-frame/dispatch [:style-editor/reset-styles-immediately]))))
     :reagent-render
     (fn []
       (let [editing-style @(re-frame/subscribe [:style-editor/editing-style])

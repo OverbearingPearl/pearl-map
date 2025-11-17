@@ -133,12 +133,28 @@ body {
     font-size: 10px; line-height: 1;
 }
 
-.multi-zoom-controls { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin; scrollbar-color: #ddd transparent; }
+.multi-zoom-controls {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    padding-top: 2px; /* Add space for top shadow */
+    padding-left: 2px; /* Add space for first child's left shadow */
+    scrollbar-width: thin;
+    scrollbar-color: #ddd transparent;
+}
 .multi-zoom-item { flex: 0 0 120px; position: relative; }
 .multi-zoom-item-opacity { flex: 0 0 120px; margin-bottom: 10px; }
 .multi-zoom-label { font-size: 10px; text-align: center; margin-top: 2px; color: #666; }
 .multi-zoom-opacity-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
 .multi-zoom-opacity-label { font-size: 11px; color: #666; }
+
+.multi-zoom-item-active {
+    background-color: rgba(0, 123, 255, 0.1); /* Subtle blue glow */
+    box-shadow: 0 0 0 2px #007bff; /* Border-like effect without layout shift */
+    border-radius: 5px;
+    /* The padding/margin trick is no longer needed and has been removed. */
+}
 
 .single-value-label { font-size: 12px; color: #666; }
 
