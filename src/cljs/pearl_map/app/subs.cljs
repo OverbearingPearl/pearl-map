@@ -31,3 +31,8 @@
  :map/light-properties
  (fn [db]
    (:map/light-properties db)))
+
+(re-frame/reg-sub
+ :map/zoom
+ (fn [db _]
+   (:map/zoom db)))

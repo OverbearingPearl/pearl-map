@@ -2,6 +2,7 @@
 
 (def default-db
   {:map-instance nil
+   :map/zoom 15
    :map-loading? false
    :current-style-key :raster-style
    :custom-layers {}

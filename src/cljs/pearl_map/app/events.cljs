@@ -53,6 +53,11 @@
  (fn [db _]
    (update db :show-other-components? not)))
 
+(re-frame/reg-event-db
+ :map/set-zoom
+ (fn [db [_ zoom]]
+   (assoc db :map/zoom zoom)))
+
 (defn init-map []
   (let [map-obj (map-engine/init-map)]
     (when map-obj

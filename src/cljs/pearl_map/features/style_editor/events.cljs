@@ -15,7 +15,8 @@
    (let [default-layer (get-in style-editor-views/layer-categories [category :default-layer])
          current-style-key (:current-style-key db)
          current-style-url (get map-engine/style-urls current-style-key)
-         current-styles (style-editor-views/get-layer-styles default-layer current-style-url)]
+         current-zoom (:map/zoom db)
+         current-styles (style-editor-views/get-layer-styles default-layer current-style-url current-zoom)]
      {:db (-> db
               (assoc :style-editor/selected-category category)
               (assoc :style-editor/target-layer default-layer)
@@ -26,7 +27,8 @@
         default-layer (get-in style-editor-views/layer-categories [category :default-layer])
         current-style-key (:current-style-key db)
         current-style-url (get map-engine/style-urls current-style-key)
-        current-styles (style-editor-views/get-layer-styles default-layer current-style-url)]
+        current-zoom (:map/zoom db)
+        current-styles (style-editor-views/get-layer-styles default-layer current-style-url current-zoom)]
     (-> db
         (assoc :style-editor/selected-category category)
         (assoc :style-editor/target-layer default-layer)
@@ -44,7 +46,8 @@
  (fn [{:keys [db]} [_ layer-id]]
    (let [current-style-key (:current-style-key db)
          current-style-url (get map-engine/style-urls current-style-key)
-         current-styles (style-editor-views/get-layer-styles layer-id current-style-url)
+         current-zoom (:map/zoom db)
+         current-styles (style-editor-views/get-layer-styles layer-id current-style-url current-zoom)
          zoom-level (style-editor-views/get-zoom-for-layer layer-id)]
      {:db (-> db
               (assoc :style-editor/target-layer layer-id)
@@ -86,7 +89,8 @@
      (if (or (not map-obj) (= current-style-key :raster-style) (not target-layer))
        ;; Do nothing if raster style or no layer is selected
        {:db db}
-       (let [current-styles (style-editor-views/get-layer-styles target-layer (get map-engine/style-urls current-style-key))]
+       (let [current-zoom (:map/zoom db)
+             current-styles (style-editor-views/get-layer-styles target-layer (get map-engine/style-urls current-style-key) current-zoom)]
          {:db (assoc db :style-editor/editing-style current-styles)})))))
 
 (re-frame/reg-event-fx

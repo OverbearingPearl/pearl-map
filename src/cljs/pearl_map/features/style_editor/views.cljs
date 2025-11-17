@@ -141,9 +141,6 @@
 
 ;; --- 2. Data Access & Formatting Helpers ---
 
-(defn- get-current-zoom []
-  (map-engine/get-current-zoom))
-
 (defn get-category-for-layer [layer-id]
   (->> layer-categories
        (filter (fn [[_ {:keys [layers]}]] (some #(= layer-id %) layers)))
@@ -190,11 +187,10 @@
 
     :else current-value))
 
-(defn get-layer-styles [layer-id current-style]
+(defn get-layer-styles [layer-id current-style current-zoom]
   (if (= current-style raster-style)
     (zipmap all-style-keys (repeat :unsupported))
-    (let [current-zoom (get-current-zoom)
-          map-instance (map-engine/get-map-instance)]
+    (let [map-instance (map-engine/get-map-instance)]
       (if (and map-instance (map-engine/layer-exists? layer-id))
         (->> all-style-keys
              (map (fn [style-key]
@@ -246,7 +242,7 @@
   ([target-layer style-key value]
    (update-layer-style target-layer style-key value nil))
   ([target-layer style-key value zoom]
-   (let [current-zoom (or zoom (get-current-zoom))
+   (let [current-zoom (or zoom @(re-frame/subscribe [:map/zoom]))
          is-layout? (contains? (set layout-style-keys) style-key)
          prop-type (if is-layout? "layout" "paint")
          processed-value (cond
@@ -434,7 +430,7 @@
   "Factory for controls that may have zoom-stops."
   [{:keys [style-key label prop-type multi-zoom-renderer single-zoom-renderer single-props-fn]}]
   (fn [{:keys [target-layer on-zoom-style-change] :as control-props}]
-    (let [current-zoom (get-current-zoom)
+    (let [current-zoom @(re-frame/subscribe [:map/zoom])
           zoom-pairs (map-engine/get-zoom-value-pairs target-layer (name style-key) current-zoom prop-type)
           active-indices (get-active-zoom-indices current-zoom zoom-pairs)]
       [render-control-group label

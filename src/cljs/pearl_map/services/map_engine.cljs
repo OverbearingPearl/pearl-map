@@ -31,10 +31,6 @@
 (defn get-custom-layers []
   (:custom-layers @db/app-db))
 
-(defn get-current-zoom []
-  (when-let [^js map-obj (get-map-instance)]
-    (.getZoom map-obj)))
-
 (defn get-layer-min-zoom [layer-id]
   (when-let [^js map-obj (get-map-instance)]
     (when-let [layer (.getLayer map-obj layer-id)]
@@ -94,6 +90,7 @@
           map-obj (maplibre/Map. map-config)]
       (.on map-obj "styledataloading" (fn [_] (re-frame/dispatch [:set-map-loading? true])))
       (.on map-obj "styledata" (fn [_] (re-frame/dispatch [:set-map-loading? false])))
+      (.on map-obj "move" (fn [] (re-frame/dispatch [:map/set-zoom (.getZoom map-obj)])))
       (.once map-obj "load"
              (fn []
                (re-frame/dispatch [:map-engine/map-loaded map-obj])))
@@ -504,7 +501,7 @@
   (let [current-value (if (= prop-type "layout")
                         (get-layout-property layer-id property-name)
                         (get-paint-property layer-id property-name))
-        current-map-zoom (get-current-zoom)
+        current-map-zoom (:map/zoom @db/app-db)
         clj-value (if (some? current-value) (js->clj current-value :keywordize-keys true) nil)]
     (let [result (cond
                    ;; If current-value is not an expression, create one if the zoom levels differ
