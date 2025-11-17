@@ -156,7 +156,8 @@
     (.flyTo map-obj #js {:center (clj->js coords)
                          :zoom zoom
                          :pitch 45
-                         :bearing 0})))
+                         :bearing 0
+                         :essential true})))
 
 (defn- get-all-points [coords]
   (if (number? (first coords))
@@ -171,14 +172,15 @@
               target-coords (first (get-all-points first-feature-coords))]
           (when target-coords
             (.flyTo map-obj #js {:center (clj->js target-coords)
-                                 :zoom default-zoom})))))))
+                                 :zoom default-zoom
+                                 :essential true})))))))
 
 (defn focus-on-layer [layer-id search-zoom]
   (if (= layer-id model-layer-id)
     (fly-to-location eiffel-tower-coords search-zoom)
     (when-let [^js map-obj (get-map-instance)]
       (let [current-center (.getCenter map-obj)]
-        (.flyTo map-obj #js {:center current-center :zoom search-zoom})
+        (.flyTo map-obj #js {:center current-center :zoom search-zoom :essential true})
         (.once map-obj "moveend"
                (fn []
                  (let [min-z (get-layer-min-zoom layer-id)
