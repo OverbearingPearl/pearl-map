@@ -474,10 +474,11 @@
         (cond
           ;; object-style stops
           (and (map? clj-value) (:stops clj-value))
-          (mapv (fn [[zoom prop-value]]
-                  {:zoom zoom
-                   :value (parse-fn prop-value current-zoom)})
-                (:stops clj-value))
+          (->> (:stops clj-value)
+               (mapv (fn [[zoom prop-value]]
+                       {:zoom zoom
+                        :value (parse-fn prop-value current-zoom)}))
+               (sort-by :zoom >))
 
           ;; array-style interpolate on zoom
           (and (vector? clj-value)
@@ -485,10 +486,11 @@
                (= "interpolate" (first clj-value))
                (= ["zoom"] (get clj-value 2)))
           (let [stops-pairs (partition 2 (subvec clj-value 3))]
-            (mapv (fn [[zoom prop-value]]
-                    {:zoom zoom
-                     :value (parse-fn prop-value current-zoom)})
-                  stops-pairs))
+            (->> stops-pairs
+                 (mapv (fn [[zoom prop-value]]
+                         {:zoom zoom
+                          :value (parse-fn prop-value current-zoom)}))
+                 (sort-by :zoom >)))
 
           :else
           [{:zoom current-zoom
@@ -529,7 +531,7 @@
                                                          [stop-zoom new-value]
                                                          [stop-zoom stop-value]))
                                                      stops)
-                                               (sort-by first (conj stops [zoom new-value])))
+                                               (sort-by first > (conj stops [zoom new-value])))
                          ;; Convert to new expression format
                          header ["interpolate" ["linear"] ["zoom"]]
                          updated-stops (reduce into [] updated-stops-pairs)
@@ -554,7 +556,7 @@
                                                          [stop-zoom new-value]
                                                          [stop-zoom stop-value]))
                                                      stops-pairs)
-                                               (sort-by first (conj stops-pairs [zoom new-value])))
+                                               (sort-by first > (conj stops-pairs [zoom new-value])))
                          updated-stops (reduce into [] updated-stops-pairs)
                          updated-expression (vec (concat header updated-stops))]
                      (if (= prop-type "layout")
