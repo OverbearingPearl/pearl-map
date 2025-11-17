@@ -59,6 +59,15 @@ jobs:
           # Assuming project pages for this setup
           echo "pages_url=https://${{ github.event.repository.owner.login }}.github.io/${{ github.event.repository.name }}/" >> $GITHUB_OUTPUT
 
+      - name: Get latest commit message
+        id: get_commit_message
+        run: |
+          # Using a delimiter to handle multi-line output directly with GITHUB_OUTPUT
+          # This is the recommended way for multi-line outputs in newer GitHub Actions
+          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
+          git log -1 --pretty=%B >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -73,6 +82,12 @@ jobs:
 
             🌐 View on GitHub Pages:
             ${{ steps.get_pages_url.outputs.pages_url }}
+
+            ---
+            **Latest Commit Message:**
+            ```
+            ${{ steps.get_commit_message.outputs.commit_message }}
+            ```
 
             ---
             _This is an automated release._
