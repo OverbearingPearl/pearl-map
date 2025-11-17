@@ -58,14 +58,30 @@
  (fn [db [_ zoom]]
    (assoc db :map/zoom zoom)))
 
+(re-frame/reg-event-db
+ :map/set-prewarming?
+ (fn [db [_ prewarming?]]
+   (assoc db :map/prewarming? prewarming?)))
+
 (defn init-map []
   (let [map-obj (map-engine/init-map)]
     (when map-obj
       (map-engine/on-map-load
        (fn [^maplibre/Map map-instance]
-         (let [light-props (:map/light-properties @rf-db/app-db)]
+         (let [light-props (:map/light-properties @rf-db/app-db)
+               prewarm-key "pearl-map-prewarmed"]
            (when light-props
-             (.setLight map-instance (clj->js light-props))))))
+             (.setLight map-instance (clj->js light-props)))
+           (re-frame/dispatch [:buildings/add-layers])
+           (when-not (.getItem js/localStorage prewarm-key)
+             (re-frame/dispatch [:map/set-prewarming? true])
+             (js/console.log "Prewarming map tiles for the first time...")
+             (map-engine/prewarm-tiles
+              map-engine/eiffel-tower-coords
+              (fn []
+                (re-frame/dispatch [:map/set-prewarming? false])
+                (.setItem js/localStorage prewarm-key "true")
+                (js/console.log "Tile prewarming complete.")))))))
       (map-engine/on-map-error
        (fn [e]
          (js/console.error "Map loading error:" e))))))

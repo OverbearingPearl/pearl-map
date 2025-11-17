@@ -66,7 +66,8 @@
                      :attributionControl true
                      :maxZoom 19
                      :minZoom 0
-                     :maxParallelImageRequests (get-max-parallel-requests)}]
+                     :maxParallelImageRequests (get-max-parallel-requests)
+                     :maxTileCacheSize 1024}]
     (if (= style-url "raster-style")
       (clj->js (assoc base-config
                       :style {:version 8
@@ -200,6 +201,41 @@
        :pitch (.getPitch map-obj)
        :bearing (.getBearing map-obj)
        :layers (get-custom-layers)})))
+
+(defn- prewarm-step [^js map-obj center zooms-to-warm original-camera-options on-complete]
+  (if (empty? zooms-to-warm)
+    (on-complete)
+    (let [zoom (first zooms-to-warm)
+          remaining-zooms (rest zooms-to-warm)]
+      (js/console.log (str "Warming zoom level: " zoom))
+      (.jumpTo map-obj #js {:center (clj->js center) :zoom zoom})
+      (.once map-obj "idle"
+             (fn []
+               (js/setTimeout
+                #(prewarm-step map-obj center remaining-zooms original-camera-options on-complete)
+                0))))))
+
+(defn prewarm-tiles [center on-complete-callback]
+  (when-let [^js map-obj (get-map-instance)]
+    (let [container (.getContainer map-obj)
+          original-visibility (.. container -style -visibility)
+          original-camera-options (get-current-map-state)
+          min-zoom (.getMinZoom map-obj)
+          max-zoom (.getMaxZoom map-obj)
+          zooms-to-warm (range (js/Math.ceil min-zoom) (inc (js/Math.floor max-zoom)))
+          on-complete (fn []
+                        (let [opts #js{}]
+                          (aset opts "center" (:center original-camera-options))
+                          (aset opts "zoom" (:zoom original-camera-options))
+                          (aset opts "pitch" (:pitch original-camera-options))
+                          (aset opts "bearing" (:bearing original-camera-options))
+                          (.jumpTo map-obj opts))
+                        (set! (.. container -style -visibility) original-visibility)
+                        (js/console.log "Prewarming complete. Restored original camera.")
+                        (when on-complete-callback (on-complete-callback)))]
+      (js/console.log (str "Prewarming tiles for center " center " from zoom " min-zoom " to " max-zoom))
+      (set! (.. container -style -visibility) "hidden")
+      (prewarm-step map-obj center zooms-to-warm original-camera-options on-complete))))
 
 (defn- apply-map-state! [^js map-obj state]
   (when map-obj

@@ -4,7 +4,7 @@
   {:map-instance nil
    :map/zoom 15
    :map-loading? false
-   :current-style-key :raster-style
+   :current-style-key :light-style
    :custom-layers {}
    :style-editor/editing-style {:fill-color "#f0f0f0"
                                 :fill-opacity 1.0
@@ -19,4 +19,5 @@
    :models-3d/eiffel-scale 1.0
    :models-3d/eiffel-rotation-z 45.0
    :show-other-components? false
-   :map-engine/on-load-callbacks []})
+   :map-engine/on-load-callbacks []
+   :map/prewarming? false})

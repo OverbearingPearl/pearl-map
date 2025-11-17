@@ -36,3 +36,8 @@
  :map/zoom
  (fn [db _]
    (:map/zoom db)))
+
+(re-frame/reg-sub
+ :map/prewarming?
+ (fn [db]
+   (:map/prewarming? db)))

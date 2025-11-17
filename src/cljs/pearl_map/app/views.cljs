@@ -70,6 +70,10 @@
       ;; Future component can be placed here
       ]]))
 
+(defn- prewarming-overlay []
+  [:div.prewarming-overlay
+   [:div.spinner]])
+
 (defn home-page []
   (reagent/create-class
    {:component-did-mount
@@ -84,6 +88,9 @@
          (re-frame/dispatch [:models-3d/add-eiffel-tower]))))
     :reagent-render
     (fn []
-      [:div
-       [map-container]
-       [map-overlays]])}))
+      (let [prewarming? @(re-frame/subscribe [:map/prewarming?])]
+        [:div {:style {:position "relative" :width "100%" :height "100%"}}
+         [map-container]
+         [map-overlays]
+         (when prewarming?
+           [prewarming-overlay])]))}))
