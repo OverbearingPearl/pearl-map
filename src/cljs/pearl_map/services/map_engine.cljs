@@ -13,6 +13,10 @@
 
 (def eiffel-tower-coords [2.294481 48.858200])
 
+(def model-layer-id "3d-model-eiffel")
+
+(def ^:private default-inspect-zoom 17)
+
 (def style-urls
   {:raster-style "raster-style"
    :dark-style "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
@@ -145,40 +149,25 @@
     [coords]
     (mapcat get-all-points coords)))
 
-(defn- calculate-bounds-from-coords [coords]
-  (let [points (get-all-points coords)]
-    (when (seq points)
-      (let [lngs (map first points)
-            lats (map second points)]
-        [[(apply min lngs) (apply min lats)]
-         [(apply max lngs) (apply max lats)]]))))
-
 (defn- fly-to-first-visible-feature [layer-id default-zoom]
   (when-let [^js map-obj (get-map-instance)]
     (let [features (.queryRenderedFeatures map-obj #js {:layers #js [layer-id]})]
-      (when-let [feature (first features)]
-        (let [geom (.-geometry feature)
-              geom-type (.-type geom)
-              coords (js->clj (.-coordinates geom))]
-          (cond
-            (= geom-type "Point")
-            (.flyTo map-obj #js {:center (clj->js coords)
-                                 :zoom default-zoom})
-
-            (or (= geom-type "Polygon") (= geom-type "LineString")
-                (= geom-type "MultiPolygon") (= geom-type "MultiLineString"))
-            (when-let [bounds (calculate-bounds-from-coords coords)]
-              (.fitBounds map-obj (clj->js bounds) #js {:padding 200 :maxZoom default-zoom}))
-
-            :else nil))))))
+      (when (seq features)
+        (let [first-feature-coords (-> (first features) .-geometry .-coordinates js->clj)
+              target-coords (first (get-all-points first-feature-coords))]
+          (when target-coords
+            (.flyTo map-obj #js {:center (clj->js target-coords)
+                                 :zoom default-zoom})))))))
 
 (defn focus-on-layer [layer-id zoom-level]
-  (when-let [^js map-obj (get-map-instance)]
-    (let [current-center (.getCenter map-obj)]
-      (.flyTo map-obj #js {:center current-center :zoom zoom-level})
-      (.once map-obj "moveend"
-             (fn []
-               (fly-to-first-visible-feature layer-id zoom-level))))))
+  (if (= layer-id model-layer-id)
+    (fly-to-location eiffel-tower-coords zoom-level)
+    (when-let [^js map-obj (get-map-instance)]
+      (let [current-center (.getCenter map-obj)]
+        (.flyTo map-obj #js {:center current-center :zoom zoom-level})
+        (.once map-obj "moveend"
+               (fn []
+                 (fly-to-first-visible-feature layer-id default-inspect-zoom)))))))
 
 
 ;; --- Style & Layer Management ---
