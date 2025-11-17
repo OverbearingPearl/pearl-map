@@ -72,7 +72,8 @@
 
 (defn- prewarming-overlay []
   [:div.prewarming-overlay
-   [:div.spinner]])
+   [:div.spinner]
+   [:div.prewarming-text "First-time setup: Caching map data for a smoother experience. Please wait..."]])
 
 (defn home-page []
   (reagent/create-class
