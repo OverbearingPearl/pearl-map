@@ -38,6 +38,11 @@
   (re-frame/dispatch [:set-map-instance instance])
   (set! (.-pearlMapInstance js/window) instance))
 
+(defn- get-max-parallel-requests []
+  (if (str/includes? (.. js/window -navigator -userAgent) "Firefox")
+    8
+    16))
+
 (defn- create-config [style-url]
   (let [base-config {:container "map-container"
                      :center (clj->js eiffel-tower-coords)
@@ -46,7 +51,8 @@
                      :bearing 0
                      :attributionControl true
                      :maxZoom 19
-                     :minZoom 0}]
+                     :minZoom 0
+                     :maxParallelImageRequests (get-max-parallel-requests)}]
     (if (= style-url "raster-style")
       (clj->js (assoc base-config
                       :style {:version 8
