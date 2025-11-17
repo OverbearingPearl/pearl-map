@@ -44,10 +44,18 @@
  (fn [{:keys [db]} [_ layer-id]]
    (let [current-style-key (:current-style-key db)
          current-style-url (get map-engine/style-urls current-style-key)
-         current-styles (style-editor-views/get-layer-styles layer-id current-style-url)]
+         current-styles (style-editor-views/get-layer-styles layer-id current-style-url)
+         zoom-level (style-editor-views/get-zoom-for-layer layer-id)]
      {:db (-> db
               (assoc :style-editor/target-layer layer-id)
-              (assoc :style-editor/editing-style current-styles))})))
+              (assoc :style-editor/editing-style current-styles))
+      :dispatch [:style-editor/fly-to-feature layer-id zoom-level]})))
+
+(re-frame/reg-event-fx
+ :style-editor/fly-to-feature
+ (fn [_ [_ layer-id zoom-level]]
+   (map-engine/focus-on-layer layer-id zoom-level)
+   {}))
 
 (re-frame/reg-event-fx
  :style-editor/update-and-apply-style

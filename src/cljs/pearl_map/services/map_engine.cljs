@@ -127,6 +127,46 @@
   (when-let [^js map-obj (get-map-instance)]
     (.setBearing map-obj bearing-angle)))
 
+(defn- get-all-points [coords]
+  (if (number? (first coords))
+    [coords]
+    (mapcat get-all-points coords)))
+
+(defn- calculate-bounds-from-coords [coords]
+  (let [points (get-all-points coords)]
+    (when (seq points)
+      (let [lngs (map first points)
+            lats (map second points)]
+        [[(apply min lngs) (apply min lats)]
+         [(apply max lngs) (apply max lats)]]))))
+
+(defn- fly-to-first-visible-feature [layer-id default-zoom]
+  (when-let [^js map-obj (get-map-instance)]
+    (let [features (.queryRenderedFeatures map-obj #js {:layers #js [layer-id]})]
+      (when-let [feature (first features)]
+        (let [geom (.-geometry feature)
+              geom-type (.-type geom)
+              coords (js->clj (.-coordinates geom))]
+          (cond
+            (= geom-type "Point")
+            (.flyTo map-obj #js {:center (clj->js coords)
+                                 :zoom default-zoom})
+
+            (or (= geom-type "Polygon") (= geom-type "LineString")
+                (= geom-type "MultiPolygon") (= geom-type "MultiLineString"))
+            (when-let [bounds (calculate-bounds-from-coords coords)]
+              (.fitBounds map-obj (clj->js bounds) #js {:padding 200 :maxZoom default-zoom}))
+
+            :else nil))))))
+
+(defn focus-on-layer [layer-id zoom-level]
+  (when-let [^js map-obj (get-map-instance)]
+    (let [current-center (.getCenter map-obj)]
+      (.flyTo map-obj #js {:center current-center :zoom zoom-level})
+      (.once map-obj "moveend"
+             (fn []
+               (fly-to-first-visible-feature layer-id zoom-level))))))
+
 
 ;; --- Style & Layer Management ---
 
