@@ -328,31 +328,27 @@
   [:div {:class "multi-zoom-controls"}
    (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
      [:div {:key (str "opacity-" zoom "-" index)
-            :class (str "multi-zoom-item-opacity" (when (contains? active-indices index) " multi-zoom-item-active"))}
-      [:div {:class "multi-zoom-opacity-header"}
-       [:span {:class "multi-zoom-opacity-label"} (str "z" zoom)]
-       [:span {:class "multi-zoom-opacity-label"}
-        (str (-> (or value 0) (* 100) js/Math.round) "%")]]
+            :class (str "multi-zoom-item" (when (contains? active-indices index) " multi-zoom-item-active"))}
       [:input {:type "range"
                :min "0" :max "1" :step "0.1"
                :value (or value 0)
                :on-change #(on-change-fn zoom (-> % .-target .-value js/parseFloat))
-               :class "slider-input"}]])])
+               :class "slider-input"}]
+      [:div {:class "multi-zoom-label"}
+       (str "z" zoom " (" (-> (or value 0) (* 100) js/Math.round) "%)")]])])
 
 (defn- render-multi-zoom-width-controls [{:keys [zoom-pairs on-change-fn active-indices]}]
   [:div {:class "multi-zoom-controls"}
    (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
      [:div {:key (str "width-" zoom "-" index)
-            :class (str "multi-zoom-item-opacity" (when (contains? active-indices index) " multi-zoom-item-active"))}
-      [:div {:class "multi-zoom-opacity-header"}
-       [:span {:class "multi-zoom-opacity-label"} (str "z" zoom)]
-       [:span {:class "multi-zoom-opacity-label"}
-        (str (.toFixed (or value 0) 1) "px")]]
+            :class (str "multi-zoom-item" (when (contains? active-indices index) " multi-zoom-item-active"))}
       [:input {:type "range"
                :min "0" :max "20" :step "0.5"
                :value (or value 0)
                :on-change #(on-change-fn zoom (-> % .-target .-value js/parseFloat))
-               :class "slider-input"}]])])
+               :class "slider-input"}]
+      [:div {:class "multi-zoom-label"}
+       (str "z" zoom " (" (.toFixed (or value 0) 1) "px)")]])])
 
 (defn- render-enum-control [{:keys [label value options on-change]}]
   [render-control-group label
