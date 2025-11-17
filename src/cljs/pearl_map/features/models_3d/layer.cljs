@@ -28,7 +28,7 @@
       (-> .-position (.copy (maplibre-light-pos->three-direction (:position light-props))))
       (set! -intensity (:intensity light-props)))))
 
-(def eiffel-tower-coords [2.2945 48.8584])
+(def eiffel-tower-coords [2.294481 48.858200])
 (def model-altitude 0)
 (def model-rotate [(/ js/Math.PI 2) 0 0])
 (def eiffel-tower-real-height 330) ;; Real height of Eiffel Tower in meters
@@ -90,6 +90,8 @@
       (set! -right frustum-half-size)
       (set! -top frustum-half-size)
       (set! -bottom (- frustum-half-size))
+      (set! -near 0.1)
+      (set! -far 1000)
       (.updateProjectionMatrix))))
 
 (defn- enable-model-shadows [^js model-scene]

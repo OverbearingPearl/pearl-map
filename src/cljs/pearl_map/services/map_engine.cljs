@@ -11,7 +11,7 @@
 
 ;; --- Constants & Configuration ---
 
-(def eiffel-tower-coords [2.2945 48.8584])
+(def eiffel-tower-coords [2.294481 48.858200])
 
 (def style-urls
   {:raster-style "raster-style"
@@ -337,7 +337,7 @@
               (if (zero? i)
                 current-value
                 (let [[prev-zoom prev-value] (nth stops (dec i))
-                      t (/ (- zoom prev-zoom) (- current-zoom prev-zoom))
+                      t (/ (- zoom prev-zoom) (- current-zoom prev-value))
                       interpolated-t (if (= base 1)
                                        t
                                        (/ (- (js/Math.pow base t) 1)
