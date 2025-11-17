@@ -35,6 +35,20 @@
   (when-let [^js map-obj (get-map-instance)]
     (.getZoom map-obj)))
 
+(defn get-layer-min-zoom [layer-id]
+  (when-let [^js map-obj (get-map-instance)]
+    (when-let [layer (.getLayer map-obj layer-id)]
+      (let [min-zoom (.-minzoom layer)]
+        (when (number? min-zoom)
+          min-zoom)))))
+
+(defn get-layer-max-zoom [layer-id]
+  (when-let [^js map-obj (get-map-instance)]
+    (when-let [layer (.getLayer map-obj layer-id)]
+      (let [max-zoom (.-maxzoom layer)]
+        (when (number? max-zoom)
+          max-zoom)))))
+
 
 ;; --- Map Initialization & Lifecycle ---
 
@@ -159,15 +173,22 @@
             (.flyTo map-obj #js {:center (clj->js target-coords)
                                  :zoom default-zoom})))))))
 
-(defn focus-on-layer [layer-id zoom-level]
+(defn focus-on-layer [layer-id search-zoom]
   (if (= layer-id model-layer-id)
-    (fly-to-location eiffel-tower-coords zoom-level)
+    (fly-to-location eiffel-tower-coords search-zoom)
     (when-let [^js map-obj (get-map-instance)]
       (let [current-center (.getCenter map-obj)]
-        (.flyTo map-obj #js {:center current-center :zoom zoom-level})
+        (.flyTo map-obj #js {:center current-center :zoom search-zoom})
         (.once map-obj "moveend"
                (fn []
-                 (fly-to-first-visible-feature layer-id default-inspect-zoom)))))))
+                 (let [min-z (get-layer-min-zoom layer-id)
+                       max-z (get-layer-max-zoom layer-id)
+                       ;; Clamp the inspect zoom to be within the layer's visible range.
+                       ;; Subtract a small epsilon from max-z because maxzoom is exclusive.
+                       final-inspect-zoom (-> default-inspect-zoom
+                                              (min (- (or max-z 22.1) 0.1)) ;; Cannot exceed maxzoom
+                                              (max (or min-z 0)))] ;; Must be at least minzoom
+                   (fly-to-first-visible-feature layer-id final-inspect-zoom))))))))
 
 
 ;; --- Style & Layer Management ---

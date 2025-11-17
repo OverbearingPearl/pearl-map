@@ -35,7 +35,6 @@
   {:transportation
    {:label "Transportation"
     :default-layer "road_pri_fill_noramp"
-    :zoom-level 15
     :layers [;; Aeroway
              "aeroway-runway" "aeroway-taxiway"
              ;; Tunnels
@@ -71,12 +70,10 @@
    :boundaries
    {:label "Background & Boundaries"
     :default-layer "background"
-    :zoom-level 8
     :layers ["background" "boundary_county" "boundary_state" "boundary_country_outline" "boundary_country_inner"]}
    :natural
    {:label "Natural Features"
     :default-layer "landcover"
-    :zoom-level 12
     :layers ["landcover"
              "park_national_park"
              "park_nature_reserve"
@@ -88,12 +85,10 @@
    :buildings
    {:label "Buildings"
     :default-layer "extruded-building"
-    :zoom-level 16
     :layers ["building" "building-top" "extruded-building" "extruded-building-top"]}
    :labels
    {:label "Labels"
     :default-layer "poi_park"
-    :zoom-level 17
     :layers [;; Water labels
              "waterway_label"
              "watername_ocean"
@@ -155,8 +150,7 @@
        ffirst))
 
 (defn get-zoom-for-layer [layer-id]
-  (when-let [category (get-category-for-layer layer-id)]
-    (get-in layer-categories [category :zoom-level] 15)))
+  (or (map-engine/get-layer-min-zoom layer-id) 15))
 
 (defn get-layers-for-category [category-key]
   (get-in layer-categories [category-key :layers]))
