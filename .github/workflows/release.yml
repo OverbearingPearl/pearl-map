@@ -64,6 +64,7 @@ jobs:
         with:
           files: "${{ steps.package_name.outputs.name }}.zip"
           fail_on_unmatched_files: true
+          token: ${{ secrets.GITHUB_TOKEN }}
           body: |
             🎉 Release ${{ github.ref_name }} is now available!
 
