@@ -155,6 +155,22 @@
 (defn get-layers-for-category [category-key]
   (get-in layer-categories [category-key :layers]))
 
+(defn- get-active-zoom-indices [current-zoom zoom-pairs]
+  (when (seq zoom-pairs)
+    (if (<= (count zoom-pairs) 1)
+      #{0} ;; If only one stop, it's always active
+      (let [;; Find the index of the first stop that is less than or equal to the current zoom.
+            ;; This is the 'lower bound' of the active interpolation range.
+            active-index (first (keep-indexed (fn [idx {:keys [zoom]}]
+                                                (when (<= zoom current-zoom) idx))
+                                              zoom-pairs))]
+        (if (nil? active-index)
+          ;; If current-zoom is smaller than all stops (e.g., zoom 5, stops are 17, 15, 10),
+          ;; the last stop (smallest zoom) is considered active.
+          #{(dec (count zoom-pairs))}
+          ;; Otherwise, the found index is the active one.
+          #{active-index})))))
+
 (defn- parse-style-value [style-key current-value current-zoom]
   (cond
     (= style-key :text-font)
@@ -301,22 +317,22 @@
    [:span {:class "single-value-label"}
     (str "Current: " label)]])
 
-(defn- render-multi-zoom-color-controls [{:keys [zoom-pairs on-change-fn]}]
+(defn- render-multi-zoom-color-controls [{:keys [zoom-pairs on-change-fn active-indices]}]
   [:div {:class "multi-zoom-controls"}
    (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
      [:div {:key (str "color-" zoom "-" index)
-            :class "multi-zoom-item"}
+            :class (str "multi-zoom-item" (when (contains? active-indices index) " multi-zoom-item-active"))}
       [render-color-input-with-overlay
        {:value value
         :on-change #(on-change-fn zoom (-> % .-target .-value))}]
       [:div {:class "multi-zoom-label"}
        (str "z" zoom)]])])
 
-(defn- render-multi-zoom-opacity-controls [{:keys [zoom-pairs on-change-fn]}]
+(defn- render-multi-zoom-opacity-controls [{:keys [zoom-pairs on-change-fn active-indices]}]
   [:div {:class "multi-zoom-controls"}
    (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
      [:div {:key (str "opacity-" zoom "-" index)
-            :class "multi-zoom-item-opacity"}
+            :class (str "multi-zoom-item-opacity" (when (contains? active-indices index) " multi-zoom-item-active"))}
       [:div {:class "multi-zoom-opacity-header"}
        [:span {:class "multi-zoom-opacity-label"} (str "z" zoom)]
        [:span {:class "multi-zoom-opacity-label"}
@@ -327,11 +343,11 @@
                :on-change #(on-change-fn zoom (-> % .-target .-value js/parseFloat))
                :class "slider-input"}]])])
 
-(defn- render-multi-zoom-width-controls [{:keys [zoom-pairs on-change-fn]}]
+(defn- render-multi-zoom-width-controls [{:keys [zoom-pairs on-change-fn active-indices]}]
   [:div {:class "multi-zoom-controls"}
    (for [[index {:keys [zoom value]}] (map-indexed vector zoom-pairs)]
      [:div {:key (str "width-" zoom "-" index)
-            :class "multi-zoom-item-opacity"}
+            :class (str "multi-zoom-item-opacity" (when (contains? active-indices index) " multi-zoom-item-active"))}
       [:div {:class "multi-zoom-opacity-header"}
        [:span {:class "multi-zoom-opacity-label"} (str "z" zoom)]
        [:span {:class "multi-zoom-opacity-label"}
@@ -419,11 +435,13 @@
   [{:keys [style-key label prop-type multi-zoom-renderer single-zoom-renderer single-props-fn]}]
   (fn [{:keys [target-layer on-zoom-style-change] :as control-props}]
     (let [current-zoom (get-current-zoom)
-          zoom-pairs (map-engine/get-zoom-value-pairs target-layer (name style-key) current-zoom prop-type)]
+          zoom-pairs (map-engine/get-zoom-value-pairs target-layer (name style-key) current-zoom prop-type)
+          active-indices (get-active-zoom-indices current-zoom zoom-pairs)]
       [render-control-group label
        (if (> (count zoom-pairs) 1)
          [multi-zoom-renderer
           {:zoom-pairs zoom-pairs
+           :active-indices active-indices
            :on-change-fn (on-zoom-style-change style-key)}]
          [single-zoom-renderer (single-props-fn style-key control-props)])])))
 
@@ -641,7 +659,8 @@
       (let [style-el (.createElement js/document "style")]
         (set! (.-textContent style-el)
               ".style-editor-scrollable::-webkit-scrollbar { width: 6px; height: 6px; }
-               .style-editor-scrollable::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }")
+               .style-editor-scrollable::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+         .multi-zoom-item-active { border: 2px solid #007bff; border-radius: 5px; padding: 3px; margin: -3px; }")
         (.appendChild js/document.head style-el)))
     :component-will-unmount
     (fn []
