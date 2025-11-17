@@ -127,6 +127,13 @@
   (when-let [^js map-obj (get-map-instance)]
     (.setBearing map-obj bearing-angle)))
 
+(defn fly-to-location [coords zoom]
+  (when-let [^js map-obj (get-map-instance)]
+    (.flyTo map-obj #js {:center (clj->js coords)
+                         :zoom zoom
+                         :pitch 45
+                         :bearing 0})))
+
 (defn- get-all-points [coords]
   (if (number? (first coords))
     [coords]

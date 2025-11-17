@@ -39,3 +39,9 @@
    (map-engine/remove-custom-layer "3d-model-eiffel")
    (model-layer/cleanup-state)
    {:db (assoc db :models-3d/eiffel-loaded? false)}))
+
+(re-frame/reg-event-fx
+ :models-3d/fly-to-eiffel-tower
+ (fn [_ _]
+   (map-engine/fly-to-location model-layer/eiffel-tower-coords 16)
+   {}))

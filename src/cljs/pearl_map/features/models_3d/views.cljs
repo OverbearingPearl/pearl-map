@@ -34,11 +34,16 @@
                :class "model-controls-value"}
          (str (-> eiffel-rotation-z js/Number (.toFixed 0)) "°")]
 
-        [ui-buttons/secondary-button
-         {:key "remove-button"
-          :class "model-controls-remove-button"
-          :on-click #(re-frame/dispatch [:models-3d/remove-eiffel-tower])}
-         "Remove Eiffel Tower"]]
+        [:div {:class "model-controls-buttons" :style {:margin-top "1rem" :display "flex" :flex-direction "column" :gap "0.5rem"}}
+         [ui-buttons/secondary-button
+          {:key "fly-to-button"
+           :on-click #(re-frame/dispatch [:models-3d/fly-to-eiffel-tower])}
+          "Fly to Eiffel Tower"]
+         [ui-buttons/secondary-button
+          {:key "remove-button"
+           :class "model-controls-remove-button"
+           :on-click #(re-frame/dispatch [:models-3d/remove-eiffel-tower])}
+          "Remove Eiffel Tower"]]]
        [ui-buttons/primary-button
         {:key "load-button" :on-click #(re-frame/dispatch [:models-3d/add-eiffel-tower])}
         "Load & Display Eiffel Tower"])]))
