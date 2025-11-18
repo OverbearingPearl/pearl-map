@@ -23,6 +23,19 @@
    :dark-style "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
    :light-style "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"})
 
+(def ^:private raster-style-object
+  {:version 8
+   :name "OSM Bright"
+   :sources {:osm {:type "raster"
+                   :tiles ["https://tile.openstreetmap.de/{z}/{x}/{y}.png"]
+                   :tileSize 256
+                   :attribution "© OpenStreetMap contributors"}}
+   :layers [{:id "osm-tiles"
+             :type "raster"
+             :source "osm"
+             :minzoom 0
+             :maxzoom 19}]})
+
 
 ;; --- State Accessors ---
 
@@ -70,6 +83,13 @@
     (js/console.log (str "Calculated maxTileCacheSize: " cache-size " (based on DPR: " dpr ")"))
     cache-size)) ; Base cache size (1024) scaled by DPR
 
+(defn- transform-request-for-cache
+  "Applies force-cache to font requests to ensure they are cached by the browser."
+  [url resource-type]
+  (if (= resource-type "Glyphs")
+    #js {:url url :cache "force-cache"}
+    #js {:url url}))
+
 (defn- create-config
   "Creates the MapLibre GL JS configuration object."
   [style-url]
@@ -82,20 +102,10 @@
                      :maxZoom 19
                      :minZoom 0
                      :maxParallelImageRequests (get-max-parallel-requests)
-                     :maxTileCacheSize (get-max-tile-cache-size)}]
+                     :maxTileCacheSize (get-max-tile-cache-size)
+                     :transformRequest transform-request-for-cache}]
     (if (= style-url "raster-style")
-      (clj->js (assoc base-config
-                      :style {:version 8
-                              :name "OSM Bright"
-                              :sources {:osm {:type "raster"
-                                              :tiles ["https://tile.openstreetmap.de/{z}/{x}/{y}.png"]
-                                              :tileSize 256
-                                              :attribution "© OpenStreetMap contributors"}}
-                              :layers [{:id "osm-tiles"
-                                        :type "raster"
-                                        :source "osm"
-                                        :minzoom 0
-                                        :maxzoom 19}]}))
+      (clj->js (assoc base-config :style raster-style-object))
       (clj->js (assoc base-config :style style-url)))))
 
 (defn init-map []
@@ -285,29 +295,25 @@
     (add-custom-layer map-obj layer-id layer-impl nil)))
 
 (defn change-map-style [style-url]
-  (let [^js map-obj (get-map-instance)
-        current-state (get-current-map-state)
-        style-key (->> style-urls
-                       (filter (fn [[_ v]] (= v style-url)))
-                       ffirst)]
-    (re-frame/dispatch-sync [:set-map-loading? true])
-    (when map-obj (.remove map-obj))
-    (re-frame/dispatch-sync [:set-current-style-key style-key])
-    (re-frame/dispatch-sync [:set-map-instance nil])
-    (set! (.-pearlMapInstance js/window) nil)
-    (re-frame/dispatch-sync [:clear-custom-layers])
-    (reagent/next-tick
-     (fn []
-       (init-map)
-       (on-map-load
-        (fn [^maplibre/Map new-map-obj]
-          (apply-map-state! new-map-obj current-state)
-          (reapply-custom-layers! new-map-obj (:layers current-state))
-          (when (not= style-url "raster-style")
-            (re-frame/dispatch [:buildings/add-layers]))
-          (.once new-map-obj "idle"
-                 (fn []
-                   (re-frame/dispatch [:style-editor/reset-to-defaults])))))))))
+  (when-let [^js map-obj (get-map-instance)]
+    (let [style-key (->> style-urls
+                         (filter (fn [[_ v]] (= v style-url)))
+                         ffirst)
+          custom-layers (get-custom-layers)
+          new-style (if (= style-url "raster-style")
+                      (clj->js raster-style-object)
+                      style-url)]
+      (re-frame/dispatch-sync [:set-map-loading? true])
+      (re-frame/dispatch-sync [:set-current-style-key style-key])
+
+      (.setStyle map-obj new-style)
+
+      (.once map-obj "styledata"
+             (fn []
+               (reapply-custom-layers! map-obj custom-layers)
+               (when (not= style-url "raster-style")
+                 (re-frame/dispatch [:buildings/add-layers]))
+               (re-frame/dispatch [:style-editor/reset-to-defaults]))))))
 
 (defn remove-custom-layer [layer-id]
   (let [^js map-obj (get-map-instance)]
