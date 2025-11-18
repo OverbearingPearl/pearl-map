@@ -209,11 +209,10 @@
           remaining-zooms (rest zooms-to-warm)]
       (js/console.log (str "Warming zoom level: " zoom))
       (.jumpTo map-obj #js {:center (clj->js center) :zoom zoom})
+      ;; Use .once "idle" to ensure the map has finished rendering before proceeding
       (.once map-obj "idle"
              (fn []
-               (js/setTimeout
-                #(prewarm-step map-obj center remaining-zooms original-camera-options on-complete)
-                0))))))
+               (prewarm-step map-obj center remaining-zooms original-camera-options on-complete))))))
 
 (defn prewarm-tiles [center on-complete-callback]
   (when-let [^js map-obj (get-map-instance)]
