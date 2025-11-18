@@ -5,7 +5,8 @@
             [pearl-map.utils.geometry :as geom]
             [clojure.string :as str]
             ["maplibre-gl" :as maplibre]
-            ["color" :as color]
+            ["color" :as color] ; For color manipulation in expressions
+            [goog.object :as gobj] ; For accessing window.devicePixelRatio
             ["@maplibre/maplibre-gl-style-spec" :as style-spec]
             ["three" :as three]))
 
@@ -52,12 +53,26 @@
   (re-frame/dispatch [:set-map-instance instance])
   (set! (.-pearlMapInstance js/window) instance))
 
-(defn- get-max-parallel-requests []
-  (if (str/includes? (.. js/window -navigator -userAgent) "Firefox")
+(defn- get-max-parallel-requests
+  "Determines the maximum number of parallel image requests based on the user agent.
+   Firefox has a lower limit (8) compared to other browsers (16) to prevent issues."
+  []
+  (if (str/includes? (str (gobj/get js/window "navigator" "userAgent")) "Firefox")
     8
     16))
 
-(defn- create-config [style-url]
+(defn- get-max-tile-cache-size
+  "Calculates the maximum tile cache size based on the device pixel ratio (DPR).
+   A higher DPR suggests a higher resolution screen, potentially benefiting from a larger cache."
+  []
+  (let [dpr (or (gobj/get js/window "devicePixelRatio") 1)
+        cache-size (js/Math.round (* 1024 dpr))]
+    (js/console.log (str "Calculated maxTileCacheSize: " cache-size " (based on DPR: " dpr ")"))
+    cache-size)) ; Base cache size (1024) scaled by DPR
+
+(defn- create-config
+  "Creates the MapLibre GL JS configuration object."
+  [style-url]
   (let [base-config {:container "map-container"
                      :center (clj->js eiffel-tower-coords)
                      :zoom 15
@@ -67,7 +82,7 @@
                      :maxZoom 19
                      :minZoom 0
                      :maxParallelImageRequests (get-max-parallel-requests)
-                     :maxTileCacheSize 1024}]
+                     :maxTileCacheSize (get-max-tile-cache-size)}]
     (if (= style-url "raster-style")
       (clj->js (assoc base-config
                       :style {:version 8
@@ -208,10 +223,9 @@
     (let [zoom (first zooms-to-warm)
           remaining-zooms (rest zooms-to-warm)]
       (js/console.log (str "Warming zoom level: " zoom))
-      (.jumpTo map-obj #js {:center (clj->js center) :zoom zoom})
-      ;; Use .once "idle" to ensure the map has finished rendering before proceeding
+      (.jumpTo map-obj #js {:center (clj->js center) :zoom zoom}) ; Jump to the current zoom level
       (.once map-obj "idle"
-             (fn []
+             (fn [] ; Once map is idle (rendered), proceed to the next zoom level
                (prewarm-step map-obj center remaining-zooms original-camera-options on-complete))))))
 
 (defn prewarm-tiles [center on-complete-callback]
