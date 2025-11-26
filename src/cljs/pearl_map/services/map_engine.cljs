@@ -79,9 +79,12 @@
   ([layer-id layer-impl before-id]
    (add-custom-layer (get-map-instance) layer-id layer-impl before-id))
   ([^js map-obj layer-id layer-impl before-id]
-   (when-not (.getLayer map-obj layer-id)
-     (.addLayer map-obj layer-impl before-id)
-     (register-custom-layer layer-id layer-impl))))
+   ;; Always register the layer in DB so it persists/restores on map reload
+   (register-custom-layer layer-id layer-impl)
+   ;; Only attempt to add to map if map instance exists
+   (when map-obj
+     (when-not (.getLayer map-obj layer-id)
+       (.addLayer map-obj layer-impl before-id)))))
 
 (defn- reapply-custom-layers! [^js map-obj layers]
   (clear-custom-layers map-obj)

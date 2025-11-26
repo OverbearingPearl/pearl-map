@@ -61,10 +61,10 @@
      :ambient ambient-light}))
 
 (defn- add-shadow-plane [^js scene]
-  (let [plane (doto (three/Mesh. (three/PlaneGeometry. 2000 2000)
-                                 (three/ShadowMaterial. #js {:opacity 0.3}))
-                (set! -receiveShadow true)
-                (-> .-rotation (set! -x (* -90 (/ js/Math.PI 180)))))]
+  (let [plane (three/Mesh. (three/PlaneGeometry. 2000 2000)
+                           (three/ShadowMaterial. #js {:opacity 0.3}))]
+    (set! (.-receiveShadow plane) true)
+    (set! (.-x (.-rotation plane)) (* -90 (/ js/Math.PI 180)))
     (.add scene plane)))
 
 (defn- configure-shadow-camera [^js directional-light ^js model-scene]
@@ -132,7 +132,7 @@
         layer-state (volatile! nil)
         ;; Watcher to trigger repaints when DB changes
         repaint-watcher (atom nil)]
-    #js {:id "3d-model-eiffel"
+    #js {:id map-engine/model-layer-id
          :type "custom"
          :renderingMode "3d"
          :onAdd (fn [map gl]
@@ -204,9 +204,9 @@
                            current-config {:scale (:models-3d/eiffel-scale db)
                                            :rotation-z (* (:models-3d/eiffel-rotation-z db) (/ js/Math.PI 180))}
                            light-props (:map/light-properties db)]
-                       
+
                        (update-light-from-props (.-light state) light-props)
-                       
+
                        (let [scene (.-scene state)
                              camera (.-camera state)
                              renderer (or (.-renderer state)
@@ -218,7 +218,7 @@
                              {:keys [final-scale user-rotation-z model-transform]} (get-render-params state current-config)
                              m (.fromArray (three/Matrix4.) (-> matrix-data .-defaultProjectionData .-mainMatrix))
                              l (calculate-local-transform-matrix model-transform final-scale user-rotation-z)]
-                         
+
                          (set! (.-projectionMatrix camera) (.multiply m l))
                          (.setSize renderer (.-width canvas) (.-height canvas) false)
                          (.resetState renderer)
@@ -226,14 +226,34 @@
                          (.triggerRepaint map-instance)))))}))
 
 (defn reload! []
-  (when (map-engine/layer-exists? map-engine/model-layer-id)
-    (let [db @rf-db/app-db
-          current-scale (:models-3d/eiffel-scale db)
-          current-rot-deg (:models-3d/eiffel-rotation-z db)]
-      (map-engine/remove-custom-layer map-engine/model-layer-id)
-      (js/requestAnimationFrame
-       (fn []
-         (map-engine/add-custom-layer
-          map-engine/model-layer-id
-          (create-custom-layer current-scale current-rot-deg)
-          nil))))))
+  (let [db @rf-db/app-db
+        current-scale (:models-3d/eiffel-scale db)
+        current-rot-deg (:models-3d/eiffel-rotation-z db)
+        new-layer (create-custom-layer current-scale current-rot-deg)]
+
+    ;; 1. Always update the registry with the NEW layer definition immediately.
+    ;; This ensures that if the map is re-initializing (e.g. due to React remount),
+    ;; it will pick up the new layer code when it loads via on-map-loaded.
+    (map-engine/register-custom-layer map-engine/model-layer-id new-layer)
+
+    ;; 2. Handle the active map instance if it exists and has the layer
+    (when-let [^js map-obj (map-engine/get-map-instance)]
+      (when (.getLayer map-obj map-engine/model-layer-id)
+        ;; Remove from map ONLY (don't use map-engine/remove-custom-layer which unregisters from DB)
+        (.removeLayer map-obj map-engine/model-layer-id)
+
+        ;; 3. Re-add to map after cleanup cycle
+        (js/requestAnimationFrame
+         (fn []
+           (js/requestAnimationFrame
+            (fn []
+              ;; Fetch the map instance again to ensure we have the current one
+              ;; (The map might have been destroyed/recreated during the RAF delay)
+              (when-let [^js current-map (map-engine/get-map-instance)]
+                ;; Use engine to add (handles safety checks and re-registration)
+                (map-engine/add-custom-layer
+                 current-map
+                 map-engine/model-layer-id
+                 new-layer
+                 nil)
+                (.triggerRepaint current-map))))))))))
