@@ -3,6 +3,7 @@
             ["maplibre-gl" :as maplibre]
             [re-frame.core :as rf]
             [re-frame.db :as rf-db]
+            [reagent.ratom :as ratom]
             [pearl-map.app.db :as app-db]
             [pearl-map.services.map-engine :as map-engine]
             [pearl-map.services.model-loader :as model-loader]
@@ -32,20 +33,7 @@
 (def eiffel-tower-coords [2.294481 48.858200])
 (def model-altitude 0)
 (def model-rotate [(/ js/Math.PI 2) 0 0])
-(def eiffel-tower-real-height 330) ;; Real height of Eiffel Tower in meters
-
-(defonce layer-state (atom nil))
-
-(defn set-scale [scale]
-  (when-let [^js st @layer-state]
-    (set! (.-userScale st) scale)))
-
-(defn set-rotation-z [degrees]
-  (when-let [^js st @layer-state]
-    (set! (.-userRotationZ st) (* degrees (/ js/Math.PI 180)))))
-
-(defn cleanup-state []
-  (reset! layer-state nil))
+(def eiffel-tower-real-height 330)
 
 (defn- make-model-transform [coords altitude model-rotate]
   (let [model-mercator (.fromLngLat maplibre/MercatorCoordinate (clj->js coords) altitude)
@@ -128,18 +116,22 @@
         (.multiply rotation-y)
         (.multiply rotation-x))))
 
-(defn- get-render-params [^js state]
+(defn- get-render-params [^js state db-state]
   (let [model-transform (.-modelTransform state)
         model-scale-factor (or (.-modelScaleFactor state) 1)
-        user-scale (.-userScale state)
+        user-scale (:scale db-state)
         final-scale (* (.-scale model-transform) model-scale-factor user-scale)
-        user-rotation-z (or (.-userRotationZ state) 0)]
+        user-rotation-z (:rotation-z db-state)]
     {:final-scale final-scale
      :user-rotation-z user-rotation-z
      :model-transform model-transform}))
 
 (defn create-custom-layer [initial-scale initial-rotation-z]
-  (let [model-transform (make-model-transform eiffel-tower-coords model-altitude model-rotate)]
+  (let [model-transform (make-model-transform eiffel-tower-coords model-altitude model-rotate)
+        ;; Local mutable state for this layer instance only
+        layer-state (volatile! nil)
+        ;; Watcher to trigger repaints when DB changes
+        repaint-watcher (atom nil)]
     #js {:id "3d-model-eiffel"
          :type "custom"
          :renderingMode "3d"
@@ -170,51 +162,78 @@
                      (fn [error]
                        (js/console.error "Failed to load Eiffel Tower model:" error)))
 
-                    ;; Dispatch events to sync UI with provided values
+                    ;; Sync initial values to DB
                     (rf/dispatch [:models-3d/set-eiffel-scale initial-scale])
                     (rf/dispatch [:models-3d/set-eiffel-rotation-z initial-rotation-z])
 
-                    ;; Store state in the atom, using provided values
-                    (reset! layer-state
-                            #js {:scene scene
-                                 :camera camera
-                                 :light directional-light
-                                 :map map-obj
-                                 :modelTransform model-transform
-                                 :userScale initial-scale
-                                 :userRotationZ (* initial-rotation-z (/ js/Math.PI 180))
-                                 :modelScaleFactor 1})))
+                    ;; Store imperative state
+                    (vreset! layer-state
+                             #js {:scene scene
+                                  :camera camera
+                                  :light directional-light
+                                  :map map-obj
+                                  :modelTransform model-transform
+                                  :modelScaleFactor 1
+                                  :renderer nil})
+
+                    ;; Setup Reactive Repaint Trigger
+                    (let [r (ratom/reaction
+                             {:scale (:models-3d/eiffel-scale @rf-db/app-db)
+                              :rotation-z (:models-3d/eiffel-rotation-z @rf-db/app-db)
+                              :light (:map/light-properties @rf-db/app-db)})]
+                      (reset! repaint-watcher r)
+                      (add-watch r :layer-repaint
+                                 (fn [_ _ _ _]
+                                   (.triggerRepaint map-obj))))))
+
          :onRemove (fn [_ _]
-                     (cleanup-state))
+                     (when-let [r @repaint-watcher]
+                       (remove-watch r :layer-repaint))
+                     (when-let [^js state @layer-state]
+                       (when-let [renderer (.-renderer state)]
+                         (.dispose renderer))
+                       (set! (.-renderer state) nil)
+                       (set! (.-scene state) nil)
+                       (set! (.-camera state) nil))
+                     (vreset! layer-state nil))
+
          :render (fn [gl matrix-data]
                    (when-let [^js state @layer-state]
-                     (update-light-from-props (.-light state) (:map/light-properties @rf-db/app-db))
-                     (let [scene (.-scene state)
-                           camera (.-camera state)
-                           renderer (or (.-renderer state)
-                                        (let [new-renderer (init-renderer (.getCanvas (.-map state)) gl)]
-                                          (set! (.-renderer state) new-renderer)
-                                          new-renderer))
-                           map-instance (.-map state)
-                           canvas (.getCanvas map-instance)
-                           {:keys [final-scale user-rotation-z model-transform]} (get-render-params state)
-                           m (.fromArray (three/Matrix4.) (-> matrix-data .-defaultProjectionData .-mainMatrix))
-                           l (calculate-local-transform-matrix model-transform final-scale user-rotation-z)]
-                       (set! (.-projectionMatrix camera) (.multiply m l))
-                       (.setSize renderer (.-width canvas) (.-height canvas) false)
-                       (.resetState renderer)
-                       (.render renderer scene camera)
-                       (.triggerRepaint map-instance))))}))
+                     (let [db @rf-db/app-db
+                           ;; Read directly from DB for the render loop
+                           current-config {:scale (:models-3d/eiffel-scale db)
+                                           :rotation-z (* (:models-3d/eiffel-rotation-z db) (/ js/Math.PI 180))}
+                           light-props (:map/light-properties db)]
+                       
+                       (update-light-from-props (.-light state) light-props)
+                       
+                       (let [scene (.-scene state)
+                             camera (.-camera state)
+                             renderer (or (.-renderer state)
+                                          (let [new-renderer (init-renderer (.getCanvas (.-map state)) gl)]
+                                            (set! (.-renderer state) new-renderer)
+                                            new-renderer))
+                             map-instance (.-map state)
+                             canvas (.getCanvas map-instance)
+                             {:keys [final-scale user-rotation-z model-transform]} (get-render-params state current-config)
+                             m (.fromArray (three/Matrix4.) (-> matrix-data .-defaultProjectionData .-mainMatrix))
+                             l (calculate-local-transform-matrix model-transform final-scale user-rotation-z)]
+                         
+                         (set! (.-projectionMatrix camera) (.multiply m l))
+                         (.setSize renderer (.-width canvas) (.-height canvas) false)
+                         (.resetState renderer)
+                         (.render renderer scene camera)
+                         (.triggerRepaint map-instance)))))}))
 
 (defn reload! []
   (when (map-engine/layer-exists? map-engine/model-layer-id)
-    (let [^js state @layer-state
-          ;; Recover state from the running layer or fallback to default
-          current-scale (if state (.-userScale state) (:models-3d/eiffel-scale app-db/default-db))
-          current-rot-rad (if state (.-userRotationZ state) 0)
-          current-rot-deg (* current-rot-rad (/ 180 js/Math.PI))]
+    (let [db @rf-db/app-db
+          current-scale (:models-3d/eiffel-scale db)
+          current-rot-deg (:models-3d/eiffel-rotation-z db)]
       (map-engine/remove-custom-layer map-engine/model-layer-id)
-      (map-engine/add-custom-layer
-       map-engine/model-layer-id
-       (create-custom-layer current-scale current-rot-deg)
-       nil))))
+      (js/requestAnimationFrame
+       (fn []
+         (map-engine/add-custom-layer
+          map-engine/model-layer-id
+          (create-custom-layer current-scale current-rot-deg)
+          nil))))))

@@ -11,13 +11,11 @@
 (re-frame/reg-event-fx
  :models-3d/set-eiffel-scale
  (fn [{:keys [db]} [_ scale]]
-   (model-layer/set-scale scale)
    {:db (assoc db :models-3d/eiffel-scale scale)}))
 
 (re-frame/reg-event-fx
  :models-3d/set-eiffel-rotation-z
  (fn [{:keys [db]} [_ degrees]]
-   (model-layer/set-rotation-z degrees)
    {:db (assoc db :models-3d/eiffel-rotation-z degrees)}))
 
 (re-frame/reg-event-fx
@@ -37,7 +35,6 @@
  :models-3d/remove-eiffel-tower
  (fn [{:keys [db]} _]
    (map-engine/remove-custom-layer "3d-model-eiffel")
-   (model-layer/cleanup-state)
    {:db (assoc db :models-3d/eiffel-loaded? false)}))
 
 (re-frame/reg-event-fx
