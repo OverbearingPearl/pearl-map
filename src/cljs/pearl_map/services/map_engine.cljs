@@ -60,6 +60,40 @@
           max-zoom)))))
 
 
+;; --- Layer Management (Moved up for initialization access) ---
+
+(defn- clear-custom-layers [^js map-obj]
+  (let [layers (get-custom-layers)]
+    (doseq [[layer-id _] layers]
+      (when (.getLayer map-obj layer-id)
+        (.removeLayer map-obj layer-id)))
+    (re-frame/dispatch [:clear-custom-layers])))
+
+(defn register-custom-layer [layer-id layer-impl]
+  (re-frame/dispatch [:register-custom-layer layer-id layer-impl]))
+
+(defn unregister-custom-layer [layer-id]
+  (re-frame/dispatch [:unregister-custom-layer layer-id]))
+
+(defn add-custom-layer
+  ([layer-id layer-impl before-id]
+   (add-custom-layer (get-map-instance) layer-id layer-impl before-id))
+  ([^js map-obj layer-id layer-impl before-id]
+   (when-not (.getLayer map-obj layer-id)
+     (.addLayer map-obj layer-impl before-id)
+     (register-custom-layer layer-id layer-impl))))
+
+(defn- reapply-custom-layers! [^js map-obj layers]
+  (clear-custom-layers map-obj)
+  (doseq [[layer-id layer-impl] layers]
+    (add-custom-layer map-obj layer-id layer-impl nil)))
+
+(defn remove-custom-layer [layer-id]
+  (let [^js map-obj (get-map-instance)]
+    (.removeLayer map-obj layer-id)
+    (unregister-custom-layer layer-id)))
+
+
 ;; --- Map Initialization & Lifecycle ---
 
 (defn set-map-instance! [instance]
@@ -110,6 +144,16 @@
 
 (defn init-map []
   (when (.getElementById js/document "map-container")
+    ;; Cleanup existing map instance to prevent race conditions during hot-reload/remount
+    (when-let [old-map (get-map-instance)]
+      (try
+        (.remove old-map)
+        (catch js/Error e
+          (js/console.warn "Error removing old map instance:" e)))
+      ;; Synchronously clear the instance so subsequent calls to on-map-load
+      ;; know to wait for the new map.
+      (re-frame/dispatch-sync [:set-map-instance nil]))
+
     (let [initial-style-key (:current-style-key @db/app-db)
           initial-style-url (get style-urls initial-style-key)
           map-config (create-config initial-style-url)
@@ -128,9 +172,18 @@
  :map-engine/map-loaded
  (fn [{:keys [db]} [_ map-obj]]
    (set-map-instance! map-obj)
-   {:dispatch-n (cons [:set-map-loading? false]
-                      (mapv (fn [callback] [:map-engine/on-map-loaded callback map-obj])
-                            (get db :map-engine/on-load-callbacks [])))
+
+   ;; Restore custom layers if any exist in DB (e.g. from hot reload)
+   (let [custom-layers (:custom-layers db)]
+     (when (seq custom-layers)
+       (reapply-custom-layers! map-obj custom-layers)))
+
+   {:dispatch-n (cond-> (cons [:set-map-loading? false]
+                              (mapv (fn [callback] [:map-engine/on-map-loaded callback map-obj])
+                                    (get db :map-engine/on-load-callbacks [])))
+                  ;; Ensure building layers are added if not in raster mode
+                  (not= (:current-style-key db) :raster-style)
+                  (conj [:buildings/add-layers]))
     :db         (assoc db :map-engine/on-load-callbacks [])}))
 
 (re-frame/reg-event-fx
@@ -268,32 +321,6 @@
       (.setPitch (:pitch state))
       (.setBearing (:bearing state)))))
 
-(defn- clear-custom-layers [^js map-obj]
-  (let [layers (get-custom-layers)]
-    (doseq [[layer-id _] layers]
-      (when (.getLayer map-obj layer-id)
-        (.removeLayer map-obj layer-id)))
-    (re-frame/dispatch [:clear-custom-layers])))
-
-(defn register-custom-layer [layer-id layer-impl]
-  (re-frame/dispatch [:register-custom-layer layer-id layer-impl]))
-
-(defn unregister-custom-layer [layer-id]
-  (re-frame/dispatch [:unregister-custom-layer layer-id]))
-
-(defn add-custom-layer
-  ([layer-id layer-impl before-id]
-   (add-custom-layer (get-map-instance) layer-id layer-impl before-id))
-  ([^js map-obj layer-id layer-impl before-id]
-   (when-not (.getLayer map-obj layer-id)
-     (.addLayer map-obj layer-impl before-id)
-     (register-custom-layer layer-id layer-impl))))
-
-(defn- reapply-custom-layers! [^js map-obj layers]
-  (clear-custom-layers map-obj)
-  (doseq [[layer-id layer-impl] layers]
-    (add-custom-layer map-obj layer-id layer-impl nil)))
-
 (defn change-map-style [style-url]
   (when-let [^js map-obj (get-map-instance)]
     (let [style-key (->> style-urls
@@ -314,11 +341,6 @@
                (when (not= style-url "raster-style")
                  (re-frame/dispatch [:buildings/add-layers]))
                (re-frame/dispatch [:style-editor/reset-to-defaults]))))))
-
-(defn remove-custom-layer [layer-id]
-  (let [^js map-obj (get-map-instance)]
-    (.removeLayer map-obj layer-id)
-    (unregister-custom-layer layer-id)))
 
 (defn layer-exists? [layer-id]
   (when-let [^js map-obj (get-map-instance)]
@@ -349,8 +371,9 @@
 
 (defn set-paint-property [layer-id property-name value]
   (when-let [^js map-obj (get-map-instance)]
-    (when (.getLayer map-obj layer-id)
-      (let [visibility (.getLayoutProperty map-obj layer-id "visibility")]
+    (when-let [layer (.getLayer map-obj layer-id)]
+      (let [visibility (.getLayoutProperty map-obj layer-id "visibility")
+            layer-type (.-type layer)]
         (when (not= visibility "none")
           (let [processed-value (if (and (string? value) (str/blank? value)) nil value)
                 js-value (cond
@@ -366,8 +389,7 @@
                                                          processed-value)
                              (number? processed-value) (str "#" (.toString (js/parseInt (str processed-value)) 16))
                              :else processed-value)
-                           :else processed-value)
-                layer-type (.-type (.getLayer map-obj layer-id))]
+                           :else processed-value)]
             (when (or (not= "fill-extrusion-color" property-name)
                       (= "fill-extrusion" layer-type))
               (.setPaintProperty map-obj layer-id property-name js-value))))))))
@@ -606,7 +628,7 @@
                                                (mapv (fn [[stop-zoom stop-value]]
                                                        (if (= stop-zoom zoom)
                                                          [stop-zoom new-value]
-                                                         [stop-zoom stop-value]))
+                                                         [stop-value stop-value]))
                                                      stops-pairs)
                                                (sort-by first > (conj stops-pairs [zoom new-value])))
                          updated-stops (reduce into [] updated-stops-pairs)

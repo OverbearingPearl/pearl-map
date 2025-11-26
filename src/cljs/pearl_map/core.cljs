@@ -9,6 +9,7 @@
             [pearl-map.features.style-editor.subs :as style-editor-subs]
             [pearl-map.features.models-3d.events :as models-3d-events]
             [pearl-map.features.models-3d.subs :as models-3d-subs]
+            [pearl-map.features.models-3d.layer :as models-3d-layer]
             [pearl-map.features.buildings.events :as buildings-events]))
 
 (defonce react-root
@@ -24,7 +25,8 @@
 
 (defn ^:dev/after-load reload []
   (when-let [root @react-root]
-    (rdomc/render root [home-page])))
+    (rdomc/render root [home-page]))
+  (models-3d-layer/reload!))
 
 (defn init []
   (re-frame/clear-subscription-cache!)

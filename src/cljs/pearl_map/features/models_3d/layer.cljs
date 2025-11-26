@@ -4,6 +4,7 @@
             [re-frame.core :as rf]
             [re-frame.db :as rf-db]
             [pearl-map.app.db :as app-db]
+            [pearl-map.services.map-engine :as map-engine]
             [pearl-map.services.model-loader :as model-loader]
             [pearl-map.features.models-3d.model-data :as model-data]
             [pearl-map.utils.geometry :as geom]))
@@ -168,19 +169,19 @@
                      (fn [error]
                        (js/console.error "Failed to load Eiffel Tower model:" error)))
 
-                    ;; Dispatch events to reset sliders to default values.
-                    (rf/dispatch [:models-3d/set-eiffel-scale (:models-3d/eiffel-scale app-db/default-db)])
-                    (rf/dispatch [:models-3d/set-eiffel-rotation-z (:models-3d/eiffel-rotation-z app-db/default-db)])
+                    ;; Dispatch events to sync UI with provided values
+                    (rf/dispatch [:models-3d/set-eiffel-scale initial-scale])
+                    (rf/dispatch [:models-3d/set-eiffel-rotation-z initial-rotation-z])
 
-                    ;; Store state in the atom, using default values
+                    ;; Store state in the atom, using provided values
                     (reset! layer-state
                             #js {:scene scene
                                  :camera camera
                                  :light directional-light
                                  :map map-obj
                                  :modelTransform model-transform
-                                 :userScale (:models-3d/eiffel-scale app-db/default-db)
-                                 :userRotationZ (* (:models-3d/eiffel-rotation-z app-db/default-db) (/ js/Math.PI 180))
+                                 :userScale initial-scale
+                                 :userRotationZ (* initial-rotation-z (/ js/Math.PI 180))
                                  :modelScaleFactor 1})))
          :onRemove (fn [_ _]
                      (cleanup-state))
@@ -203,3 +204,16 @@
                        (.resetState renderer)
                        (.render renderer scene camera)
                        (.triggerRepaint map-instance))))}))
+
+(defn reload! []
+  (when (map-engine/layer-exists? map-engine/model-layer-id)
+    (let [^js state @layer-state
+          ;; Recover state from the running layer or fallback to default
+          current-scale (if state (.-userScale state) (:models-3d/eiffel-scale app-db/default-db))
+          current-rot-rad (if state (.-userRotationZ state) 0)
+          current-rot-deg (* current-rot-rad (/ 180 js/Math.PI))]
+      (map-engine/remove-custom-layer map-engine/model-layer-id)
+      (map-engine/add-custom-layer
+       map-engine/model-layer-id
+       (create-custom-layer current-scale current-rot-deg)
+       nil))))
