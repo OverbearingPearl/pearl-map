@@ -1,6 +1,7 @@
 (ns pearl-map.app.events
   (:require [re-frame.core :as re-frame]
             [pearl-map.app.db :as app-db]
+            [pearl-map.config :as config]
             [pearl-map.features.lighting.events]
             [pearl-map.services.map-engine :as map-engine]
             [re-frame.db :as rf-db]
@@ -87,7 +88,7 @@
              (re-frame/dispatch [:map/set-prewarming? true])
              (js/console.log "Prewarming map tiles for the first time...")
              (map-engine/prewarm-tiles
-              map-engine/eiffel-tower-coords
+              config/eiffel-tower-coords
               (fn []
                 (re-frame/dispatch [:map/set-prewarming? false])
                 (.setItem js/localStorage prewarm-key "true")

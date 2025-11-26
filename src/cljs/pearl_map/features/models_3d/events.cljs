@@ -1,5 +1,6 @@
 (ns pearl-map.features.models-3d.events
   (:require [re-frame.core :as re-frame]
+            [pearl-map.config :as config]
             [pearl-map.features.models-3d.layer :as model-layer]
             [pearl-map.services.map-engine :as map-engine]))
 
@@ -26,7 +27,7 @@
          initial-rotation-z (:models-3d/eiffel-rotation-z db)
          custom-layer (model-layer/create-custom-layer initial-scale initial-rotation-z)]
      (map-engine/add-custom-layer
-      "3d-model-eiffel"
+      config/model-layer-id
       (clj->js custom-layer)
       nil)
      {:db (assoc db :models-3d/eiffel-loaded? true)})))
@@ -34,11 +35,11 @@
 (re-frame/reg-event-fx
  :models-3d/remove-eiffel-tower
  (fn [{:keys [db]} _]
-   (map-engine/remove-custom-layer "3d-model-eiffel")
+   (map-engine/remove-custom-layer config/model-layer-id)
    {:db (assoc db :models-3d/eiffel-loaded? false)}))
 
 (re-frame/reg-event-fx
  :models-3d/fly-to-eiffel-tower
  (fn [_ _]
-   (map-engine/fly-to-location model-layer/eiffel-tower-coords 16)
+   (map-engine/fly-to-location config/eiffel-tower-coords 16)
    {}))

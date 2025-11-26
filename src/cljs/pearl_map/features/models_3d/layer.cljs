@@ -5,6 +5,7 @@
             [re-frame.db :as rf-db]
             [reagent.ratom :as ratom]
             [pearl-map.app.db :as app-db]
+            [pearl-map.config :as config]
             [pearl-map.services.map-engine :as map-engine]
             [pearl-map.services.model-loader :as model-loader]
             [pearl-map.features.models-3d.model-data :as model-data]
@@ -30,10 +31,8 @@
       (-> .-position (.copy (maplibre-light-pos->three-direction (:position light-props))))
       (set! -intensity (:intensity light-props)))))
 
-(def eiffel-tower-coords [2.294481 48.858200])
 (def model-altitude 0)
 (def model-rotate [(/ js/Math.PI 2) 0 0])
-(def eiffel-tower-real-height 330)
 
 (defn- make-model-transform [coords altitude model-rotate]
   (let [model-mercator (.fromLngLat maplibre/MercatorCoordinate (clj->js coords) altitude)
@@ -98,7 +97,7 @@
                  (.getSize (three/Vector3.)))
         model-unit-height (.-y size)]
     (if (pos? model-unit-height)
-      (/ eiffel-tower-real-height model-unit-height)
+      (/ config/eiffel-tower-real-height model-unit-height)
       1)))
 
 (defn- calculate-local-transform-matrix [^js model-transform final-scale user-rotation-z]
@@ -127,12 +126,12 @@
      :model-transform model-transform}))
 
 (defn create-custom-layer [initial-scale initial-rotation-z]
-  (let [model-transform (make-model-transform eiffel-tower-coords model-altitude model-rotate)
+  (let [model-transform (make-model-transform config/eiffel-tower-coords model-altitude model-rotate)
         ;; Local mutable state for this layer instance only
         layer-state (volatile! nil)
         ;; Watcher to trigger repaints when DB changes
         repaint-watcher (atom nil)]
-    #js {:id map-engine/model-layer-id
+    #js {:id config/model-layer-id
          :type "custom"
          :renderingMode "3d"
          :onAdd (fn [map gl]
@@ -234,13 +233,13 @@
     ;; 1. Always update the registry with the NEW layer definition immediately.
     ;; This ensures that if the map is re-initializing (e.g. due to React remount),
     ;; it will pick up the new layer code when it loads via on-map-loaded.
-    (map-engine/register-custom-layer map-engine/model-layer-id new-layer)
+    (map-engine/register-custom-layer config/model-layer-id new-layer)
 
     ;; 2. Handle the active map instance if it exists and has the layer
     (when-let [^js map-obj (map-engine/get-map-instance)]
-      (when (.getLayer map-obj map-engine/model-layer-id)
+      (when (.getLayer map-obj config/model-layer-id)
         ;; Remove from map ONLY (don't use map-engine/remove-custom-layer which unregisters from DB)
-        (.removeLayer map-obj map-engine/model-layer-id)
+        (.removeLayer map-obj config/model-layer-id)
 
         ;; 3. Re-add to map after cleanup cycle
         (js/requestAnimationFrame
@@ -253,7 +252,7 @@
                 ;; Use engine to add (handles safety checks and re-registration)
                 (map-engine/add-custom-layer
                  current-map
-                 map-engine/model-layer-id
+                 config/model-layer-id
                  new-layer
                  nil)
                 (.triggerRepaint current-map))))))))))

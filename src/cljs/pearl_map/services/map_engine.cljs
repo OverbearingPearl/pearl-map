@@ -3,6 +3,7 @@
             [re-frame.db :as db]
             [reagent.core :as reagent]
             [pearl-map.utils.geometry :as geom]
+            [pearl-map.config :as config]
             [clojure.string :as str]
             ["maplibre-gl" :as maplibre]
             ["color" :as color] ; For color manipulation in expressions
@@ -11,10 +12,6 @@
             ["three" :as three]))
 
 ;; --- Constants & Configuration ---
-
-(def eiffel-tower-coords [2.294481 48.858200])
-
-(def model-layer-id "3d-model-eiffel")
 
 (def ^:private default-inspect-zoom 17)
 
@@ -131,7 +128,7 @@
   "Creates the MapLibre GL JS configuration object."
   [style-url]
   (let [base-config {:container "map-container"
-                     :center (clj->js eiffel-tower-coords)
+                     :center (clj->js config/eiffel-tower-coords)
                      :zoom 15
                      :pitch 45
                      :bearing 0
@@ -255,8 +252,8 @@
                                  :essential true})))))))
 
 (defn focus-on-layer [layer-id search-zoom]
-  (if (= layer-id model-layer-id)
-    (fly-to-location eiffel-tower-coords search-zoom)
+  (if (= layer-id config/model-layer-id)
+    (fly-to-location config/eiffel-tower-coords search-zoom)
     (when-let [^js map-obj (get-map-instance)]
       (let [current-center (.getCenter map-obj)]
         (.flyTo map-obj #js {:center current-center :zoom search-zoom :essential true})
