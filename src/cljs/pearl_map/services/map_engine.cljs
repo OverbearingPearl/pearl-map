@@ -562,11 +562,12 @@
   "Update a property to a single value (not a stops expression)"
   new-value)
 
-(defn update-zoom-value-pair [layer-id property-name zoom new-value prop-type]
-  (let [current-value (if (= prop-type "layout")
+(defn update-zoom-value-pair [layer-id property-name zoom-raw new-value prop-type]
+  (let [zoom (js/parseFloat zoom-raw) ;; Ensure zoom is a number
+        current-value (if (= prop-type "layout")
                         (get-layout-property layer-id property-name)
                         (get-paint-property layer-id property-name))
-        current-map-zoom (:map/zoom @db/app-db)
+        current-map-zoom (js/parseFloat (:map/zoom @db/app-db)) ;; Ensure map zoom is a number
         clj-value (if (some? current-value) (js->clj current-value :keywordize-keys true) nil)]
     (let [result (cond
                    ;; If current-value is not an expression, create one if the zoom levels differ
@@ -586,14 +587,16 @@
                    ;; object-style stops (e.g., {:stops [[z1 v1] [z2 v2]]})
                    (and (map? clj-value) (:stops clj-value))
                    (let [stops (vec (:stops clj-value))
-                         stop-exists? (some #(= zoom (first %)) stops)
+                         ;; Ensure we compare numbers
+                         stop-exists? (some #(= (js/parseFloat (first %)) zoom) stops)
                          updated-stops-pairs (if stop-exists?
                                                (mapv (fn [[stop-zoom stop-value]]
-                                                       (if (= stop-zoom zoom)
-                                                         [stop-zoom new-value]
-                                                         [stop-zoom stop-value]))
+                                                       (if (= (js/parseFloat stop-zoom) zoom)
+                                                         [zoom new-value]
+                                                         [(js/parseFloat stop-zoom) stop-value]))
                                                      stops)
-                                               (sort-by first > (conj stops [zoom new-value])))
+                                               (sort-by first > (conj (mapv (fn [[z v]] [(js/parseFloat z) v]) stops)
+                                                                      [zoom new-value])))
                          ;; Convert to new expression format
                          header ["interpolate" ["linear"] ["zoom"]]
                          updated-stops (reduce into [] updated-stops-pairs)
@@ -611,14 +614,15 @@
                    (let [header (subvec clj-value 0 3)
                          stops-data (subvec clj-value 3)
                          stops-pairs (partition 2 stops-data)
-                         stop-exists? (some #(= zoom (first %)) stops-pairs)
+                         stop-exists? (some #(= (js/parseFloat (first %)) zoom) stops-pairs)
                          updated-stops-pairs (if stop-exists?
                                                (mapv (fn [[stop-zoom stop-value]]
-                                                       (if (= stop-zoom zoom)
-                                                         [stop-zoom new-value]
-                                                         [stop-value stop-value]))
+                                                       (if (= (js/parseFloat stop-zoom) zoom)
+                                                         [zoom new-value]
+                                                         [(js/parseFloat stop-zoom) stop-value]))
                                                      stops-pairs)
-                                               (sort-by first > (conj stops-pairs [zoom new-value])))
+                                               (sort-by first > (conj (mapv (fn [[z v]] [(js/parseFloat z) v]) stops-pairs)
+                                                                      [zoom new-value])))
                          updated-stops (reduce into [] updated-stops-pairs)
                          updated-expression (vec (concat header updated-stops))]
                      (if (= prop-type "layout")
