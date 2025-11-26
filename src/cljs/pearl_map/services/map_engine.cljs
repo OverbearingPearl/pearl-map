@@ -349,21 +349,12 @@
 (defn get-paint-property [layer-id property-name]
   (when-let [^js map-obj (get-map-instance)]
     (when (.getLayer map-obj layer-id)
-      (try
-        (.getPaintProperty map-obj layer-id property-name)
-        (catch js/Error e
-          ;; This can happen if property is not applicable for layer type.
-          ;; MapLibre throws a TypeError in this case.
-          ;; We can safely ignore it and return nil.
-          nil)))))
+      (.getPaintProperty map-obj layer-id property-name))))
 
 (defn get-layout-property [layer-id property-name]
   (when-let [^js map-obj (get-map-instance)]
     (when (.getLayer map-obj layer-id)
-      (try
-        (.getLayoutProperty map-obj layer-id property-name)
-        (catch js/Error e
-          nil)))))
+      (.getLayoutProperty map-obj layer-id property-name))))
 
 (defn- clj-expression? [x]
   (or (and (vector? x) (string? (first x)) (> (count x) 1))
@@ -399,10 +390,7 @@
     (when (.getLayer map-obj layer-id)
       (let [processed-value (if (and (string? value) (str/blank? value)) nil value)
             js-value (clj->js processed-value)]
-        (try
-          (.setLayoutProperty map-obj layer-id property-name js-value)
-          (catch js/Error e
-            (js/console.error (str "map-engine/set-layout-property: Error calling .setLayoutProperty for " layer-id " " property-name) e)))))))
+        (.setLayoutProperty map-obj layer-id property-name js-value)))))
 
 
 ;; --- Style Expression Handling ---

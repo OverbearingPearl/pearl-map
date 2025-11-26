@@ -142,6 +142,15 @@
 
 ;; --- 2. Data Access & Formatting Helpers ---
 
+(def ^:private layer-type-supported-props
+  {"fill"           #{:fill-color :fill-opacity :fill-outline-color :visibility}
+   "fill-extrusion" #{:fill-extrusion-color :fill-extrusion-opacity :visibility}
+   "line"           #{:line-color :line-opacity :line-width :line-cap :line-join :visibility}
+   "symbol"         #{:text-color :text-opacity :text-field :text-font :text-size :text-transform :text-anchor :symbol-placement :visibility}
+   "background"     #{:background-color :background-opacity :visibility}})
+
+(def ^:private layout-style-keys-set (set layout-style-keys))
+
 (defn get-category-for-layer [layer-id]
   (->> layer-categories
        (filter (fn [[_ {:keys [layers]}]] (some #(= layer-id %) layers)))
@@ -191,21 +200,25 @@
 (defn get-layer-styles [layer-id current-style current-zoom]
   (if (= current-style raster-style)
     (zipmap all-style-keys (repeat :unsupported))
-    (let [map-instance (map-engine/get-map-instance)]
-      (if (and map-instance (map-engine/layer-exists? layer-id))
-        (->> all-style-keys
-             (map (fn [style-key]
-                    (let [prop-type (if (contains? (set layout-style-keys) style-key) "layout" "paint")
-                          get-fn (if (= prop-type "layout")
-                                   map-engine/get-layout-property
-                                   map-engine/get-paint-property)
-                          current-value (get-fn layer-id (name style-key))
-                          parsed-value (when (some? current-value)
-                                         (parse-style-value style-key current-value current-zoom))]
-                      [style-key (if (and (= style-key :visibility) (nil? parsed-value))
-                                   "visible"
-                                   parsed-value)])))
-             (into {}))
+    (let [^js map-instance (map-engine/get-map-instance)]
+      (if-let [layer (and map-instance (.getLayer map-instance layer-id))]
+        (let [layer-type (.-type layer)
+              supported-keys (get layer-type-supported-props layer-type #{:visibility})]
+          (->> all-style-keys
+               (map (fn [style-key]
+                      (if (contains? supported-keys style-key)
+                        (let [prop-type (if (contains? layout-style-keys-set style-key) "layout" "paint")
+                              get-fn (if (= prop-type "layout")
+                                       map-engine/get-layout-property
+                                       map-engine/get-paint-property)
+                              current-value (get-fn layer-id (name style-key))
+                              parsed-value (when (some? current-value)
+                                             (parse-style-value style-key current-value current-zoom))]
+                          [style-key (if (and (= style-key :visibility) (nil? parsed-value))
+                                       "visible"
+                                       parsed-value)])
+                        [style-key nil])))
+               (into {})))
         (zipmap all-style-keys (repeat nil))))))
 
 (defn format-color-input [value]
