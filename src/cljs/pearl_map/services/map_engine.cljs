@@ -307,6 +307,7 @@
                           (aset opts "bearing" (:bearing original-camera-options))
                           (.jumpTo map-obj opts))
                         (set! (.. container -style -visibility) original-visibility)
+                        (.triggerRepaint map-obj)
                         (js/console.log "Prewarming complete. Restored original camera.")
                         (when on-complete-callback (on-complete-callback)))]
       (js/console.log (str "Prewarming tiles for center " center " from zoom " min-zoom " to " max-zoom))
