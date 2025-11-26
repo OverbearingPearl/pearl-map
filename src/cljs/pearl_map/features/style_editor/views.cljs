@@ -159,6 +159,13 @@
 (defn get-zoom-for-layer [layer-id]
   (or (map-engine/get-layer-min-zoom layer-id) 15))
 
+(defn get-inspect-zoom-for-layer [layer-id]
+  (let [category (get-category-for-layer layer-id)
+        min-zoom (get-zoom-for-layer layer-id)]
+    (if (= category :boundaries)
+      min-zoom
+      (max min-zoom map-engine/default-inspect-zoom))))
+
 (defn get-layers-for-category [category-key]
   (get-in layer-categories [category-key :layers]))
 

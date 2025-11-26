@@ -233,11 +233,13 @@
                          :zoom zoom
                          :pitch 45
                          :bearing 0
+                         :speed 0.6
+                         :curve 1.5
                          :essential true})))
 
 (defn zoom-to-level [zoom callback]
   (when-let [^js map-obj (get-map-instance)]
-    (.flyTo map-obj #js {:zoom zoom :essential true})
+    (.flyTo map-obj #js {:zoom zoom :speed 0.8 :essential true})
     (when callback
       (.once map-obj "moveend" callback))))
 

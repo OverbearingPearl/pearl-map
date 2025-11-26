@@ -57,8 +57,9 @@
        ;; Not found
        (if (and allow-zoom-retry? map-obj)
          (let [current-zoom (.getZoom map-obj)]
-           (if (> current-zoom (+ search-zoom 0.5))
-             ;; Zoom out and retry (disable retry flag for next attempt to avoid loops)
+           (cond
+             ;; Case 1: Zoom out if too deep
+             (> current-zoom (+ search-zoom 0.5))
              {:dispatch [:style-editor/zoom-and-retry-find
                          {:zoom search-zoom
                           :retry-event [:style-editor/smart-find-feature
@@ -67,7 +68,19 @@
                                          :search-zoom search-zoom
                                          :on-found-event on-found-event
                                          :allow-zoom-retry? false}]}]}
-             ;; Already zoomed out, give up
+
+             ;; Case 2: Zoom in if too high (e.g. looking at country view, searching for park)
+             (< current-zoom (- search-zoom 0.5))
+             {:dispatch [:style-editor/zoom-and-retry-find
+                         {:zoom search-zoom
+                          :retry-event [:style-editor/smart-find-feature
+                                        {:layer-id layer-id
+                                         :excluded-set excluded-set
+                                         :search-zoom search-zoom
+                                         :on-found-event on-found-event
+                                         :allow-zoom-retry? false}]}]}
+
+             :else
              {}))
          ;; No retry allowed or map not ready
          {})))))
@@ -85,7 +98,8 @@
          current-style-url (get map-engine/style-urls current-style-key)
          current-zoom (:map/zoom db)
          current-styles (style-editor-views/get-layer-styles layer-id current-style-url current-zoom)
-         search-zoom (style-editor-views/get-zoom-for-layer layer-id)]
+         search-zoom (style-editor-views/get-zoom-for-layer layer-id)
+         inspect-zoom (style-editor-views/get-inspect-zoom-for-layer layer-id)]
      {:db (-> db
               (assoc :style-editor/target-layer layer-id)
               (assoc :style-editor/editing-style current-styles)
@@ -95,13 +109,13 @@
                  {:layer-id layer-id
                   :excluded-set #{}
                   :search-zoom search-zoom
-                  :on-found-event [:style-editor/on-switch-layer-found]
+                  :on-found-event [:style-editor/on-switch-layer-found inspect-zoom]
                   :allow-zoom-retry? true}]})))
 
 (re-frame/reg-event-fx
  :style-editor/on-switch-layer-found
- (fn [_ [_ coords]]
-   {:dispatch [:style-editor/fly-to-coords coords]}))
+ (fn [_ [_ search-zoom coords]]
+   {:dispatch [:style-editor/fly-to-coords coords search-zoom]}))
 
 (re-frame/reg-event-fx
  :style-editor/update-layer-style
@@ -164,8 +178,8 @@
 
 (re-frame/reg-event-fx
  :style-editor/fly-to-coords
- (fn [_ [_ coords]]
-   (map-engine/fly-to-location coords map-engine/default-inspect-zoom)
+ (fn [_ [_ coords zoom]]
+   (map-engine/fly-to-location coords (or zoom map-engine/default-inspect-zoom))
    {}))
 
 (re-frame/reg-event-fx
@@ -179,9 +193,10 @@
        (if (< index (dec (count history)))
          ;; Case 1: Moving forward in existing history (Redo)
          (let [next-index (inc index)
-               next-coords (nth history next-index)]
+               next-coords (nth history next-index)
+               inspect-zoom (style-editor-views/get-inspect-zoom-for-layer layer-id)]
            {:db (assoc db :style-editor/navigation-index next-index)
-            :dispatch [:style-editor/fly-to-coords next-coords]})
+            :dispatch [:style-editor/fly-to-coords next-coords inspect-zoom]})
 
          ;; Case 2: Finding a new feature
          (let [;; If history is empty, record current position as start point
@@ -193,7 +208,8 @@
                temp-index (if current-center 0 index)
 
                excluded-set (set temp-history)
-               search-zoom (style-editor-views/get-zoom-for-layer layer-id)]
+               search-zoom (style-editor-views/get-zoom-for-layer layer-id)
+               inspect-zoom (style-editor-views/get-inspect-zoom-for-layer layer-id)]
 
            {:db (if current-center
                   (-> db
@@ -204,12 +220,12 @@
                        {:layer-id layer-id
                         :excluded-set excluded-set
                         :search-zoom search-zoom
-                        :on-found-event [:style-editor/on-next-found]
+                        :on-found-event [:style-editor/on-next-found inspect-zoom]
                         :allow-zoom-retry? true}]}))))))
 
 (re-frame/reg-event-fx
  :style-editor/on-next-found
- (fn [{:keys [db]} [_ coords]]
+ (fn [{:keys [db]} [_ search-zoom coords]]
    (let [history (:style-editor/navigation-history db)
          index (:style-editor/navigation-index db)
          new-history (conj history coords)
@@ -217,18 +233,20 @@
      {:db (-> db
               (assoc :style-editor/navigation-history new-history)
               (assoc :style-editor/navigation-index new-index))
-      :dispatch [:style-editor/fly-to-coords coords]})))
+      :dispatch [:style-editor/fly-to-coords coords search-zoom]})))
 
 (re-frame/reg-event-fx
  :style-editor/navigate-prev
  (fn [{:keys [db]} _]
    (let [history (:style-editor/navigation-history db)
-         index (:style-editor/navigation-index db)]
+         index (:style-editor/navigation-index db)
+         layer-id (:style-editor/target-layer db)]
      (if (> index 0)
        (let [prev-index (dec index)
-             prev-coords (nth history prev-index)]
+             prev-coords (nth history prev-index)
+             inspect-zoom (style-editor-views/get-inspect-zoom-for-layer layer-id)]
          {:db (assoc db :style-editor/navigation-index prev-index)
-          :dispatch [:style-editor/fly-to-coords prev-coords]})
+          :dispatch [:style-editor/fly-to-coords prev-coords inspect-zoom]})
        {}))))
 
 (re-frame/reg-event-fx
