@@ -32,7 +32,9 @@
     (-> db
         (assoc :style-editor/selected-category category)
         (assoc :style-editor/target-layer default-layer)
-        (assoc :style-editor/editing-style current-styles))))
+        (assoc :style-editor/editing-style current-styles)
+        (assoc :style-editor/navigation-history [])
+        (assoc :style-editor/navigation-index -1))))
 
 (re-frame/reg-event-fx
  :style-editor/initialize
@@ -51,7 +53,9 @@
          zoom-level (style-editor-views/get-zoom-for-layer layer-id)]
      {:db (-> db
               (assoc :style-editor/target-layer layer-id)
-              (assoc :style-editor/editing-style current-styles))
+              (assoc :style-editor/editing-style current-styles)
+              (assoc :style-editor/navigation-history [])
+              (assoc :style-editor/navigation-index -1))
       :dispatch [:style-editor/fly-to-feature layer-id zoom-level]})))
 
 (re-frame/reg-event-fx
@@ -120,6 +124,88 @@
          {:db (assoc db :style-editor/editing-style current-styles)})))))
 
 (re-frame/reg-event-fx
+ :style-editor/fly-to-coords
+ (fn [_ [_ coords]]
+   (map-engine/fly-to-location coords 17)
+   {}))
+
+(re-frame/reg-event-fx
+ :style-editor/zoom-and-retry-next
+ (fn [_ [_ zoom]]
+   (map-engine/zoom-to-level zoom #(re-frame/dispatch [:style-editor/navigate-next]))
+   {}))
+
+(re-frame/reg-event-fx
+ :style-editor/navigate-next
+ (fn [{:keys [db]} _]
+   (let [layer-id (:style-editor/target-layer db)
+         history (:style-editor/navigation-history db)
+         index (:style-editor/navigation-index db)
+         ^js map-obj (map-engine/get-map-instance)]
+     (when (and layer-id map-obj)
+       (if (< index (dec (count history)))
+         ;; Case 1: Moving forward in existing history (Redo)
+         (let [next-index (inc index)
+               next-coords (nth history next-index)]
+           {:db (assoc db :style-editor/navigation-index next-index)
+            :dispatch [:style-editor/fly-to-coords next-coords]})
+
+         ;; Case 2: Finding a new feature
+         (let [;; If history is empty, record current position as start point
+               current-center (if (empty? history)
+                                (let [^js c (.getCenter map-obj)] [(.-lng c) (.-lat c)])
+                                nil)
+               ;; Prepare history for exclusion check
+               temp-history (if current-center (conj history current-center) history)
+               temp-index (if current-center 0 index)
+
+               ;; Exclude all points currently in history to avoid loops
+               excluded-set (set temp-history)
+
+               ;; Find next nearest feature
+               next-coords (map-engine/find-next-visible-feature layer-id excluded-set)]
+
+           (if next-coords
+             (let [new-history (conj temp-history next-coords)
+                   new-index (inc temp-index)]
+               {:db (-> db
+                        (assoc :style-editor/navigation-history new-history)
+                        (assoc :style-editor/navigation-index new-index))
+                :dispatch [:style-editor/fly-to-coords next-coords]})
+
+             ;; Not found. Check if we should zoom out and retry.
+             (let [current-zoom (.getZoom map-obj)
+                   target-zoom (style-editor-views/get-zoom-for-layer layer-id)]
+               ;; If we are zoomed in closer than the target layer's ideal zoom (plus a buffer),
+               ;; zoom out to that ideal zoom to broaden the search.
+               (if (> current-zoom (+ target-zoom 0.5))
+                 {:db (if current-center
+                        (-> db
+                            (assoc :style-editor/navigation-history temp-history)
+                            (assoc :style-editor/navigation-index temp-index))
+                        db)
+                  :dispatch [:style-editor/zoom-and-retry-next target-zoom]}
+
+                 ;; Already wide enough, just give up (or save state)
+                 {:db (if current-center
+                        (-> db
+                            (assoc :style-editor/navigation-history temp-history)
+                            (assoc :style-editor/navigation-index temp-index))
+                        db)})))))))))
+
+(re-frame/reg-event-fx
+ :style-editor/navigate-prev
+ (fn [{:keys [db]} _]
+   (let [history (:style-editor/navigation-history db)
+         index (:style-editor/navigation-index db)]
+     (if (> index 0)
+       (let [prev-index (dec index)
+             prev-coords (nth history prev-index)]
+         {:db (assoc db :style-editor/navigation-index prev-index)
+          :dispatch [:style-editor/fly-to-coords prev-coords]})
+       {}))))
+
+(re-frame/reg-event-fx
  :style-editor/reset-to-defaults
  (fn [{:keys [db]} _]
    (let [current-style-key (:current-style-key db)]
@@ -128,6 +214,8 @@
        {:db (-> db
                 (assoc :style-editor/target-layer nil)
                 (assoc :style-editor/editing-style nil)
-                (assoc :style-editor/selected-category nil))}
+                (assoc :style-editor/selected-category nil)
+                (assoc :style-editor/navigation-history [])
+                (assoc :style-editor/navigation-index -1))}
        ;; When entering a vector style, always re-initialize to default.
        {:db (init-to-default-db db)}))))

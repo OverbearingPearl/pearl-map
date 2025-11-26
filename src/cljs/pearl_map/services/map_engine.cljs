@@ -235,10 +235,55 @@
                          :bearing 0
                          :essential true})))
 
+(defn zoom-to-level [zoom callback]
+  (when-let [^js map-obj (get-map-instance)]
+    (.flyTo map-obj #js {:zoom zoom :essential true})
+    (when callback
+      (.once map-obj "moveend" callback))))
+
 (defn- get-all-points [coords]
   (if (number? (first coords))
     [coords]
     (mapcat get-all-points coords)))
+
+(defn- dist-sq [p1 p2]
+  (let [dx (- (.-x p1) (.-x p2))
+        dy (- (.-y p1) (.-y p2))]
+    (+ (* dx dx) (* dy dy))))
+
+(defn find-next-visible-feature [layer-id excluded-coords-set]
+  (when-let [^js map-obj (get-map-instance)]
+    (let [features (.queryRenderedFeatures map-obj #js {:layers #js [layer-id]})]
+      (when (seq features)
+        (let [center-point (.project map-obj (.getCenter map-obj))
+              ;; Helper to check if a coordinate is effectively in the excluded set
+              is-excluded? (fn [coords] (contains? excluded-coords-set coords))
+
+              calc-dist-sq (fn [feature]
+                             (let [coords (-> feature .-geometry .-coordinates js->clj)
+                                   flat-coords (get-all-points coords)
+                                   target-coord (first flat-coords)]
+                               (if (and target-coord (not (is-excluded? target-coord)))
+                                 (let [point (.project map-obj (maplibre/LngLat. (first target-coord) (second target-coord)))
+                                       d (dist-sq point center-point)]
+                                   ;; Filter out points that are extremely close to center (current position)
+                                   ;; 100 pixels squared = 10 pixels distance threshold
+                                   (if (> d 100)
+                                     d
+                                     js/Infinity))
+                                 js/Infinity)))
+
+              ;; Find feature with minimum distance that is valid
+              candidates (map (fn [f]
+                                {:feature f
+                                 :dist (calc-dist-sq f)})
+                              features)
+              valid-candidates (filter #(not= (:dist %) js/Infinity) candidates)]
+
+          (when (seq valid-candidates)
+            (let [best (apply min-key :dist valid-candidates)
+                  feature (:feature best)]
+              (-> feature .-geometry .-coordinates js->clj get-all-points first))))))))
 
 (defn- fly-to-nearest-visible-feature [layer-id default-zoom]
   (when-let [^js map-obj (get-map-instance)]

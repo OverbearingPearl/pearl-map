@@ -657,6 +657,23 @@
         ^{:key "background-color-control"} [render-background-color-control control-props]
         ^{:key "background-opacity-control"} [render-background-opacity-control control-props]])]))
 
+(defn- render-navigation-controls [{:keys [target-layer]}]
+  (let [history @(re-frame/subscribe [:style-editor/navigation-history])
+        index @(re-frame/subscribe [:style-editor/navigation-index])
+        has-prev? (> index 0)]
+    [:div {:class "navigation-controls" :style {:display "flex" :gap "8px" :margin-left "12px"}}
+     [:button {:class (str "nav-btn" (when-not has-prev? " nav-btn-disabled"))
+               :disabled (not has-prev?)
+               :on-click #(re-frame/dispatch [:style-editor/navigate-prev])
+               :title "Previous Feature"
+               :style {:padding "2px 8px" :cursor (if has-prev? "pointer" "not-allowed") :opacity (if has-prev? 1 0.5)}}
+      "Previous"]
+     [:button {:class "nav-btn"
+               :on-click #(re-frame/dispatch [:style-editor/navigate-next])
+               :title "Find Next Nearest Feature"
+               :style {:padding "2px 8px" :cursor "pointer"}}
+      "Next"]]))
+
 (defn style-editor []
   (reagent/create-class
    {:component-did-mount
@@ -700,7 +717,7 @@
                 (let [on-style-change (fn [style-key]
                                         (fn [value] (update-layer-style target-layer style-key value)))]
                   [:div
-                   [:div {:class "visibility-toggle"}
+                   [:div {:class "visibility-toggle" :style {:display "flex" :align-items "center"}}
                     [:input {:type "checkbox"
                              :id "layer-visibility-checkbox"
                              :checked (= (:visibility editing-style) "visible")
@@ -711,7 +728,8 @@
                              :class "visibility-checkbox"}]
                     [:label {:for "layer-visibility-checkbox"
                              :class "visibility-label"}
-                     "Visible"]]
+                     "Visible"]
+                    [render-navigation-controls {:target-layer target-layer}]]
                    [render-style-controls {:target-layer target-layer
                                            :editing-style editing-style
                                            :on-style-change on-style-change}]

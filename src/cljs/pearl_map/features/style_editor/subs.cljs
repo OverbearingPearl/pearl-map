@@ -15,3 +15,13 @@
  :style-editor/selected-category
  (fn [db]
    (get db :style-editor/selected-category)))
+
+(re-frame/reg-sub
+ :style-editor/navigation-history
+ (fn [db]
+   (get db :style-editor/navigation-history [])))
+
+(re-frame/reg-sub
+ :style-editor/navigation-index
+ (fn [db]
+   (get db :style-editor/navigation-index -1)))
