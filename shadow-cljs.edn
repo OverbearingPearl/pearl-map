@@ -21,7 +21,6 @@
               :devtools {:after-load pearl-map.core/reload
                          :preloads [day8.re-frame-10x.preload.react-18]}}
         :compiler-options {:ignore-source-regex [".*~$" ".*#$" ".*\\.swp$" ".*\\.swo$" ".*\\.DS_Store$"
-                                                  "src/cljs/pearl_map/features/models_3d/model_data\\.cljs"
                                                   ".*\\.iml$" "\\.idea/.*" "\\.vscode/.*" "\\.calva/.*" "\\.lsp/.*"
                                                   "\\.aider.*" "\\.cpcache/.*"]}
         :release {:compiler-options {}}}

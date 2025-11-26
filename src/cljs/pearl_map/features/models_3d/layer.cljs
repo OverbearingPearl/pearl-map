@@ -8,7 +8,6 @@
             [pearl-map.config :as config]
             [pearl-map.services.map-engine :as map-engine]
             [pearl-map.services.model-loader :as model-loader]
-            [pearl-map.features.models-3d.model-data :as model-data]
             [pearl-map.utils.geometry :as geom]))
 
 (defn- maplibre-light-pos->three-direction
@@ -148,7 +147,7 @@
 
                     (model-loader/load-model
                      loader
-                     model-data/eiffel-tower-model-data
+                     "models/eiffel_tower/scene.gltf"
                      (fn [gltf]
                        (let [^three/Object3D model-scene (.-scene gltf)
                              _ (configure-shadow-camera directional-light model-scene)

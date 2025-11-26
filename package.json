@@ -6,11 +6,10 @@
         "dev": "shadow-cljs watch app",
         "build": "npm run prebuild && shadow-cljs release app && clojure -M -m pearl-map.build --cleanup",
         "clean": "rm -rf target/public",
-        "clean:cache": "rm -rf pom.xml *.jar *.class /lib/ /classes/ /target/ /checkouts/ .lein-deps-sum .lein-repl-history .lein-plugins/ .lein-failures .boot/ .nrepl-port .cpcache/ out/ .shadow-cljs/ .cljs_node_repl/ .cljs_rhino_repl/ main.js .aider.chat.history.md .aider.input.history .aider.tags.cache.v4/ .aider.tags.cache.v7/ node_modules/ npm-debug.log* yarn-debug.log* yarn-error.log* lerna-debug.log* .pnpm-debug.log* pids/ *.pid *.seed *.pid.lock coverage/ *.lcov .nyc_output/ .grunt/ bower_components/ .lock-wscript build/ jspm_packages/ typings/ *.tsbuildinfo .npm/ .eslintcache .stylelintcache .rpt2_cache/ .rts2_cache_cjs/ .rts2_cache_es/ .rts2_cache_umd/ .node_repl_history *.tgz .yarn-integrity .env.test .cache/ .parcel-cache/ .next/ .nuxt/ dist/ .vuepress/ .serverless/ .fusebox/ .dynamodb/ .tern-port .vscode-test/ .pnp.* .yarn/ .clj-kondo/ .lsp/ .calva/ resources/public/models/eiffel_tower/scene.glb resources/public/js/ resources/public/css/maplibre-gl.css src/cljs/pearl_map/features/models_3d/model_data.cljs && find . -type f \\( -name '*~' -o -name '#*#' -o -name '*.swp' -o -name '*.swo' -o -name '.#*' \\) -delete",
+        "clean:cache": "rm -rf pom.xml *.jar *.class /lib/ /classes/ /target/ /checkouts/ .lein-deps-sum .lein-repl-history .lein-plugins/ .lein-failures .boot/ .nrepl-port .cpcache/ out/ .shadow-cljs/ .cljs_node_repl/ .cljs_rhino_repl/ main.js .aider.chat.history.md .aider.input.history .aider.tags.cache.v4/ .aider.tags.cache.v7/ node_modules/ npm-debug.log* yarn-debug.log* yarn-error.log* lerna-debug.log* .pnpm-debug.log* pids/ *.pid *.seed *.pid.lock coverage/ *.lcov .nyc_output/ .grunt/ bower_components/ .lock-wscript build/ jspm_packages/ typings/ *.tsbuildinfo .npm/ .eslintcache .stylelintcache .rpt2_cache/ .rts2_cache_cjs/ .rts2_cache_es/ .rts2_cache_umd/ .node_repl_history *.tgz .yarn-integrity .env.test .cache/ .parcel-cache/ .next/ .nuxt/ dist/ .vuepress/ .serverless/ .fusebox/ .dynamodb/ .tern-port .vscode-test/ .pnp.* .yarn/ .clj-kondo/ .lsp/ .calva/ resources/public/js/ resources/public/css/maplibre-gl.css src/cljs/pearl_map/features/models_3d/model_data.cljs && find . -type f \\( -name '*~' -o -name '#*#' -o -name '*.swp' -o -name '*.swo' -o -name '.#*' \\) -delete",
         "predev": "npm run prebuild",
-        "prebuild": "npm run build:model && npm run build:assets",
-        "build:assets": "clojure -M -m pearl-map.build",
-        "build:model": "gltf-pipeline -i resources/public/models/eiffel_tower/scene.gltf -o resources/public/models/eiffel_tower/scene.glb -b"
+        "prebuild": "npm run build:assets",
+        "build:assets": "clojure -M -m pearl-map.build"
     },
     "keywords": ["map", "3d", "geospatial", "visualization"],
     "author": "OverbearingPearl",
@@ -23,7 +22,6 @@
         "three": "^0.169.0"
     },
     "devDependencies": {
-        "gltf-pipeline": "^4.1.0",
         "shadow-cljs": "^2.28.1"
     }
 }
