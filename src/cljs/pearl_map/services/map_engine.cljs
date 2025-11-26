@@ -240,12 +240,22 @@
     [coords]
     (mapcat get-all-points coords)))
 
-(defn- fly-to-first-visible-feature [layer-id default-zoom]
+(defn- fly-to-nearest-visible-feature [layer-id default-zoom]
   (when-let [^js map-obj (get-map-instance)]
     (let [features (.queryRenderedFeatures map-obj #js {:layers #js [layer-id]})]
       (when (seq features)
-        (let [first-feature-coords (-> (first features) .-geometry .-coordinates js->clj)
-              target-coords (first (get-all-points first-feature-coords))]
+        (let [center-point (.project map-obj (.getCenter map-obj))
+              calc-dist-sq (fn [feature]
+                             (let [coords (-> feature .-geometry .-coordinates js->clj)
+                                   [lng lat] (first (get-all-points coords))]
+                               (if (and lng lat)
+                                 (let [point (.project map-obj (maplibre/LngLat. lng lat))
+                                       dx (- (.-x point) (.-x center-point))
+                                       dy (- (.-y point) (.-y center-point))]
+                                   (+ (* dx dx) (* dy dy)))
+                                 js/Infinity)))
+              nearest-feature (apply min-key calc-dist-sq features)
+              target-coords (-> nearest-feature .-geometry .-coordinates js->clj get-all-points first)]
           (when target-coords
             (.flyTo map-obj #js {:center (clj->js target-coords)
                                  :zoom default-zoom
@@ -266,7 +276,7 @@
                        final-inspect-zoom (-> default-inspect-zoom
                                               (min (- (or max-z 22.1) 0.1)) ;; Cannot exceed maxzoom
                                               (max (or min-z 0)))] ;; Must be at least minzoom
-                   (fly-to-first-visible-feature layer-id final-inspect-zoom))))))))
+                   (fly-to-nearest-visible-feature layer-id final-inspect-zoom))))))))
 
 
 ;; --- Style & Layer Management ---
