@@ -3,6 +3,7 @@
             [pearl-map.app.db :as app-db]
             [pearl-map.config :as config]
             [pearl-map.features.lighting.events]
+            [pearl-map.features.models-3d.events]
             [pearl-map.services.map-engine :as map-engine]
             [re-frame.db :as rf-db]
             ["maplibre-gl" :as maplibre]))
@@ -84,6 +85,7 @@
            (when light-props
              (.setLight map-instance (clj->js light-props)))
            (re-frame/dispatch [:buildings/add-layers])
+           (re-frame/dispatch [:models-3d/add-eiffel-tower])
            (when-not (.getItem js/localStorage prewarm-key)
              (re-frame/dispatch [:map/set-prewarming? true])
              (js/console.log "Prewarming map tiles for the first time...")
