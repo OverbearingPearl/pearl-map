@@ -44,25 +44,64 @@
      {:db (init-to-default-db db)})))
 
 (re-frame/reg-event-fx
+ :style-editor/smart-find-feature
+ (fn [{:keys [db]} [_ {:keys [layer-id excluded-set search-zoom on-found-event allow-zoom-retry?]}]]
+   (let [^js map-obj (map-engine/get-map-instance)
+         ;; Try find in current view
+         next-coords (map-engine/find-next-visible-feature layer-id (or excluded-set #{}))]
+
+     (if next-coords
+       ;; Found! Dispatch success event with coords
+       {:dispatch (conj on-found-event next-coords)}
+
+       ;; Not found
+       (if (and allow-zoom-retry? map-obj)
+         (let [current-zoom (.getZoom map-obj)]
+           (if (> current-zoom (+ search-zoom 0.5))
+             ;; Zoom out and retry (disable retry flag for next attempt to avoid loops)
+             {:dispatch [:style-editor/zoom-and-retry-find
+                         {:zoom search-zoom
+                          :retry-event [:style-editor/smart-find-feature
+                                        {:layer-id layer-id
+                                         :excluded-set excluded-set
+                                         :search-zoom search-zoom
+                                         :on-found-event on-found-event
+                                         :allow-zoom-retry? false}]}]}
+             ;; Already zoomed out, give up
+             {}))
+         ;; No retry allowed or map not ready
+         {})))))
+
+(re-frame/reg-event-fx
+ :style-editor/zoom-and-retry-find
+ (fn [_ [_ {:keys [zoom retry-event]}]]
+   (map-engine/zoom-to-level zoom #(re-frame/dispatch retry-event))
+   {}))
+
+(re-frame/reg-event-fx
  :style-editor/switch-target-layer
  (fn [{:keys [db]} [_ layer-id]]
    (let [current-style-key (:current-style-key db)
          current-style-url (get map-engine/style-urls current-style-key)
          current-zoom (:map/zoom db)
          current-styles (style-editor-views/get-layer-styles layer-id current-style-url current-zoom)
-         zoom-level (style-editor-views/get-zoom-for-layer layer-id)]
+         search-zoom (style-editor-views/get-zoom-for-layer layer-id)]
      {:db (-> db
               (assoc :style-editor/target-layer layer-id)
               (assoc :style-editor/editing-style current-styles)
               (assoc :style-editor/navigation-history [])
               (assoc :style-editor/navigation-index -1))
-      :dispatch [:style-editor/fly-to-feature layer-id zoom-level]})))
+      :dispatch [:style-editor/smart-find-feature
+                 {:layer-id layer-id
+                  :excluded-set #{}
+                  :search-zoom search-zoom
+                  :on-found-event [:style-editor/on-switch-layer-found]
+                  :allow-zoom-retry? true}]})))
 
 (re-frame/reg-event-fx
- :style-editor/fly-to-feature
- (fn [_ [_ layer-id zoom-level]]
-   (map-engine/focus-on-layer layer-id zoom-level)
-   {}))
+ :style-editor/on-switch-layer-found
+ (fn [_ [_ coords]]
+   {:dispatch [:style-editor/fly-to-coords coords]}))
 
 (re-frame/reg-event-fx
  :style-editor/update-layer-style
@@ -126,13 +165,7 @@
 (re-frame/reg-event-fx
  :style-editor/fly-to-coords
  (fn [_ [_ coords]]
-   (map-engine/fly-to-location coords 17)
-   {}))
-
-(re-frame/reg-event-fx
- :style-editor/zoom-and-retry-next
- (fn [_ [_ zoom]]
-   (map-engine/zoom-to-level zoom #(re-frame/dispatch [:style-editor/navigate-next]))
+   (map-engine/fly-to-location coords map-engine/default-inspect-zoom)
    {}))
 
 (re-frame/reg-event-fx
@@ -159,39 +192,32 @@
                temp-history (if current-center (conj history current-center) history)
                temp-index (if current-center 0 index)
 
-               ;; Exclude all points currently in history to avoid loops
                excluded-set (set temp-history)
+               search-zoom (style-editor-views/get-zoom-for-layer layer-id)]
 
-               ;; Find next nearest feature
-               next-coords (map-engine/find-next-visible-feature layer-id excluded-set)]
+           {:db (if current-center
+                  (-> db
+                      (assoc :style-editor/navigation-history temp-history)
+                      (assoc :style-editor/navigation-index temp-index))
+                  db)
+            :dispatch [:style-editor/smart-find-feature
+                       {:layer-id layer-id
+                        :excluded-set excluded-set
+                        :search-zoom search-zoom
+                        :on-found-event [:style-editor/on-next-found]
+                        :allow-zoom-retry? true}]}))))))
 
-           (if next-coords
-             (let [new-history (conj temp-history next-coords)
-                   new-index (inc temp-index)]
-               {:db (-> db
-                        (assoc :style-editor/navigation-history new-history)
-                        (assoc :style-editor/navigation-index new-index))
-                :dispatch [:style-editor/fly-to-coords next-coords]})
-
-             ;; Not found. Check if we should zoom out and retry.
-             (let [current-zoom (.getZoom map-obj)
-                   target-zoom (style-editor-views/get-zoom-for-layer layer-id)]
-               ;; If we are zoomed in closer than the target layer's ideal zoom (plus a buffer),
-               ;; zoom out to that ideal zoom to broaden the search.
-               (if (> current-zoom (+ target-zoom 0.5))
-                 {:db (if current-center
-                        (-> db
-                            (assoc :style-editor/navigation-history temp-history)
-                            (assoc :style-editor/navigation-index temp-index))
-                        db)
-                  :dispatch [:style-editor/zoom-and-retry-next target-zoom]}
-
-                 ;; Already wide enough, just give up (or save state)
-                 {:db (if current-center
-                        (-> db
-                            (assoc :style-editor/navigation-history temp-history)
-                            (assoc :style-editor/navigation-index temp-index))
-                        db)})))))))))
+(re-frame/reg-event-fx
+ :style-editor/on-next-found
+ (fn [{:keys [db]} [_ coords]]
+   (let [history (:style-editor/navigation-history db)
+         index (:style-editor/navigation-index db)
+         new-history (conj history coords)
+         new-index (inc index)]
+     {:db (-> db
+              (assoc :style-editor/navigation-history new-history)
+              (assoc :style-editor/navigation-index new-index))
+      :dispatch [:style-editor/fly-to-coords coords]})))
 
 (re-frame/reg-event-fx
  :style-editor/navigate-prev

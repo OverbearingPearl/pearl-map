@@ -13,7 +13,7 @@
 
 ;; --- Constants & Configuration ---
 
-(def ^:private default-inspect-zoom 17)
+(def default-inspect-zoom 17)
 
 (def style-urls
   {:raster-style "raster-style"
@@ -285,43 +285,6 @@
                   feature (:feature best)]
               (-> feature .-geometry .-coordinates js->clj get-all-points first))))))))
 
-(defn- fly-to-nearest-visible-feature [layer-id default-zoom]
-  (when-let [^js map-obj (get-map-instance)]
-    (let [features (.queryRenderedFeatures map-obj #js {:layers #js [layer-id]})]
-      (when (seq features)
-        (let [center-point (.project map-obj (.getCenter map-obj))
-              calc-dist-sq (fn [feature]
-                             (let [coords (-> feature .-geometry .-coordinates js->clj)
-                                   [lng lat] (first (get-all-points coords))]
-                               (if (and lng lat)
-                                 (let [point (.project map-obj (maplibre/LngLat. lng lat))
-                                       dx (- (.-x point) (.-x center-point))
-                                       dy (- (.-y point) (.-y center-point))]
-                                   (+ (* dx dx) (* dy dy)))
-                                 js/Infinity)))
-              nearest-feature (apply min-key calc-dist-sq features)
-              target-coords (-> nearest-feature .-geometry .-coordinates js->clj get-all-points first)]
-          (when target-coords
-            (.flyTo map-obj #js {:center (clj->js target-coords)
-                                 :zoom default-zoom
-                                 :essential true})))))))
-
-(defn focus-on-layer [layer-id search-zoom]
-  (if (= layer-id config/model-layer-id)
-    (fly-to-location config/eiffel-tower-coords search-zoom)
-    (when-let [^js map-obj (get-map-instance)]
-      (let [current-center (.getCenter map-obj)]
-        (.flyTo map-obj #js {:center current-center :zoom search-zoom :essential true})
-        (.once map-obj "moveend"
-               (fn []
-                 (let [min-z (get-layer-min-zoom layer-id)
-                       max-z (get-layer-max-zoom layer-id)
-                       ;; Clamp the inspect zoom to be within the layer's visible range.
-                       ;; Subtract a small epsilon from max-z because maxzoom is exclusive.
-                       final-inspect-zoom (-> default-inspect-zoom
-                                              (min (- (or max-z 22.1) 0.1)) ;; Cannot exceed maxzoom
-                                              (max (or min-z 0)))] ;; Must be at least minzoom
-                   (fly-to-nearest-visible-feature layer-id final-inspect-zoom))))))))
 
 
 ;; --- Style & Layer Management ---
