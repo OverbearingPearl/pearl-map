@@ -161,10 +161,17 @@
 
 (defn get-inspect-zoom-for-layer [layer-id]
   (let [category (get-category-for-layer layer-id)
-        min-zoom (get-zoom-for-layer layer-id)]
+        min-zoom (get-zoom-for-layer layer-id)
+        max-zoom (map-engine/get-layer-max-zoom layer-id)
+        ;; Default target is 17, but ensure it's at least min-zoom
+        base-target (max min-zoom map-engine/default-inspect-zoom)]
     (if (= category :boundaries)
       min-zoom
-      (max min-zoom map-engine/default-inspect-zoom))))
+      (if max-zoom
+        ;; If layer has a max-zoom, clamp our target to be slightly less than it
+        ;; to ensure visibility (max-zoom is exclusive in Mapbox spec)
+        (min base-target (- max-zoom 0.5))
+        base-target))))
 
 (defn get-layers-for-category [category-key]
   (get-in layer-categories [category-key :layers]))
