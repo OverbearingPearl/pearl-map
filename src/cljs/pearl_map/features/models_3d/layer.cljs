@@ -165,7 +165,8 @@
                              model-scale-factor (calculate-model-scale-factor model-scene)]
                          (.add scene model-scene)
                          (when-let [^js st @layer-state]
-                           (set! (.-modelScaleFactor st) model-scale-factor))))
+                           (set! (.-modelScaleFactor st) model-scale-factor))
+                         (.triggerRepaint map-obj)))
                      (fn [error]
                        (js/console.error "Failed to load Eiffel Tower model:" error)))
 
