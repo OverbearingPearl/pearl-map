@@ -26,6 +26,11 @@
    (let [initial-scale (:models-3d/eiffel-scale db)
          initial-rotation-z (:models-3d/eiffel-rotation-z db)
          custom-layer (model-layer/create-custom-layer initial-scale initial-rotation-z)]
+     ;; Remove existing layer if present (e.g. restored by map-engine on hot reload)
+     ;; to ensure we use the fresh instance created from current code.
+     (when (map-engine/layer-exists? config/model-layer-id)
+       (map-engine/remove-custom-layer config/model-layer-id))
+
      (map-engine/add-custom-layer
       config/model-layer-id
       (clj->js custom-layer)
