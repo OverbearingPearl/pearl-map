@@ -61,6 +61,32 @@
    {}))
 
 (re-frame/reg-event-fx
+ :style-editor/update-layer-style
+ (fn [{:keys [db]} [_ target-layer style-key value zoom]]
+   (let [current-zoom (or zoom (:map/zoom db))
+         is-layout? (contains? (set style-editor-views/layout-style-keys) style-key)
+         prop-type (if is-layout? "layout" "paint")
+         processed-value (cond
+                           (= style-key :text-font) value
+                           (contains? style-editor-views/color-style-keys style-key) (style-editor-views/format-color-input value)
+                           (or (contains? style-editor-views/opacity-style-keys style-key)
+                               (contains? style-editor-views/width-style-keys style-key)
+                               (= style-key :text-size)) (style-editor-views/format-numeric-input value)
+                           (contains? #{:visibility :line-cap :line-join :text-transform :text-anchor :symbol-placement} style-key) (style-editor-views/format-enum-input value)
+                           :else value)]
+     (if (some? processed-value)
+       (let [updated-value (map-engine/update-zoom-value-pair target-layer (name style-key) current-zoom processed-value prop-type)]
+         {:dispatch [:style-editor/update-and-apply-style style-key updated-value]})
+       {}))))
+
+(re-frame/reg-event-fx
+ :style-editor/update-style-debounced
+ (fn [{:keys [db]} [_ target-layer style-key value zoom]]
+   {:dispatch-debounce {:key (str "update-style-" target-layer "-" (name style-key))
+                        :event [:style-editor/update-layer-style target-layer style-key value zoom]
+                        :delay 300}}))
+
+(re-frame/reg-event-fx
  :style-editor/update-and-apply-style
  (fn [{:keys [db]} [_ style-key value]]
    (let [updated-db (assoc-in db [:style-editor/editing-style style-key] value)]

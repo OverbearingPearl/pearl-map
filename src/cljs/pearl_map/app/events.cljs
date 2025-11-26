@@ -63,6 +63,16 @@
  (fn [db [_ prewarming?]]
    (assoc db :map/prewarming? prewarming?)))
 
+(defonce debounce-timers (atom {}))
+
+(re-frame/reg-fx
+ :dispatch-debounce
+ (fn [{:keys [key event delay]}]
+   (when-let [timer-id (get @debounce-timers key)]
+     (js/clearTimeout timer-id))
+   (let [new-timer-id (js/setTimeout #(re-frame/dispatch event) (or delay 300))]
+     (swap! debounce-timers assoc key new-timer-id))))
+
 (defn init-map []
   (let [map-obj (map-engine/init-map)]
     (when map-obj
