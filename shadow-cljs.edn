@@ -22,7 +22,7 @@
                          :preloads [day8.re-frame-10x.preload.react-18]}}
         :compiler-options {:ignore-source-regex [".*~$" ".*#$" ".*\\.swp$" ".*\\.swo$" ".*\\.DS_Store$"
                                                   ".*\\.iml$" "\\.idea/.*" "\\.vscode/.*" "\\.calva/.*" "\\.lsp/.*"
-                                                  "\\.aider.*" "\\.cpcache/.*"]}
+                                                  "\\.aider.*" "\\.cpcache/.*" ".*\\.glb$"]}
         :release {:compiler-options {}}}
   :test {:target :browser-test
          :test-dir "target/test"
