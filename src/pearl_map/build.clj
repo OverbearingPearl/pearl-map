@@ -39,19 +39,23 @@
       (exit-with-error (str "Source file not found: " (.getAbsolutePath source))))))
 
 (defn copy-directory!
-  "Copies all files from source directory to target directory.
+  "Copies all files from source directory to target directory recursively.
   Exits with error if source directory does not exist."
   [source-dir-path target-dir-path]
   (let [source-dir (io/file source-dir-path)
         target-dir (io/file target-dir-path)]
-    (log-info (str "Copying files from " source-dir-path " to " target-dir-path))
+    (log-info (str "Copying directory " source-dir-path " to " target-dir-path))
     (when-not (.exists target-dir)
       (log-info (str "Creating target directory: " (.getAbsolutePath target-dir)))
       (when-not (.mkdirs target-dir)
         (exit-with-error (str "Failed to create target directory: " (.getAbsolutePath target-dir)))))
     (if (.exists source-dir)
       (doseq [file (.listFiles source-dir)]
-        (copy-file! (.getAbsolutePath file) (str (.getAbsolutePath target-dir) "/" (.getName file))))
+        (let [child-source (.getAbsolutePath file)
+              child-target (str (.getAbsolutePath target-dir) "/" (.getName file))]
+          (if (.isDirectory file)
+            (copy-directory! child-source child-target)
+            (copy-file! child-source child-target))))
       (exit-with-error (str "Source directory not found: " (.getAbsolutePath source-dir))))))
 
 (defn copy-maplibre-css
@@ -78,12 +82,21 @@
   []
   (copy-file! "resources/public/css/style.css" "target/public/css/style.css"))
 
+(defn copy-draco-assets
+  "Copies Draco decoder files from node_modules to target directory."
+  []
+  (log-info "Copying Draco decoder assets...")
+  (let [source-dir "node_modules/three/examples/jsm/libs/draco"
+        target-dir "target/public/js/libs/draco"]
+    (copy-directory! source-dir target-dir)))
+
 (defn ^:export build-hook []
   (log-info "Starting build hook tasks...")
   (copy-index-html)
   (copy-main-css)
   (copy-maplibre-css)
   (copy-model-assets)
+  (copy-draco-assets)
   (log-info "All build hook tasks completed."))
 
 (defn -main [& args]

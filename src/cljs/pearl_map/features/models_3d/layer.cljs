@@ -147,7 +147,7 @@
 
                     (model-loader/load-model
                      loader
-                     "models/eiffel_tower/scene.gltf"
+                     "models/eiffel_tower/scene.glb"
                      (fn [gltf]
                        (let [^three/Object3D model-scene (.-scene gltf)
                              _ (configure-shadow-camera directional-light model-scene)
