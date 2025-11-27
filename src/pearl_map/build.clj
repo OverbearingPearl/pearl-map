@@ -82,6 +82,11 @@
   []
   (copy-file! "resources/public/css/style.css" "target/public/css/style.css"))
 
+(defn copy-favicon
+  "Copies favicon.jpg from resources/public to target/public."
+  []
+  (copy-file! "resources/public/favicon.jpg" "target/public/favicon.jpg"))
+
 (defn copy-draco-assets
   "Copies Draco decoder files from node_modules to target directory."
   []
@@ -93,6 +98,7 @@
 (defn ^:export build-hook []
   (log-info "Starting build hook tasks...")
   (copy-index-html)
+  (copy-favicon)
   (copy-main-css)
   (copy-maplibre-css)
   (copy-model-assets)
