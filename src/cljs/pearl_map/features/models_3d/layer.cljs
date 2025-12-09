@@ -8,38 +8,14 @@
             [pearl-map.config :as config]
             [pearl-map.services.map-engine :as map-engine]
             [pearl-map.services.model-loader :as model-loader]
-            [pearl-map.utils.geometry :as geom]))
+            [pearl-map.services.map-adapter :as map-adapter]))
 
-(defn- maplibre-light-pos->three-direction
-  "Converts MapLibre light position [r, a, p] to a Three.js direction Vector3.
-  It assumes the map is on the XZ plane and Y is up.
-  - MapLibre's azimuth 'a' is clockwise from North (-Z direction).
-  - MapLibre's polar 'p' is from zenith (+Y direction)."
-  [[r a p]]
-  (let [a-rad (* a (/ js/Math.PI 180))
-        p-rad (* p (/ js/Math.PI 180))
-        x (* r (js/Math.sin p-rad) (js/Math.sin a-rad))
-        y (* r (js/Math.cos p-rad))
-        z (* r (- (js/Math.sin p-rad)) (js/Math.cos a-rad))]
-    (three/Vector3. x y z)))
-
-(defn- update-light-from-props [^js light light-props]
-  (when (and light-props light)
+(defn- update-light-from-props [^js light map-light-props]
+  (when-let [three-light-props (map-adapter/convert-light-props map-light-props)]
     (doto light
-      (-> .-color (.set (three/Color. (:color light-props))))
-      (-> .-position (.copy (maplibre-light-pos->three-direction (:position light-props))))
-      (set! -intensity (:intensity light-props)))))
-
-(defn- make-model-transform [coords altitude model-rotate]
-  (let [model-mercator (.fromLngLat maplibre/MercatorCoordinate (clj->js coords) altitude)
-        base-model-scale (.meterInMercatorCoordinateUnits model-mercator)]
-    #js {:translateX (.-x model-mercator)
-         :translateY (.-y model-mercator)
-         :translateZ (.-z model-mercator)
-         :rotateX (nth model-rotate 0)
-         :rotateY (nth model-rotate 1)
-         :rotateZ (nth model-rotate 2)
-         :scale base-model-scale}))
+      (-> .-color (.set (:color three-light-props)))
+      (-> .-position (.copy (:position three-light-props)))
+      (set! -intensity (:intensity three-light-props)))))
 
 (defn- init-renderer [^js canvas ^js gl]
   (doto (three/WebGLRenderer. #js {:canvas canvas :context gl :antialias true})
@@ -96,129 +72,108 @@
       (/ config/eiffel-tower-real-height model-unit-height)
       1)))
 
-(defn- calculate-local-transform-matrix [^js model-transform final-scale user-rotation-z]
-  (let [rotation-x (.makeRotationAxis (three/Matrix4.) (three/Vector3. 1 0 0) (.-rotateX model-transform))
-        rotation-y (.makeRotationAxis (three/Matrix4.) (three/Vector3. 0 1 0) (.-rotateY model-transform))
-        rotation-z (.makeRotationAxis (three/Matrix4.) (three/Vector3. 0 0 1) (+ (.-rotateZ model-transform) user-rotation-z))]
-    (-> (three/Matrix4.)
-        (.makeTranslation (.-translateX model-transform)
-                          (.-translateY model-transform)
-                          (.-translateZ model-transform))
-        (.scale (three/Vector3. final-scale
-                                (- final-scale)
-                                final-scale))
-        (.multiply rotation-z)
-        (.multiply rotation-y)
-        (.multiply rotation-x))))
+(defn create-custom-layer
+  ([] (create-custom-layer config/eiffel-tower-initial-scale config/eiffel-tower-initial-rotation-z))
+  ([initial-scale initial-rotation-z]
+   (let [;; Local mutable state for this layer instance only
+         layer-state (volatile! nil)
+         ;; Watcher to trigger repaints when DB changes
+         repaint-watcher (atom nil)]
+     #js {:id config/model-layer-id
+          :type "custom"
+          :renderingMode "3d"
+          :onAdd (fn [map gl]
+                   (let [^js map-obj map
+                         ^js scene (three/Scene.)
+                         ^js camera (three/Camera.)
+                         ^js loader (model-loader/create-gltf-loader)
+                         lights (init-lights)
+                         directional-light (:directional lights)]
 
-(defn- get-render-params [^js state db-state]
-  (let [model-transform (.-modelTransform state)
-        model-scale-factor (or (.-modelScaleFactor state) 1)
-        user-scale (:scale db-state)
-        final-scale (* (.-scale model-transform) model-scale-factor user-scale)
-        user-rotation-z (:rotation-z db-state)]
-    {:final-scale final-scale
-     :user-rotation-z user-rotation-z
-     :model-transform model-transform}))
+                     (.add scene directional-light)
+                     (.add scene (:ambient lights))
+                     (add-shadow-plane scene)
 
-(defn create-custom-layer [initial-scale initial-rotation-z]
-  (let [model-transform (make-model-transform config/eiffel-tower-coords config/model-altitude config/model-rotate)
-        ;; Local mutable state for this layer instance only
-        layer-state (volatile! nil)
-        ;; Watcher to trigger repaints when DB changes
-        repaint-watcher (atom nil)]
-    #js {:id config/model-layer-id
-         :type "custom"
-         :renderingMode "3d"
-         :onAdd (fn [map gl]
-                  (let [^js map-obj map
-                        ^js scene (three/Scene.)
-                        ^js camera (three/Camera.)
-                        ^js loader (model-loader/create-gltf-loader)
-                        lights (init-lights)
-                        directional-light (:directional lights)]
+                     (model-loader/load-model
+                      loader
+                      "models/eiffel_tower/scene.glb"
+                      (fn [gltf]
+                        (let [^three/Object3D model-scene (.-scene gltf)
+                              _ (configure-shadow-camera directional-light model-scene)
+                              _ (enable-model-shadows model-scene)
+                              model-scale-factor (calculate-model-scale-factor model-scene)]
+                          (.add scene model-scene)
+                          (when-let [^js st @layer-state]
+                            (set! (.-modelScaleFactor st) model-scale-factor))
+                          (.triggerRepaint map-obj)))
+                      (fn [error]
+                        (js/console.error "Failed to load Eiffel Tower model:" error)))
 
-                    (.add scene directional-light)
-                    (.add scene (:ambient lights))
-                    (add-shadow-plane scene)
+                     ;; Sync initial values to DB
+                     (rf/dispatch [:models-3d/set-eiffel-scale initial-scale])
+                     (rf/dispatch [:models-3d/set-eiffel-rotation-z initial-rotation-z])
 
-                    (model-loader/load-model
-                     loader
-                     "models/eiffel_tower/scene.glb"
-                     (fn [gltf]
-                       (let [^three/Object3D model-scene (.-scene gltf)
-                             _ (configure-shadow-camera directional-light model-scene)
-                             _ (enable-model-shadows model-scene)
-                             model-scale-factor (calculate-model-scale-factor model-scene)]
-                         (.add scene model-scene)
-                         (when-let [^js st @layer-state]
-                           (set! (.-modelScaleFactor st) model-scale-factor))
-                         (.triggerRepaint map-obj)))
-                     (fn [error]
-                       (js/console.error "Failed to load Eiffel Tower model:" error)))
+                     ;; Store imperative state
+                     (vreset! layer-state
+                              #js {:scene scene
+                                   :camera camera
+                                   :light directional-light
+                                   :map map-obj
+                                   :modelScaleFactor 1
+                                   :renderer nil})
 
-                    ;; Sync initial values to DB
-                    (rf/dispatch [:models-3d/set-eiffel-scale initial-scale])
-                    (rf/dispatch [:models-3d/set-eiffel-rotation-z initial-rotation-z])
+                     ;; Setup Reactive Repaint Trigger
+                     (let [r (ratom/reaction
+                              {:scale (:models-3d/eiffel-scale @rf-db/app-db)
+                               :rotation-z (:models-3d/eiffel-rotation-z @rf-db/app-db)
+                               :light (:map/light-properties @rf-db/app-db)})]
+                       (reset! repaint-watcher r)
+                       (add-watch r :layer-repaint
+                                  (fn [_ _ _ _]
+                                    (.triggerRepaint map-obj))))))
 
-                    ;; Store imperative state
-                    (vreset! layer-state
-                             #js {:scene scene
-                                  :camera camera
-                                  :light directional-light
-                                  :map map-obj
-                                  :modelTransform model-transform
-                                  :modelScaleFactor 1
-                                  :renderer nil})
+          :onRemove (fn [_ _]
+                      (when-let [r @repaint-watcher]
+                        (remove-watch r :layer-repaint))
+                      (when-let [^js state @layer-state]
+                        (when-let [renderer (.-renderer state)]
+                          (.dispose renderer))
+                        (set! (.-renderer state) nil)
+                        (set! (.-scene state) nil)
+                        (set! (.-camera state) nil))
+                      (vreset! layer-state nil))
 
-                    ;; Setup Reactive Repaint Trigger
-                    (let [r (ratom/reaction
-                             {:scale (:models-3d/eiffel-scale @rf-db/app-db)
-                              :rotation-z (:models-3d/eiffel-rotation-z @rf-db/app-db)
-                              :light (:map/light-properties @rf-db/app-db)})]
-                      (reset! repaint-watcher r)
-                      (add-watch r :layer-repaint
-                                 (fn [_ _ _ _]
-                                   (.triggerRepaint map-obj))))))
+          :render (fn [gl matrix-data]
+                    (when-let [^js state @layer-state]
+                      (let [db @rf-db/app-db
+                            light-props (:map/light-properties db)]
 
-         :onRemove (fn [_ _]
-                     (when-let [r @repaint-watcher]
-                       (remove-watch r :layer-repaint))
-                     (when-let [^js state @layer-state]
-                       (when-let [renderer (.-renderer state)]
-                         (.dispose renderer))
-                       (set! (.-renderer state) nil)
-                       (set! (.-scene state) nil)
-                       (set! (.-camera state) nil))
-                     (vreset! layer-state nil))
+                        (update-light-from-props (.-light state) light-props)
 
-         :render (fn [gl matrix-data]
-                   (when-let [^js state @layer-state]
-                     (let [db @rf-db/app-db
-                           ;; Read directly from DB for the render loop
-                           current-config {:scale (:models-3d/eiffel-scale db)
-                                           :rotation-z (* (:models-3d/eiffel-rotation-z db) (/ js/Math.PI 180))}
-                           light-props (:map/light-properties db)]
+                        (let [scene (.-scene state)
+                              camera (.-camera state)
+                              renderer (or (.-renderer state)
+                                           (let [new-renderer (init-renderer (.getCanvas (.-map state)) gl)]
+                                             (set! (.-renderer state) new-renderer)
+                                             new-renderer))
+                              ^js map-instance (.-map state)
+                              canvas (.getCanvas map-instance)
+                              model-transform-params {:lng-lat config/eiffel-tower-coords
+                                                      :altitude config/model-altitude
+                                                      :rotation-rad {:x (nth config/model-rotate 0)
+                                                                     :y (+ (nth config/model-rotate 1) (* (:models-3d/eiffel-rotation-z db) (/ js/Math.PI 180)))
+                                                                     :z (nth config/model-rotate 2)}
+                                                      :scale (* (:models-3d/eiffel-scale db) (.-modelScaleFactor state))}
+                              model-matrix (map-adapter/get-model-matrix model-transform-params)
+                              camera-matrix-params {:map-projection-matrix (-> matrix-data .-defaultProjectionData .-mainMatrix)
+                                                    :model-matrix model-matrix}
+                              final-matrix (map-adapter/get-camera-matrix camera-matrix-params)]
 
-                       (update-light-from-props (.-light state) light-props)
-
-                       (let [scene (.-scene state)
-                             camera (.-camera state)
-                             renderer (or (.-renderer state)
-                                          (let [new-renderer (init-renderer (.getCanvas (.-map state)) gl)]
-                                            (set! (.-renderer state) new-renderer)
-                                            new-renderer))
-                             map-instance (.-map state)
-                             canvas (.getCanvas map-instance)
-                             {:keys [final-scale user-rotation-z model-transform]} (get-render-params state current-config)
-                             m (.fromArray (three/Matrix4.) (-> matrix-data .-defaultProjectionData .-mainMatrix))
-                             l (calculate-local-transform-matrix model-transform final-scale user-rotation-z)]
-
-                         (set! (.-projectionMatrix camera) (.multiply m l))
-                         (.setSize renderer (.-width canvas) (.-height canvas) false)
-                         (.resetState renderer)
-                         (.render renderer scene camera)
-                         (.triggerRepaint map-instance)))))}))
+                          (set! (.-projectionMatrix camera) final-matrix)
+                          (.setSize renderer (.-width canvas) (.-height canvas) false)
+                          (.resetState renderer)
+                          (.render renderer scene camera)
+                          (.triggerRepaint map-instance)))))})))
 
 (defn reload! []
   (let [db @rf-db/app-db

@@ -1,7 +1,9 @@
 (ns pearl-map.config)
 
-(def eiffel-tower-coords [2.294481 48.858200])
-(def eiffel-tower-real-height 330)
+(def eiffel-tower-coords [2.2944800 48.8582700])
+(def eiffel-tower-real-height 310)
+(def eiffel-tower-initial-scale 1)
+(def eiffel-tower-initial-rotation-z 45)
 (def model-layer-id "3d-model-eiffel")
 
 (def default-inspect-zoom 17)

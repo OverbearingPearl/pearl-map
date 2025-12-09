@@ -2,7 +2,6 @@
   (:require [re-frame.core :as re-frame]
             [re-frame.db :as db]
             [reagent.core :as reagent]
-            [pearl-map.utils.geometry :as geom]
             [pearl-map.config :as config]
             [clojure.string :as str]
             ["maplibre-gl" :as maplibre]
