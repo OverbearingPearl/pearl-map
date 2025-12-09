@@ -1,13 +1,59 @@
-(ns pearl-map.components.ui.layout
-  (:require [reagent.core :as reagent]))
+(ns pearl-map.components.ui.layout)
 
-(defn- component-factory [base-class dissoc-keys]
-  (fn [props & children]
-    (let [attrs (if (map? props) props {})
-          class-name (str base-class " " (or (:class attrs) ""))]
-      (into [:div (assoc (apply dissoc attrs dissoc-keys) :class class-name)] children))))
+(defn flex-container
+  [{:keys [direction align justify gap wrap style class] :as props} & children]
+  (let [styles (cond-> {:display "flex"}
+                 direction (assoc :flex-direction direction)
+                 align     (assoc :align-items align)
+                 justify   (assoc :justify-content justify)
+                 gap       (assoc :gap gap)
+                 wrap      (assoc :flex-wrap wrap)
+                 style     (merge style))
+        clean-props (dissoc props :direction :align :justify :gap :wrap :style :class)]
+    (into [:div (assoc clean-props
+                       :class (str "flex-container " (or class ""))
+                       :style styles)]
+          children)))
 
-(def flex-container (component-factory "flex-container" [:direction :align :justify :gap :wrap :style]))
-(def grid-container (component-factory "grid-container" [:columns :gap :style]))
-(def card (component-factory "card" [:padding :background :border-radius :shadow :style :width]))
-(def overlay (component-factory "overlay" [:position :top :right :bottom :left :z-index :style]))
+(defn grid-container
+  [{:keys [columns gap style class] :as props} & children]
+  (let [styles (cond-> {:display "grid"}
+                 columns (assoc :grid-template-columns columns)
+                 gap     (assoc :gap gap)
+                 style   (merge style))
+        clean-props (dissoc props :columns :gap :style :class)]
+    (into [:div (assoc clean-props
+                       :class (str "grid-container " (or class ""))
+                       :style styles)]
+          children)))
+
+(defn card
+  [{:keys [padding background border-radius shadow width style class] :as props} & children]
+  (let [styles (cond-> {}
+                 padding       (assoc :padding padding)
+                 background    (assoc :background background)
+                 border-radius (assoc :border-radius border-radius)
+                 shadow        (assoc :box-shadow shadow)
+                 width         (assoc :width width)
+                 style         (merge style))
+        clean-props (dissoc props :padding :background :border-radius :shadow :width :style :class)]
+    (into [:div (assoc clean-props
+                       :class (str "card " (or class ""))
+                       :style styles)]
+          children)))
+
+(defn overlay
+  [{:keys [position top right bottom left z-index style class] :as props} & children]
+  (let [styles (cond-> {}
+                 position (assoc :position position)
+                 top      (assoc :top top)
+                 right    (assoc :right right)
+                 bottom   (assoc :bottom bottom)
+                 left     (assoc :left left)
+                 z-index  (assoc :z-index z-index)
+                 style    (merge style))
+        clean-props (dissoc props :position :top :right :bottom :left :z-index :style :class)]
+    (into [:div (assoc clean-props
+                       :class (str "overlay " (or class ""))
+                       :style styles)]
+          children)))
