@@ -11,15 +11,26 @@
         mercator-scale (.meterInMercatorCoordinateUnits model-mercator)
         final-scale (* mercator-scale scale)
         {:keys [x y z]} rotation-rad
-        ;; 1. Rotation: Apply rotations first to orient the model correctly.
-        ;; Order "XYZ" ensures we can tilt it upright (X) and then rotate azimuth (Y).
+
+        ;; 1. Uniform Scale: Apply model's scale in its local coordinate system.
+        uniform-scale-matrix (.makeScale (three/Matrix4.) final-scale final-scale final-scale)
+
+        ;; 2. Rotation: Apply rotations to orient the model correctly.
         rotation-matrix (.makeRotationFromEuler (three/Matrix4.)
                                                 (.set (three/Euler.) x y z "XYZ"))
-        ;; 2. Scale: Apply scaling. Note the Y-inversion for MapLibre's coordinate system.
-        scale-matrix (.makeScale (three/Matrix4.) final-scale (- final-scale) final-scale)
-        ;; Combine: Scale * Rotation (Rotate first, then Scale)
-        model-matrix (.multiply scale-matrix rotation-matrix)]
-    ;; 3. Translation: Move to the final position on the map.
+
+        ;; 3. Coordinate System Flip: Invert Y-axis for MapLibre's coordinate system.
+        flip-matrix (.makeScale (three/Matrix4.) 1 -1 1)
+
+        ;; 4. Combine transformations. Order of operations on a vertex is:
+        ;; Uniform Scale -> Rotation -> Flip.
+        ;; Matrix multiplication order is reversed: Flip * Rotation * UniformScale.
+        model-matrix (doto (three/Matrix4.)
+                       (.multiply flip-matrix)
+                       (.multiply rotation-matrix)
+                       (.multiply uniform-scale-matrix))]
+
+    ;; 5. Translation: Move to the final position on the map.
     (.setPosition model-matrix
                   (.-x model-mercator)
                   (.-y model-mercator)
