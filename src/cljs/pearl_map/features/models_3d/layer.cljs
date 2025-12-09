@@ -30,9 +30,6 @@
       (-> .-position (.copy (maplibre-light-pos->three-direction (:position light-props))))
       (set! -intensity (:intensity light-props)))))
 
-(def model-altitude 0)
-(def model-rotate [(/ js/Math.PI 2) 0 0])
-
 (defn- make-model-transform [coords altitude model-rotate]
   (let [model-mercator (.fromLngLat maplibre/MercatorCoordinate (clj->js coords) altitude)
         base-model-scale (.meterInMercatorCoordinateUnits model-mercator)]
@@ -125,7 +122,7 @@
      :model-transform model-transform}))
 
 (defn create-custom-layer [initial-scale initial-rotation-z]
-  (let [model-transform (make-model-transform config/eiffel-tower-coords model-altitude model-rotate)
+  (let [model-transform (make-model-transform config/eiffel-tower-coords config/model-altitude config/model-rotate)
         ;; Local mutable state for this layer instance only
         layer-state (volatile! nil)
         ;; Watcher to trigger repaints when DB changes

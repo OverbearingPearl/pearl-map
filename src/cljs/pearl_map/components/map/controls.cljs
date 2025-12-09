@@ -1,16 +1,17 @@
 (ns pearl-map.components.map.controls
   (:require [re-frame.core :as re-frame]
+            [pearl-map.config :as config]
             [pearl-map.services.map-engine :as map-engine]
             [pearl-map.components.ui.buttons :as ui-buttons]
             [pearl-map.components.ui.layout :as ui-layout]))
 
 (defn change-map-style [style-key]
-  (let [style-url (get map-engine/style-urls style-key)]
+  (let [style-url (get config/style-urls style-key)]
     (map-engine/change-map-style style-url)))
 
 (defn style-controls []
   (let [current-style-key @(re-frame/subscribe [:current-style-key])
-        current-style-url (get map-engine/style-urls current-style-key)
+        current-style-url (get config/style-urls current-style-key)
         show-other-components? @(re-frame/subscribe [:show-other-components?])
         map-instance @(re-frame/subscribe [:map-instance])]
     [ui-layout/card

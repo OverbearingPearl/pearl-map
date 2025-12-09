@@ -2,6 +2,7 @@
   (:require [reagent.core :as reagent]
             [re-frame.core :as re-frame]
             [clojure.string :as str]
+            [pearl-map.config :as config]
             [pearl-map.services.map-engine :as map-engine]
             [pearl-map.utils.colors :as colors]))
 
@@ -164,7 +165,7 @@
         min-zoom (get-zoom-for-layer layer-id)
         max-zoom (map-engine/get-layer-max-zoom layer-id)
         ;; Default target is 17, but ensure it's at least min-zoom
-        base-target (max min-zoom map-engine/default-inspect-zoom)]
+        base-target (max min-zoom config/default-inspect-zoom)]
     (if (= category :boundaries)
       min-zoom
       (if max-zoom

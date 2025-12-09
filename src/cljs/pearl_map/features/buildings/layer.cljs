@@ -1,5 +1,6 @@
 (ns pearl-map.features.buildings.layer
   (:require [re-frame.db :as db]
+            [pearl-map.config :as config]
             [pearl-map.services.map-engine :as map-engine]))
 
 (def ^:private shadow-buckets
@@ -30,27 +31,6 @@
                                                "fill-extrusion-translate"
                                                (clj->js [dx dy]))))))))))
 
-(def eiffel-tower-osm-ids
-  "OSM IDs for buildings in the Eiffel Tower complex to be excluded from the map."
-  [;; Main structure:
-   5013364
-   ;; Other structures that have little impact (IDs identified via click debugging):
-   278644
-   ;; 279659
-   ;; 540568
-   ;; 540590]
-   ;; Surrounding structures:
-   308687745
-   308687744
-   308689164
-   4114842
-   4114839
-   308687746
-   308145239
-   69034127
-   335101043
-   4114841])
-
 (defn- create-extruded-layer-spec
   ([layer-id initial-color]
    (create-extruded-layer-spec layer-id initial-color nil))
@@ -79,7 +59,7 @@
                        :fill-extrusion-vertical-gradient (not is-top-layer?)
                        :fill-extrusion-translate [0, 0]
                        :fill-extrusion-translate-anchor "map"})
-         filter (let [exclude-eiffel-tower ["!", ["in", ["id"], ["literal", eiffel-tower-osm-ids]]]]
+         filter (let [exclude-eiffel-tower ["!", ["in", ["id"], ["literal", config/eiffel-tower-osm-ids]]]]
                   (if is-shadow-layer?
                     ["all"
                      exclude-eiffel-tower

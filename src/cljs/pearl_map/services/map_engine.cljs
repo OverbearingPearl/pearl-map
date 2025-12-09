@@ -13,25 +13,6 @@
 
 ;; --- Constants & Configuration ---
 
-(def default-inspect-zoom 17)
-
-(def style-urls
-  {:raster-style "raster-style"
-   :dark-style "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-   :light-style "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"})
-
-(def ^:private raster-style-object
-  {:version 8
-   :name "OSM Bright"
-   :sources {:osm {:type "raster"
-                   :tiles ["https://tile.openstreetmap.de/{z}/{x}/{y}.png"]
-                   :tileSize 256
-                   :attribution "© OpenStreetMap contributors"}}
-   :layers [{:id "osm-tiles"
-             :type "raster"
-             :source "osm"
-             :minzoom 0
-             :maxzoom 19}]})
 
 
 ;; --- State Accessors ---
@@ -139,7 +120,7 @@
                      :maxTileCacheSize (get-max-tile-cache-size)
                      :transformRequest transform-request-for-cache}]
     (if (= style-url "raster-style")
-      (clj->js (assoc base-config :style raster-style-object))
+      (clj->js (assoc base-config :style config/raster-style-object))
       (clj->js (assoc base-config :style style-url)))))
 
 (defn init-map []
@@ -155,7 +136,7 @@
       (re-frame/dispatch-sync [:set-map-instance nil]))
 
     (let [initial-style-key (:current-style-key @db/app-db)
-          initial-style-url (get style-urls initial-style-key)
+          initial-style-url (get config/style-urls initial-style-key)
           map-config (create-config initial-style-url)
           map-obj (maplibre/Map. map-config)]
       (.on map-obj "styledataloading" (fn [_] (re-frame/dispatch [:set-map-loading? true])))
@@ -344,12 +325,12 @@
 
 (defn change-map-style [style-url]
   (when-let [^js map-obj (get-map-instance)]
-    (let [style-key (->> style-urls
+    (let [style-key (->> config/style-urls
                          (filter (fn [[_ v]] (= v style-url)))
                          ffirst)
           custom-layers (get-custom-layers)
           new-style (if (= style-url "raster-style")
-                      (clj->js raster-style-object)
+                      (clj->js config/raster-style-object)
                       style-url)]
       (re-frame/dispatch-sync [:set-map-loading? true])
       (re-frame/dispatch-sync [:set-current-style-key style-key])

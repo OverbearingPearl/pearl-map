@@ -1,5 +1,6 @@
 (ns pearl-map.features.style-editor.events
   (:require [re-frame.core :as re-frame]
+            [pearl-map.config :as config]
             [pearl-map.services.map-engine :as map-engine]
             [pearl-map.features.style-editor.views :as style-editor-views]))
 
@@ -14,7 +15,7 @@
  (fn [{:keys [db]} [_ category]]
    (let [default-layer (get-in style-editor-views/layer-categories [category :default-layer])
          current-style-key (:current-style-key db)
-         current-style-url (get map-engine/style-urls current-style-key)
+         current-style-url (get config/style-urls current-style-key)
          current-zoom (:map/zoom db)
          current-styles (style-editor-views/get-layer-styles default-layer current-style-url current-zoom)]
      {:db (-> db
@@ -26,7 +27,7 @@
   (let [category :buildings
         default-layer (get-in style-editor-views/layer-categories [category :default-layer])
         current-style-key (:current-style-key db)
-        current-style-url (get map-engine/style-urls current-style-key)
+        current-style-url (get config/style-urls current-style-key)
         current-zoom (:map/zoom db)
         current-styles (style-editor-views/get-layer-styles default-layer current-style-url current-zoom)]
     (-> db
@@ -95,7 +96,7 @@
  :style-editor/switch-target-layer
  (fn [{:keys [db]} [_ layer-id]]
    (let [current-style-key (:current-style-key db)
-         current-style-url (get map-engine/style-urls current-style-key)
+         current-style-url (get config/style-urls current-style-key)
          current-zoom (:map/zoom db)
          current-styles (style-editor-views/get-layer-styles layer-id current-style-url current-zoom)
          search-zoom (style-editor-views/get-zoom-for-layer layer-id)
@@ -173,13 +174,13 @@
        ;; Do nothing if raster style or no layer is selected
        {:db db}
        (let [current-zoom (:map/zoom db)
-             current-styles (style-editor-views/get-layer-styles target-layer (get map-engine/style-urls current-style-key) current-zoom)]
+             current-styles (style-editor-views/get-layer-styles target-layer (get config/style-urls current-style-key) current-zoom)]
          {:db (assoc db :style-editor/editing-style current-styles)})))))
 
 (re-frame/reg-event-fx
  :style-editor/fly-to-coords
  (fn [_ [_ coords zoom]]
-   (map-engine/fly-to-location coords (or zoom map-engine/default-inspect-zoom))
+   (map-engine/fly-to-location coords (or zoom config/default-inspect-zoom))
    {}))
 
 (re-frame/reg-event-fx
