@@ -10,9 +10,6 @@
             ["@maplibre/maplibre-gl-style-spec" :as style-spec]
             ["three" :as three]))
 
-;; --- Constants & Configuration ---
-
-
 
 ;; --- State Accessors ---
 
@@ -35,6 +32,11 @@
       (let [max-zoom (.-maxzoom layer)]
         (when (number? max-zoom)
           max-zoom)))))
+
+(defn get-layer-type [layer-id]
+  (when-let [^js map-obj (get-map-instance)]
+    (when-let [layer (.getLayer map-obj layer-id)]
+      (.-type layer))))
 
 
 ;; --- Layer Management (Moved up for initialization access) ---
@@ -266,7 +268,6 @@
             (let [best (apply min-key :dist valid-candidates)
                   feature (:feature best)]
               (-> feature .-geometry .-coordinates js->clj get-all-points first))))))))
-
 
 
 ;; --- Style & Layer Management ---

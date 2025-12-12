@@ -124,22 +124,6 @@
              ;; House numbers
              "housenumber"]}})
 
-(def ^:private transportation-layers
-  (-> layer-categories :transportation :layers set))
-
-(def ^:private label-layers
-  (-> layer-categories :labels :layers set))
-
-(def ^:private line-layers
-  (clojure.set/union
-   transportation-layers
-   #{"boundary_county" "boundary_state" "boundary_country_outline" "boundary_country_inner" "waterway"}))
-
-(def ^:private fill-layers
-  (clojure.set/union
-   #{"building" "building-top"}
-   #{"landcover" "park_national_park" "park_nature_reserve" "landuse_residential" "landuse" "water" "water_shadow"}))
-
 
 ;; --- 2. Data Access & Formatting Helpers ---
 
@@ -624,22 +608,23 @@
         control-props {:target-layer target-layer
                        :editing-style editing-style
                        :on-style-change on-style-change
-                       :on-zoom-style-change on-zoom-style-change}]
+                       :on-zoom-style-change on-zoom-style-change}
+        layer-type (map-engine/get-layer-type target-layer)]
     [:div
-     (when (contains? fill-layers target-layer)
+     (when (= layer-type "fill")
        [:<>
         ^{:key "fill-color-control"} [render-fill-color-control control-props]
-        ^{:key "fill-opacity-control"} [render-fill-opacity-control control-props]])
+        ^{:key "fill-opacity-control"} [render-fill-opacity-control control-props]
+        ;; Special outline for 'building' layer
+        (when (= target-layer building-layer)
+          ^{:key "outline-color-control"} [render-outline-color-control control-props])])
 
-     (when (= target-layer building-layer)
-       ^{:key "outline-color-control"} [render-outline-color-control control-props])
-
-     (when (contains? #{"extruded-building" "extruded-building-top"} target-layer)
+     (when (= layer-type "fill-extrusion")
        [:<>
         ^{:key "extrusion-color-control"} [render-extrusion-color-control control-props]
         ^{:key "extrusion-opacity-control"} [render-extrusion-opacity-control control-props]])
 
-     (when (contains? line-layers target-layer)
+     (when (= layer-type "line")
        [:<>
         ^{:key "line-layout-controls"}
         [:div
@@ -655,7 +640,7 @@
         ^{:key "line-opacity-control"} [render-line-opacity-control control-props]
         ^{:key "line-width-control"} [render-line-width-control control-props]])
 
-     (when (contains? label-layers target-layer)
+     (when (= layer-type "symbol")
        [:<>
         ^{:key "label-layout-controls"}
         [:div
@@ -667,7 +652,7 @@
         ^{:key "text-color-control"} [render-text-color-control control-props]
         ^{:key "text-opacity-control"} [render-text-opacity-control control-props]])
 
-     (when (= target-layer "background")
+     (when (= layer-type "background")
        [:<>
         ^{:key "background-color-control"} [render-background-color-control control-props]
         ^{:key "background-opacity-control"} [render-background-opacity-control control-props]])]))
